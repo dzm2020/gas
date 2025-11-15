@@ -20,6 +20,11 @@ const (
 	running
 )
 
+type IMailbox interface {
+	PostMessage(msg interface{}) error
+	RegisterHandlers(invoker IMessageInvoker, dispatcher IDispatcher)
+}
+
 var _ IMailbox = &Mailbox{}
 
 type Mailbox struct {

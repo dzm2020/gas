@@ -1,23 +1,26 @@
-package protocol
+package codec
 
 import (
 	"encoding/binary"
-
-	"github.com/panjf2000/gnet/v2"
+	"gas/internal/gate/protocol"
 )
 
 // ICodec 编解码器接口
 type ICodec interface {
-	Encode(msg *Message) []byte                     // 编码（消息→字节流）
-	Decode(reader gnet.Reader) (msgList []*Message) // 解码（字节流→消息）
+	Encode(msg *protocol.Message) []byte                        // 编码（消息→字节流）
+	Decode(buf []byte) (msgList []*protocol.Message, readN int) // 解码（字节流→消息）
+}
+
+func New() ICodec {
+	return new(Codec)
 }
 
 type Codec struct {
 }
 
-func (*Codec) Encode(msg *Message) []byte {
+func (*Codec) Encode(msg *protocol.Message) []byte {
 	msg.Len = uint32(len(msg.Data))
-	buf := make([]byte, HeadLen+len(msg.Data))
+	buf := make([]byte, protocol.HeadLen+len(msg.Data))
 	offset := 0
 	binary.BigEndian.PutUint32(buf[offset:], msg.Len)
 	offset += 4
@@ -33,28 +36,19 @@ func (*Codec) Encode(msg *Message) []byte {
 	return buf
 }
 
-func (*Codec) Decode(reader gnet.Reader) (msgList []*Message, err error) {
+func (*Codec) Decode(buf []byte) (msgList []*protocol.Message, readN int) {
+
 	for {
-		var buf []byte
-		if reader.InboundBuffered() < HeadLen {
-			return
-		}
-		buf, err = reader.Peek(HeadLen)
-		if err != nil {
+		if len(buf) < protocol.HeadLen {
 			return
 		}
 		l := binary.BigEndian.Uint32(buf)
-		total := HeadLen + int(l)
-		if reader.InboundBuffered() < total {
+		total := protocol.HeadLen + int(l)
+		if len(buf) < total {
 			return
 		}
 
-		buf, err = reader.Peek(total)
-		if err != nil {
-			return
-		}
-
-		msg := New()
+		msg := protocol.New()
 		offset := 0
 		msg.Len = binary.BigEndian.Uint32(buf[offset : offset+4])
 		offset += 4
@@ -71,6 +65,8 @@ func (*Codec) Decode(reader gnet.Reader) (msgList []*Message, err error) {
 
 		msgList = append(msgList, msg)
 
-		_, _ = reader.Discard(total)
+		buf = buf[total:]
+
+		readN += total
 	}
 }

@@ -9,7 +9,6 @@
 package actor
 
 import (
-	"gas/pkg/utils/reflectx"
 	"sync/atomic"
 
 	"github.com/duke-git/lancet/v2/maputil"
@@ -18,27 +17,18 @@ import (
 var (
 	uniqId      atomic.Uint64
 	processDict = maputil.NewConcurrentMap[uint64, IProcess](10)
-
-	routerDict = maputil.NewConcurrentMap[string, IRouter](10)
 )
 
-func Spawn(producer Producer, params ...interface{}) IProcess {
+func Spawn(producer Producer, options ...Option) IProcess {
+	opts := loadOptions(options...)
 	actorId := uniqId.Add(1)
 	actor := producer()
-	router := getRouter(actor)
-	context := newBaseActorContext(actorId, actor, router)
+	context := newBaseActorContext(actorId, actor, opts.Middlewares)
 	mailBox := NewMailbox()
 	mailBox.RegisterHandlers(context, NewDefaultDispatcher(50))
 	process := NewProcess(context, mailBox)
-	_ = process.Post("OnInit", params)
+	_ = process.PushTask(func(ctx IContext) error {
+		return ctx.Actor().OnInit(ctx, opts.Params)
+	})
 	return process
-}
-
-func getRouter(actor IActor) IRouter {
-	name := reflectx.TypeFullName(actor)
-	v, ok := routerDict.Get(name)
-	if !ok {
-		v, ok = routerDict.GetOrSet(name, NewRouter(actor))
-	}
-	return v
 }

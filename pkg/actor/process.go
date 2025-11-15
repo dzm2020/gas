@@ -1,13 +1,16 @@
 package actor
 
+type IProcess interface {
+	Context() IContext
+	PushTask(f Task) error
+}
+
 func NewProcess(ctx IContext, mailbox IMailbox) IProcess {
 	process := &Process{
 		mailbox: mailbox,
 		ctx:     ctx,
 	}
-
 	processDict.Set(ctx.ID(), process)
-
 	return process
 }
 
@@ -22,16 +25,11 @@ func (p *Process) Context() IContext {
 	return p.ctx
 }
 
-func (p *Process) Post(name string, args ...interface{}) error {
-	m := &Message{
-		Name: name,
-		Args: args,
+func (p *Process) PushTask(task Task) error {
+	if task == nil {
+		return nil
 	}
-	return p.mailbox.PostMessage(m)
-}
-
-func (p *Process) SubmitTask(f func() error) error {
-	return p.mailbox.PostMessage(&AsyncCallMessage{
-		f: f,
+	return p.mailbox.PostMessage(&TaskMessage{
+		task: task,
 	})
 }

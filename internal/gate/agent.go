@@ -4,6 +4,14 @@ import (
 	"gas/pkg/actor"
 )
 
+type AgentProducer func() IAgent
+
+type IAgent interface {
+	actor.IActor
+	OnSessionOpen(ctx actor.IContext, session *Session) error
+	OnSessionClose(ctx actor.IContext, session *Session) error
+}
+
 type Agent struct {
 	actor.Actor
 }

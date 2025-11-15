@@ -3,6 +3,11 @@
 
 package actor
 
+type IDispatcher interface {
+	Schedule(f func(), recoverFun func(err interface{})) error
+	Throughput() int
+}
+
 // 协程调度器
 type goroutineDispatcher int
 

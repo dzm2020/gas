@@ -1,50 +1,73 @@
 package gate
 
 import (
-	"gas/internal/protocol"
+	"fmt"
+
+	"gas/internal/gate/codec"
 	"gas/pkg/actor"
 	"gas/pkg/network"
-	"sync/atomic"
+	"gas/pkg/utils/buffer"
 )
 
-var sessionId atomic.Uint64
-
-func NewSession(gate *Gate) *Session {
+func NewSession(gate *Gate, entity network.IEntity) *Session {
 	session := &Session{
-		ID:   sessionId.Add(1),
-		gate: gate,
+		gate:    gate,
+		IEntity: entity,
+		buffer:  buffer.New(int(gate.opts.ReadBufferSize)),
+		codec:   gate.opts.Codec,
 	}
-	gate.mgr.Add(session)
 	return session
 }
 
 type Session struct {
-	ID uint64
 	network.IEntity
-	gate  *Gate
-	actor actor.IProcess
-	msg   *protocol.Message
+	gate   *Gate
+	agent  actor.IProcess
+	buffer buffer.IBuffer
+	codec  codec.ICodec
 }
 
-func (m *Session) GetID() uint64 {
-	return m.ID
-}
-func (m *Session) OnConnect(entity network.IEntity) error {
-	m.IEntity = entity
-	m.actor = actor.Spawn(m.gate.producer, nil)
-	return m.actor.Post("OnSessionOpen", m)
+func (m *Session) OnConnect() error {
+	producer := m.gate.producer
+	if producer == nil {
+		return fmt.Errorf("gate: agent producer is nil")
+	}
+
+	m.agent = actor.Spawn(func() actor.IActor {
+		return producer()
+	}, nil)
+
+	return m.agent.PushTask(func(ctx actor.IContext) error {
+		agent := ctx.Actor().(IAgent)
+		return agent.OnSessionOpen(ctx, m)
+	})
 }
 
-func (m *Session) OnTraffic(msg *protocol.Message) error {
-	m.msg = msg
-	return m.gate.Router().Handle(m, msg)
+func (m *Session) OnTraffic() error {
+	//  写入缓冲区BUFFER
+	if _, err := m.buffer.WriteReader(m.IEntity); err != nil {
+		return err
+	}
+	//  解包
+	msgList, readN := m.codec.Decode(m.buffer.Bytes())
+	for _, msg := range msgList {
+		if err := m.gate.Router().Handle(m, msg); err != nil {
+			return err
+		}
+	}
+	//  移动缓冲区指针
+	return m.buffer.Skip(readN)
 }
 
-func (m *Session) GetActor() actor.IProcess {
-	return m.actor
+func (m *Session) Agent() actor.IProcess {
+	return m.agent
 }
 
 func (m *Session) OnClose(err error) error {
-	m.gate.mgr.Remove(m.GetID())
-	return m.actor.Post("OnSessionClose", m)
+	return m.agent.PushTask(func(ctx actor.IContext) (wrong error) {
+		agent := ctx.Actor().(IAgent)
+		wrong = agent.OnSessionClose(ctx, m)
+		m.gate.mgr.Remove(m.ID())
+		return
+	})
 }

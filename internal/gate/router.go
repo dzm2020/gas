@@ -3,7 +3,8 @@ package gate
 import (
 	"errors"
 	"fmt"
-	"gas/internal/protocol"
+	"gas/internal/gate/protocol"
+	"gas/pkg/actor"
 	"reflect"
 	"sync"
 
@@ -11,13 +12,11 @@ import (
 )
 
 type IRouter interface {
-	Register(cmd uint8, act uint8, prototype proto.Message, handlerName string) error
+	Register(cmd uint8, act uint8, handler interface{}) error
 	Handle(session *Session, msg *protocol.Message) error
 }
 
 var ErrMessageHandlerNotFound = errors.New("gate: message handler not found")
-
-type MessageHandler func(session *Session, message proto.Message) error
 
 type protoMessageRouter struct {
 	mu     sync.RWMutex
@@ -25,8 +24,9 @@ type protoMessageRouter struct {
 }
 
 type routerEntry struct {
-	msgType     reflect.Type
-	handlerName string
+	msgType      reflect.Type
+	handler      reflect.Value
+	returnsError bool
 }
 
 func NewProtoMessageRouter() IRouter {
@@ -35,22 +35,56 @@ func NewProtoMessageRouter() IRouter {
 	}
 }
 
-func (r *protoMessageRouter) Register(cmd uint8, act uint8, prototype proto.Message, handlerName string) error {
-	if prototype == nil {
-		return fmt.Errorf("gate: prototype message is nil")
-	}
-	if len(handlerName) <= 0 {
-		return fmt.Errorf("gate: message handler is nil")
+var (
+	typeOfActorContext = reflect.TypeOf((*actor.IContext)(nil)).Elem()
+	typeOfSession      = reflect.TypeOf((*Session)(nil))
+	typeOfError        = reflect.TypeOf((*error)(nil)).Elem()
+	typeOfProtoMessage = reflect.TypeOf((*proto.Message)(nil)).Elem()
+)
+
+func (r *protoMessageRouter) Register(cmd uint8, act uint8, handler interface{}) error {
+	if handler == nil {
+		return fmt.Errorf("gate: handler is nil")
 	}
 
-	msgType := reflect.TypeOf(prototype)
+	handlerValue := reflect.ValueOf(handler)
+	handlerType := handlerValue.Type()
+
+	if handlerType.Kind() != reflect.Func {
+		return fmt.Errorf("gate: handler must be a function, got %s", handlerType.Kind())
+	}
+
+	if handlerType.NumIn() != 3 {
+		return fmt.Errorf("gate: handler must accept exactly 3 parameters (ctx, session, message)")
+	}
+
+	if handlerType.In(0) != typeOfActorContext {
+		return fmt.Errorf("gate: handler first parameter must be actor.IContext")
+	}
+
+	if handlerType.In(1) != typeOfSession {
+		return fmt.Errorf("gate: handler second parameter must be *gate.Session")
+	}
+
+	msgType := handlerType.In(2)
 	if msgType.Kind() != reflect.Pointer {
-		return fmt.Errorf("gate: prototype must be a pointer, got %s", msgType)
+		return fmt.Errorf("gate: handler third parameter must be pointer to proto message, got %s", msgType)
+	}
+	if !msgType.Implements(typeOfProtoMessage) {
+		return fmt.Errorf("gate: handler third parameter must implement proto.Message")
 	}
 
-	elem := msgType.Elem()
-	if elem.Kind() != reflect.Struct {
-		return fmt.Errorf("gate: prototype must point to a struct, got %s", elem.Kind())
+	numOut := handlerType.NumOut()
+	if numOut > 1 {
+		return fmt.Errorf("gate: handler can return at most one value")
+	}
+
+	returnsError := false
+	if numOut == 1 {
+		if !handlerType.Out(0).Implements(typeOfError) {
+			return fmt.Errorf("gate: handler return type must be error")
+		}
+		returnsError = true
 	}
 
 	key := protocol.CmdAct(cmd, act)
@@ -63,8 +97,9 @@ func (r *protoMessageRouter) Register(cmd uint8, act uint8, prototype proto.Mess
 	}
 
 	r.routes[key] = routerEntry{
-		msgType:     elem,
-		handlerName: handlerName,
+		msgType:      msgType,
+		handler:      handlerValue,
+		returnsError: returnsError,
 	}
 	return nil
 }
@@ -73,7 +108,12 @@ func (r *protoMessageRouter) Handle(session *Session, msg *protocol.Message) err
 	if msg == nil {
 		return fmt.Errorf("gate: message is nil")
 	}
+	if session == nil {
+		return fmt.Errorf("gate: session is nil")
+	}
+
 	key := protocol.CmdAct(msg.Cmd, msg.Act)
+
 	r.mu.RLock()
 	entry, ok := r.routes[key]
 	r.mu.RUnlock()
@@ -82,10 +122,10 @@ func (r *protoMessageRouter) Handle(session *Session, msg *protocol.Message) err
 		return ErrMessageHandlerNotFound
 	}
 
-	instance := reflect.New(entry.msgType).Interface()
-	protoMsg, ok := instance.(proto.Message)
+	msgValue := reflect.New(entry.msgType.Elem())
+	protoMsg, ok := msgValue.Interface().(proto.Message)
 	if !ok {
-		return fmt.Errorf("gate: registered prototype for cmd=%d act=%d does not implement proto.Message", msg.Cmd, msg.Act)
+		return fmt.Errorf("gate: message type for cmd=%d act=%d does not implement proto.Message", msg.Cmd, msg.Act)
 	}
 
 	if len(msg.Data) > 0 {
@@ -93,5 +133,26 @@ func (r *protoMessageRouter) Handle(session *Session, msg *protocol.Message) err
 			return fmt.Errorf("gate: unmarshal proto message (cmd=%d act=%d) failed: %w", msg.Cmd, msg.Act, err)
 		}
 	}
-	return session.actor.Post(entry.handlerName, session, protoMsg)
+
+	if session.agent == nil {
+		return fmt.Errorf("gate: session agent is nil")
+	}
+
+	return session.agent.PushTask(func(ctx actor.IContext) error {
+		args := []reflect.Value{
+			reflect.ValueOf(ctx),
+			reflect.ValueOf(session),
+			msgValue,
+		}
+
+		results := entry.handler.Call(args)
+		if entry.returnsError && len(results) == 1 && !results[0].IsNil() {
+			if err, ok := results[0].Interface().(error); ok {
+				return err
+			}
+			return fmt.Errorf("gate: handler returned non-error value")
+		}
+
+		return nil
+	})
 }

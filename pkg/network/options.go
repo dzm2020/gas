@@ -20,12 +20,12 @@ func defaultOptions() *Options {
 }
 
 type Options struct {
-	opts           []gnet.Option
-	sessionFactory func() ISession
+	opts    []gnet.Option
+	handler IHandler
 }
 
-func WithSessionFactory(factory func() ISession) Option {
+func WithHandler(handler IHandler) Option {
 	return func(op *Options) {
-		op.sessionFactory = factory
+		op.handler = handler
 	}
 }
