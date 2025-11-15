@@ -9,6 +9,11 @@ import (
 	"gas/pkg/utils/buffer"
 )
 
+type ISession interface {
+	network.IEntity
+	GetAgent() actor.IProcess
+}
+
 func NewSession(gate *Gate, entity network.IEntity) *Session {
 	session := &Session{
 		gate:    gate,
@@ -35,7 +40,7 @@ func (m *Session) OnConnect() error {
 
 	m.agent = actor.Spawn(func() actor.IActor {
 		return producer()
-	}, nil)
+	})
 
 	return m.agent.PushTask(func(ctx actor.IContext) error {
 		agent := ctx.Actor().(IAgent)
@@ -59,10 +64,6 @@ func (m *Session) OnTraffic() error {
 	return m.buffer.Skip(readN)
 }
 
-func (m *Session) Agent() actor.IProcess {
-	return m.agent
-}
-
 func (m *Session) OnClose(err error) error {
 	return m.agent.PushTask(func(ctx actor.IContext) (wrong error) {
 		agent := ctx.Actor().(IAgent)
@@ -70,4 +71,8 @@ func (m *Session) OnClose(err error) error {
 		m.gate.mgr.Remove(m.ID())
 		return
 	})
+}
+
+func (m *Session) GetAgent() actor.IProcess {
+	return m.agent
 }

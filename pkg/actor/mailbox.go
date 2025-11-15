@@ -9,7 +9,7 @@
 package actor
 
 import (
-	"fmt"
+	"gas/pkg/glog"
 	"gas/pkg/utils/mpsc"
 	"runtime"
 	"sync/atomic"
@@ -28,11 +28,10 @@ type IMailbox interface {
 var _ IMailbox = &Mailbox{}
 
 type Mailbox struct {
-	invoker       IMessageInvoker
-	queue         *mpsc.Queue
-	dispatch      IDispatcher
-	dispatchStat  atomic.Int32
-	inCnt, outCnt atomic.Uint64
+	invoker      IMessageInvoker
+	queue        *mpsc.Queue
+	dispatch     IDispatcher
+	dispatchStat atomic.Int32
 }
 
 func NewMailbox() *Mailbox {
@@ -52,7 +51,6 @@ func (m *Mailbox) PostMessage(msg interface{}) error {
 		return nil
 	}
 	m.queue.Push(msg)
-	m.inCnt.Add(1)
 	return m.schedule()
 }
 
@@ -62,7 +60,7 @@ func (m *Mailbox) schedule() error {
 	}
 	if err := m.dispatch.Schedule(m.process, func(err interface{}) {
 	}); err != nil {
-		fmt.Printf("schedule err:%v\n", err)
+		glog.Errorf("Mailbox dispatch schedule error:%v", err)
 		return err
 	}
 	return nil
@@ -103,6 +101,5 @@ func (m *Mailbox) invokerMessage(msg interface{}) error {
 	if err := m.invoker.InvokerMessage(msg); err != nil {
 		return err
 	}
-	m.outCnt.Add(1)
 	return nil
 }
