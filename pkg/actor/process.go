@@ -2,6 +2,7 @@ package actor
 
 import (
 	"errors"
+	"sync/atomic"
 	"time"
 )
 
@@ -16,7 +17,6 @@ func NewProcess(ctx IContext, mailbox IMailbox) IProcess {
 		mailbox: mailbox,
 		ctx:     ctx,
 	}
-	processDict.Set(ctx.ID(), process)
 	return process
 }
 
@@ -25,6 +25,7 @@ var _ IProcess = (*Process)(nil)
 type Process struct {
 	mailbox IMailbox
 	ctx     IContext
+	isExit  atomic.Bool
 }
 
 func (p *Process) Context() IContext {
@@ -58,4 +59,14 @@ func (p *Process) PushTaskAndWait(timeout time.Duration, task Task) error {
 	}
 
 	return waiter.Wait()
+}
+
+func (p *Process) Exit() error {
+	if !p.isExit.CompareAndSwap(false, true) {
+		return nil
+	}
+	return p.PushTask(func(ctx IContext) error {
+		ctx.Exit()
+		return nil
+	})
 }

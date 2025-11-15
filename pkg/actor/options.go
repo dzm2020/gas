@@ -5,6 +5,7 @@ type Option func(*Options)
 type Options struct {
 	Params      []interface{}
 	Middlewares []TaskMiddleware
+	Name        string
 }
 
 func loadOptions(options ...Option) *Options {
@@ -24,5 +25,11 @@ func WithParams(params []interface{}) Option {
 func WithMiddlewares(middlewares []TaskMiddleware) Option {
 	return func(op *Options) {
 		op.Middlewares = middlewares
+	}
+}
+
+func WithName(name string) Option {
+	return func(op *Options) {
+		op.Name = name
 	}
 }

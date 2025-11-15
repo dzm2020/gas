@@ -17,18 +17,24 @@ import (
 var (
 	uniqId      atomic.Uint64
 	processDict = maputil.NewConcurrentMap[uint64, IProcess](10)
+	nameDict    = maputil.NewConcurrentMap[string, IProcess](10)
 )
 
 func Spawn(producer Producer, options ...Option) IProcess {
 	opts := loadOptions(options...)
 	actorId := uniqId.Add(1)
 	actor := producer()
-	context := newBaseActorContext(actorId, actor, opts.Middlewares)
+	context := newBaseActorContext(actorId, actor, opts.Name, opts.Middlewares)
 	mailBox := NewMailbox()
 	mailBox.RegisterHandlers(context, NewDefaultDispatcher(50))
 	process := NewProcess(context, mailBox)
+
+	processDict.Set(context.ID(), process)
+	nameDict.Set(context.Name(), process)
+
 	_ = process.PushTask(func(ctx IContext) error {
 		return ctx.Actor().OnInit(ctx, opts.Params)
 	})
+
 	return process
 }
