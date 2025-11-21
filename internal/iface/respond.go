@@ -6,3 +6,4 @@ func NewErrorResponse(errMsg string) *RespondMessage {
 		Error: errMsg,
 	}
 }
+
