@@ -17,6 +17,7 @@ const (
 type IMailbox interface {
 	PostMessage(msg interface{}) error
 	RegisterHandlers(invoker IMessageInvoker, dispatcher IDispatcher)
+	IsEmpty() bool
 }
 
 var _ IMailbox = &Mailbox{}
@@ -97,4 +98,9 @@ func (m *Mailbox) invokerMessage(msg interface{}) error {
 		return err
 	}
 	return nil
+}
+
+// IsEmpty 检查 mailbox 队列是否为空
+func (m *Mailbox) IsEmpty() bool {
+	return m.queue.Empty()
 }

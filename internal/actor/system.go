@@ -20,11 +20,12 @@ import (
 
 // System Actor 系统，管理所有进程和消息传递
 type System struct {
-	uniqId      atomic.Uint64
-	nameDict    *maputil.ConcurrentMap[string, iface.IProcess]
-	processDict *maputil.ConcurrentMap[uint64, iface.IProcess]
-	serializer  serializer.ISerializer
-	node        iface.INode
+	uniqId       atomic.Uint64
+	nameDict     *maputil.ConcurrentMap[string, iface.IProcess]
+	processDict  *maputil.ConcurrentMap[uint64, iface.IProcess]
+	serializer   serializer.ISerializer
+	node         iface.INode
+	shuttingDown atomic.Bool
 }
 
 // NewSystem 创建新的 Actor 系统
@@ -70,6 +71,9 @@ func (s *System) newPid() *iface.Pid {
 
 // Spawn 创建新的 actor 进程
 func (s *System) Spawn(actor iface.IActor, options ...Option) (*iface.Pid, iface.IProcess) {
+	if s.shuttingDown.Load() {
+		return nil, nil
+	}
 	opts := loadOptions(options...)
 	pid := s.newPid()
 	pid.Name = opts.Name
@@ -120,6 +124,9 @@ func (s *System) GetProcessByName(name string) iface.IProcess {
 
 // Send 发送消息到指定进程
 func (s *System) Send(message *iface.Message) error {
+	if s.shuttingDown.Load() {
+		return errors.New("system is shutting down")
+	}
 	process := s.GetProcess(message.GetTo())
 	if process == nil {
 		return errors.New("process not found")
@@ -129,6 +136,9 @@ func (s *System) Send(message *iface.Message) error {
 
 // Request 发送消息到指定进程
 func (s *System) Request(message *iface.Message, timeout time.Duration) *iface.RespondMessage {
+	if s.shuttingDown.Load() {
+		return iface.NewErrorResponse("system is shutting down")
+	}
 	waiter := newChanWaiter[*iface.RespondMessage](timeout)
 
 	msg := &SyncMessage{Message: message}
@@ -185,4 +195,70 @@ func (s *System) GetAllProcesses() []iface.IProcess {
 	})
 
 	return processes
+}
+
+// Shutdown 优雅关闭 Actor 系统
+// timeout: 最大等待时间，如果为 0 则使用默认值 30 秒
+func (s *System) Shutdown(timeout time.Duration) error {
+	// 标记为关闭状态，拒绝新的消息和进程创建
+	if !s.shuttingDown.CompareAndSwap(false, true) {
+		return nil // 已经在关闭中
+	}
+
+	if timeout == 0 {
+		timeout = 30 * time.Second
+	}
+	deadline := time.Now().Add(timeout)
+
+	// 获取所有进程的快照
+	processes := s.GetAllProcesses()
+
+	// 第一步：依次调用每个进程的 Exit()
+	// Exit() 会推送退出任务到队列，并等待最多1秒
+	for _, process := range processes {
+		if err := process.Exit(); err != nil {
+			continue
+		}
+	}
+
+	// 第二步：等待所有进程从系统中注销（进程数量变为0）
+	if err := s.waitForAllProcessesExited(time.Until(deadline)); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// waitForAllProcessesExited 等待所有进程从系统中注销（进程数量变为0）
+func (s *System) waitForAllProcessesExited(timeout time.Duration) error {
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
+
+	timeoutTimer := time.NewTimer(timeout)
+	defer timeoutTimer.Stop()
+
+	for {
+		// 检查进程数量是否为0
+		processCount := s.getProcessCount()
+		if processCount == 0 {
+			return nil
+		}
+
+		select {
+		case <-ticker.C:
+			continue
+		case <-timeoutTimer.C:
+			return errors.New("shutdown timeout: some processes are not exited")
+		}
+	}
+}
+
+// getProcessCount 获取当前系统中的进程数量
+func (s *System) getProcessCount() int {
+	count := 0
+	s.processDict.Range(func(key uint64, value iface.IProcess) bool {
+		count++
+		return true
+	})
+	return count
 }

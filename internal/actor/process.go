@@ -31,12 +31,46 @@ func (p *Process) PushTask(task iface.Task) error {
 	if task == nil {
 		return nil
 	}
+	if p.isExit.Load() {
+		return errors.New("process is exiting")
+	}
 	return p.mailbox.PostMessage(&TaskMessage{
 		task: task,
 	})
 }
 
 func (p *Process) PushTaskAndWait(timeout time.Duration, task iface.Task) error {
+	if task == nil {
+		return errors.New("task is nil")
+	}
+	if p.isExit.Load() {
+		return errors.New("process is exiting")
+	}
+	return p.pushTaskAndWait(timeout, task)
+}
+
+func (p *Process) PushMessage(message interface{}) error {
+	if p.isExit.Load() {
+		return errors.New("process is exiting")
+	}
+	return p.mailbox.PostMessage(message)
+}
+
+func (p *Process) Exit() error {
+	if !p.isExit.CompareAndSwap(false, true) {
+		return nil // 已经在退出中
+	}
+	// 设置退出标志后，使用 pushExitTaskAndWait 推送退出任务
+	// 这个方法会绕过退出检查，确保退出任务能够执行
+	return p.pushTaskAndWait(time.Second, func(ctx iface.IContext) error {
+		ctx.Exit()
+		return nil
+	})
+}
+
+// pushExitTaskAndWait 推送退出任务并等待完成
+// 注意：这个方法会绕过退出状态检查，仅用于 Exit() 方法内部
+func (p *Process) pushTaskAndWait(timeout time.Duration, task iface.Task) error {
 	if task == nil {
 		return errors.New("task is nil")
 	}
@@ -49,6 +83,7 @@ func (p *Process) PushTaskAndWait(timeout time.Duration, task iface.Task) error 
 		return e
 	}
 
+	// 直接调用 mailbox，跳过退出检查
 	if err := p.mailbox.PostMessage(&TaskMessage{task: syncTask}); err != nil {
 		return err
 	}
@@ -56,16 +91,10 @@ func (p *Process) PushTaskAndWait(timeout time.Duration, task iface.Task) error 
 	return err
 }
 
-func (p *Process) PushMessage(message interface{}) error {
-	return p.mailbox.PostMessage(message)
-}
-
-func (p *Process) Exit() error {
-	if !p.isExit.CompareAndSwap(false, true) {
-		return nil
+// isQueueEmpty 检查进程的 mailbox 队列是否为空
+func (p *Process) isQueueEmpty() bool {
+	if m, ok := p.mailbox.(*Mailbox); ok {
+		return m.IsEmpty()
 	}
-	return p.PushTask(func(ctx iface.IContext) error {
-		ctx.Exit()
-		return nil
-	})
+	return true
 }
