@@ -6,6 +6,7 @@ type Options struct {
 	Params      []interface{}
 	Middlewares []TaskMiddleware
 	Name        string
+	Router      IRouter
 }
 
 func loadOptions(options ...Option) *Options {
@@ -31,5 +32,11 @@ func WithMiddlewares(middlewares []TaskMiddleware) Option {
 func WithName(name string) Option {
 	return func(op *Options) {
 		op.Name = name
+	}
+}
+
+func WithRouter(r IRouter) Option {
+	return func(op *Options) {
+		op.Router = r
 	}
 }

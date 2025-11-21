@@ -48,7 +48,9 @@ func (*Codec) Decode(buf []byte) (msgList []*protocol.Message, readN int) {
 			return
 		}
 
-		msg := protocol.New()
+		msg := &protocol.Message{
+			Head: &protocol.Head{},
+		}
 		offset := 0
 		msg.Len = binary.BigEndian.Uint32(buf[offset : offset+4])
 		offset += 4

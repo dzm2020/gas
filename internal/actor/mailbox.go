@@ -1,18 +1,12 @@
-/**
- * @Author: dingQingHui
- * @Description:
- * @File: mailbox
- * @Version: 1.0.0
- * @Date: 2024/10/15 14:27
- */
-
 package actor
 
 import (
-	"gas/pkg/glog"
+	"gas/pkg/utils/glog"
 	"gas/pkg/utils/mpsc"
 	"runtime"
 	"sync/atomic"
+
+	"go.uber.org/zap"
 )
 
 const (
@@ -59,6 +53,7 @@ func (m *Mailbox) schedule() error {
 		return nil
 	}
 	if err := m.dispatch.Schedule(m.process, func(err interface{}) {
+		glog.Errorf("Mailbox dispatch schedule panic:%+v stack:%+v", err, zap.Stack("stack"))
 	}); err != nil {
 		glog.Errorf("Mailbox dispatch schedule error:%v", err)
 		return err

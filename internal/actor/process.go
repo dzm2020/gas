@@ -2,17 +2,12 @@ package actor
 
 import (
 	"errors"
+	"gas/internal/iface"
 	"sync/atomic"
 	"time"
 )
 
-type IProcess interface {
-	Context() IContext
-	PushTask(f Task) error
-	PushTaskAndWait(timeout time.Duration, task Task) error
-}
-
-func NewProcess(ctx IContext, mailbox IMailbox) IProcess {
+func NewProcess(ctx iface.IContext, mailbox IMailbox) iface.IProcess {
 	process := &Process{
 		mailbox: mailbox,
 		ctx:     ctx,
@@ -20,19 +15,19 @@ func NewProcess(ctx IContext, mailbox IMailbox) IProcess {
 	return process
 }
 
-var _ IProcess = (*Process)(nil)
+var _ iface.IProcess = (*Process)(nil)
 
 type Process struct {
 	mailbox IMailbox
-	ctx     IContext
+	ctx     iface.IContext
 	isExit  atomic.Bool
 }
 
-func (p *Process) Context() IContext {
+func (p *Process) Context() iface.IContext {
 	return p.ctx
 }
 
-func (p *Process) PushTask(task Task) error {
+func (p *Process) PushTask(task iface.Task) error {
 	if task == nil {
 		return nil
 	}
@@ -41,14 +36,14 @@ func (p *Process) PushTask(task Task) error {
 	})
 }
 
-func (p *Process) PushTaskAndWait(timeout time.Duration, task Task) error {
+func (p *Process) PushTaskAndWait(timeout time.Duration, task iface.Task) error {
 	if task == nil {
 		return errors.New("task is nil")
 	}
 
-	waiter := newChanWaiter(timeout)
+	waiter := newChanWaiter[error](timeout)
 
-	syncTask := func(ctx IContext) error {
+	syncTask := func(ctx iface.IContext) error {
 		e := task(ctx)
 		waiter.Done(e)
 		return e
@@ -57,15 +52,19 @@ func (p *Process) PushTaskAndWait(timeout time.Duration, task Task) error {
 	if err := p.mailbox.PostMessage(&TaskMessage{task: syncTask}); err != nil {
 		return err
 	}
+	_, err := waiter.Wait()
+	return err
+}
 
-	return waiter.Wait()
+func (p *Process) PushMessage(message interface{}) error {
+	return p.mailbox.PostMessage(message)
 }
 
 func (p *Process) Exit() error {
 	if !p.isExit.CompareAndSwap(false, true) {
 		return nil
 	}
-	return p.PushTask(func(ctx IContext) error {
+	return p.PushTask(func(ctx iface.IContext) error {
 		ctx.Exit()
 		return nil
 	})

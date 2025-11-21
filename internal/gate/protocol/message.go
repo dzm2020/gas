@@ -21,10 +21,16 @@ const (
 	ActKick            // 强制关闭连接
 )
 
-func New() *Message {
+func New(cmd, act uint8, data []byte) *Message {
 	return &Message{
-		Head: new(Head),
-		Data: nil,
+		Head: &Head{
+			Len:   0,
+			Cmd:   cmd,
+			Act:   act,
+			Error: 0,
+			Index: 0,
+		},
+		Data: data,
 	}
 }
 
@@ -35,8 +41,8 @@ func NewWithData(data []byte) *Message {
 	}
 }
 
-func NewErr(code uint16) *Message {
-	m := New()
+func NewErr(cmd, act uint8, code uint16) *Message {
+	m := New(cmd, act, nil)
 	m.Error = code
 	return m
 }

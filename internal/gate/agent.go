@@ -1,25 +1,49 @@
 package gate
 
 import (
-	"gas/pkg/actor"
+	"fmt"
+	"gas/internal/gate/protocol"
+	"gas/internal/iface"
 )
 
-type AgentProducer func() IAgent
+type Factory func() IAgent
 
 type IAgent interface {
-	actor.IActor
-	OnSessionOpen(ctx actor.IContext, session *Session) error
-	OnSessionClose(ctx actor.IContext, session *Session) error
+	iface.IActor
+	OnConnectionOpen(ctx iface.IContext, connection *Connection) error
+	OnConnectionClose(ctx iface.IContext) error
 }
 
 type Agent struct {
-	actor.Actor
+	iface.Actor
+	connection *Connection
+	ctx        iface.IContext
 }
 
-func (agent *Agent) OnSessionOpen(ctx actor.IContext, session *Session) error {
+func (agent *Agent) OnConnectionOpen(ctx iface.IContext, connection *Connection) error {
+	agent.connection = connection
 	return nil
 }
 
-func (agent *Agent) OnSessionClose(ctx actor.IContext, session *Session) error {
+func (agent *Agent) OnConnectionClose(ctx iface.IContext) error {
+	agent.connection = nil
 	return nil
+}
+
+func (agent *Agent) SendMessage(msg *protocol.Message) error {
+	if agent.connection == nil {
+		return fmt.Errorf("gate: connection is nil")
+	}
+	return agent.connection.Send(msg)
+}
+
+func (agent *Agent) GetConnection() *Connection {
+	return agent.connection
+}
+
+func (agent *Agent) Close() {
+	if agent.connection == nil {
+		return
+	}
+	_ = agent.connection.Close()
 }

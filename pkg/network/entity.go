@@ -21,6 +21,9 @@ type IEntity interface {
 	LocalAddr() string
 	RemoteAddr() string
 	Read(p []byte) (n int, err error)
+	SetContext(interface{})
+	Context() interface{}
+	Close() error
 }
 
 var autoId atomic.Uint64
@@ -42,6 +45,7 @@ type baseEntity struct {
 	network    string
 	localAddr  string
 	remoteAddr string
+	ctx        interface{}
 }
 
 func (m *baseEntity) init() {
@@ -78,6 +82,17 @@ func (m *baseEntity) Write(data []byte) error {
 func (m *baseEntity) Read(p []byte) (n int, err error) {
 	n = min(m.InboundBuffered(), len(p))
 	return m.Con().Read(p[:n])
+}
+
+func (m *baseEntity) SetContext(ctx interface{}) {
+	m.ctx = ctx
+}
+func (m *baseEntity) Context() interface{} {
+	return m.ctx
+}
+
+func (m *baseEntity) Close() error {
+	return m.Con().Close()
 }
 
 // newTcpEntity

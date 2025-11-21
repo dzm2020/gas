@@ -76,6 +76,7 @@ func (m *baseListener) onOpen(entity IEntity) (out []byte, action gnet.Action) {
 	if err := m.opts.handler.OnOpen(entity); err != nil {
 		return nil, gnet.Close
 	}
+	Add(entity)
 	return nil, gnet.None
 }
 
@@ -86,6 +87,7 @@ func (m *baseListener) onTraffic(entity IEntity) (action gnet.Action) {
 	return gnet.None
 }
 func (m *baseListener) onClose(entity IEntity, err error) (action gnet.Action) {
+	Remove(entity.ID())
 	if wrong := m.opts.handler.OnClose(entity, err); wrong != nil {
 		return gnet.Close
 	}

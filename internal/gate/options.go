@@ -1,16 +1,16 @@
 package gate
 
 import (
-	"time"
-
+	"gas/internal/actor"
 	"gas/internal/gate/codec"
+	"time"
 )
 
 type Option func(*Options)
 
 type Options struct {
 	ProtoAddr      string
-	Router         IRouter
+	Router         actor.IRouter
 	Codec          codec.ICodec
 	MaxConn        int32
 	ReadBufferSize uint32
@@ -20,7 +20,7 @@ type Options struct {
 func defaultOptions() *Options {
 	return &Options{
 		ProtoAddr:      "tcp://127.0.0.1:9000",
-		Router:         NewProtoMessageRouter(),
+		Router:         actor.NewRouter(),
 		ReadBufferSize: 1024 * 4,
 		Codec:          codec.New(),
 		MaxConn:        100000,
@@ -36,7 +36,7 @@ func loadOptions(opts ...Option) *Options {
 		}
 	}
 	if options.Router == nil {
-		options.Router = NewProtoMessageRouter()
+		options.Router = actor.NewRouter()
 	}
 	if options.Codec == nil {
 		options.Codec = codec.New()
@@ -62,7 +62,7 @@ func WithProtoAddr(addr string) Option {
 	}
 }
 
-func WithRouter(router IRouter) Option {
+func WithRouter(router actor.IRouter) Option {
 	return func(o *Options) {
 		o.Router = router
 	}
@@ -82,11 +82,5 @@ func WithMaxConn(MaxConn int32) Option {
 func WithReadBufferSize(ReadBufferSize uint32) Option {
 	return func(o *Options) {
 		o.ReadBufferSize = ReadBufferSize
-	}
-}
-
-func WithGracePeriod(d time.Duration) Option {
-	return func(o *Options) {
-		o.GracePeriod = d
 	}
 }

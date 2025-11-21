@@ -14,7 +14,7 @@ func init() {
 }
 
 func newLogger(options ...Option) *logger {
-	opts := loadOptions(options...)
+	opts := LoadOptions(options...)
 	l := new(logger)
 	l.options = opts
 	l.Init()
@@ -29,7 +29,7 @@ type logger struct {
 }
 
 func (l *logger) Init() {
-	level := l.options.level
+	level := l.options.Level
 	l.loglevel = zap.NewAtomicLevelAt(level)
 	encoderConfig := zapcore.EncoderConfig{
 		MessageKey:     "M",                                                            // 结构化（json）输出：msg的key
@@ -46,11 +46,11 @@ func (l *logger) Init() {
 	}
 
 	// 获取io.Writer的实现
-	loggerWriter := l.options.writer
+	loggerWriter := l.options.Writer
 	// 实现多个输出
 	var cores []zapcore.Core
 	cores = append(cores, zapcore.NewCore(zapcore.NewJSONEncoder(encoderConfig), zapcore.AddSync(loggerWriter), level))
-	if l.options.printConsole {
+	if l.options.PrintConsole {
 		// 同时将日志输出到控制台，NewJSONEncoder 是结构化输出
 		cores = append(cores, zapcore.NewCore(zapcore.NewConsoleEncoder(encoderConfig), zapcore.NewMultiWriteSyncer(zapcore.AddSync(os.Stdout)), level))
 	}
@@ -61,7 +61,7 @@ func (l *logger) Init() {
 		zap.AddStacktrace(zap.DPanicLevel),
 		zap.AddCallerSkip(1),
 	}
-	options = append(options, l.options.zapOption...)
+	options = append(options, l.options.ZapOption...)
 	l.Logger = zap.New(mulCore, options...)
 	l.SugaredLogger = l.Logger.Sugar()
 }

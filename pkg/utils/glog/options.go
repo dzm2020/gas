@@ -18,14 +18,14 @@ import (
 type Option func(*Options)
 
 type Options struct {
-	path         string
-	level        zapcore.Level
-	printConsole bool
-	zapOption    []zap.Option
-	writer       io.Writer
+	Path         string
+	Level        zapcore.Level
+	PrintConsole bool
+	ZapOption    []zap.Option
+	Writer       io.Writer
 }
 
-func loadOptions(options ...Option) *Options {
+func LoadOptions(options ...Option) *Options {
 	opts := defaultOptions()
 	for _, option := range options {
 		option(opts)
@@ -36,10 +36,10 @@ func loadOptions(options ...Option) *Options {
 func defaultOptions() *Options {
 	const defaultPath = "./logs/app.log"
 	return &Options{
-		path:         defaultPath,
-		level:        zapcore.InfoLevel,
-		printConsole: true,
-		zapOption:    nil,
-		writer:       defaultWriter(defaultPath),
+		Path:         defaultPath,
+		Level:        zapcore.InfoLevel,
+		PrintConsole: true,
+		ZapOption:    nil,
+		Writer:       defaultWriter(defaultPath),
 	}
 }

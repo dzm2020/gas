@@ -2,74 +2,70 @@ package gate
 
 import (
 	"fmt"
+	"gas/internal/actor"
+	"gas/internal/iface"
 	"gas/pkg/network"
+	"gas/pkg/utils/glog"
 	"gas/pkg/utils/workers"
 	"time"
 )
 
-func New(producer AgentProducer, opts ...Option) *Gate {
+func New(node iface.INode, factory Factory, opts ...Option) *Gate {
 	gate := &Gate{
-		producer: producer,
-		listener: nil,
-		mgr:      NewSessionManager(),
-		opts:     loadOptions(opts...),
+		factory:     factory,
+		listener:    nil,
+		opts:        loadOptions(opts...),
+		actorSystem: node.GetSystem().(*actor.System),
 	}
 	return gate
 }
 
 type Gate struct {
-	producer AgentProducer
-	listener network.IListener
-	mgr      ISessionManager
-	opts     *Options
+	factory     Factory
+	listener    network.IListener
+	opts        *Options
+	actorSystem *actor.System
 }
 
 func (m *Gate) Run() {
 	m.listener = network.NewListener(m.opts.ProtoAddr, network.WithHandler(m))
 	workers.Submit(func() {
 		if err := m.listener.Serve(); err != nil {
-			fmt.Println(err)
+			glog.Errorf("gate run listening on %s err:%v", m.listener.Addr(), err)
 		}
 	}, nil)
-}
 
-func (m *Gate) Router() IRouter {
-	return m.opts.Router
-}
-
-func (m *Gate) RegisterMessage(cmd uint8, act uint8, handler interface{}) error {
-	return m.Router().Register(cmd, act, handler)
+	glog.Infof("gate run listening on %s", m.listener.Addr())
 }
 
 func (m *Gate) OnOpen(entity network.IEntity) (err error) {
-	if m.mgr.Count() > m.opts.MaxConn {
+	if network.Count() > m.opts.MaxConn {
 		return fmt.Errorf("maximum number of connections exceeded")
 	}
-	session := NewSession(m, entity)
-	m.mgr.Add(session)
-
-	if err = session.OnConnect(); err != nil {
+	connection := NewConnection(m, entity)
+	entity.SetContext(connection)
+	if err = connection.OnConnect(); err != nil {
 		return
 	}
 	return
 }
 
 func (m *Gate) OnTraffic(entity network.IEntity) (err error) {
-	session, _ := m.mgr.Get(entity.ID())
-	if session == nil {
-		return fmt.Errorf("no bind session")
+	connection, _ := entity.Context().(*Connection)
+	if connection == nil {
+		return fmt.Errorf("no bind connection")
 	}
-	if err = session.OnTraffic(); err != nil {
+	if err = connection.OnTraffic(); err != nil {
 		return err
 	}
 	return
 }
 func (m *Gate) OnClose(entity network.IEntity, wrong error) (err error) {
-	session, _ := m.mgr.Get(entity.ID())
-	if session == nil {
-		return fmt.Errorf("no bind session")
+	connection, _ := entity.Context().(*Connection)
+	if connection == nil {
+		return fmt.Errorf("no bind connection")
 	}
-	if err = session.OnClose(wrong); err != nil {
+	if err = connection.OnClose(wrong); err != nil {
 		return
 	}
 
@@ -95,7 +91,7 @@ func (m *Gate) GracefulStop() {
 	defer ticker.Stop()
 
 	for {
-		if m.mgr == nil || m.mgr.Count() == 0 {
+		if network.Count() == 0 {
 			return
 		}
 

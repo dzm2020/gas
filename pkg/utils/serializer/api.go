@@ -13,3 +13,8 @@ var (
 	MsgPack = new(msgPackCodec)
 	PB      = new(pbCodec)
 )
+
+type ISerializer interface {
+	Unmarshal(data []byte, msg interface{}) error
+	Marshal(msg interface{}) ([]byte, error)
+}
