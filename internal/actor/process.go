@@ -68,8 +68,7 @@ func (p *Process) Exit() error {
 	})
 }
 
-// pushExitTaskAndWait 推送退出任务并等待完成
-// 注意：这个方法会绕过退出状态检查，仅用于 Exit() 方法内部
+// pushTaskAndWait 推送任务并等待完成
 func (p *Process) pushTaskAndWait(timeout time.Duration, task iface.Task) error {
 	if task == nil {
 		return errors.New("task is nil")
@@ -83,18 +82,9 @@ func (p *Process) pushTaskAndWait(timeout time.Duration, task iface.Task) error 
 		return e
 	}
 
-	// 直接调用 mailbox，跳过退出检查
 	if err := p.mailbox.PostMessage(&iface.TaskMessage{task: syncTask}); err != nil {
 		return err
 	}
 	_, err := waiter.Wait()
 	return err
-}
-
-// isQueueEmpty 检查进程的 mailbox 队列是否为空
-func (p *Process) isQueueEmpty() bool {
-	if m, ok := p.mailbox.(*Mailbox); ok {
-		return m.IsEmpty()
-	}
-	return true
 }

@@ -44,38 +44,26 @@ func (a *baseActorContext) InvokerMessage(msg interface{}) error {
 
 	switch m := msg.(type) {
 	case *iface.TaskMessage:
-		_task := chain(a.middlerWares, m.Task)
-		return _task(a)
+		return chain(a.middlerWares, m.Task)(a)
 	case *iface.Message:
-		if !a.router.HasRoute(uint16(m.GetId())) {
-			break
+		if a.router != nil && a.router.HasRoute(uint16(m.GetId())) {
+			_, err := a.execHandler(m)
+			return err
 		}
-		_, err := a.execHandler(m)
-		return err
 	case *iface.SyncMessage:
-		if !a.router.HasRoute(uint16(m.GetId())) {
-			break
+		if a.router != nil && a.router.HasRoute(uint16(m.GetId())) {
+			data, err := a.execHandler(m.Message)
+			m.Response(data, err)
+			return err
 		}
-		data, err := a.execHandler(m.Message)
-		m.Response(data, err)
-		return err
 	}
 
-	if err := a.actor.OnMessage(a, msg); err != nil {
-		return err
-	}
-
-	return nil
+	return a.actor.OnMessage(a, msg)
 }
 
-func (a *baseActorContext) execHandler(msg *iface.Message) (data []byte, err error) {
-	if a.router == nil {
-		err = fmt.Errorf("router is nil")
-		return
-	}
+func (a *baseActorContext) execHandler(msg *iface.Message) ([]byte, error) {
 	if msg == nil {
-		err = fmt.Errorf("msg is nil")
-		return
+		return nil, fmt.Errorf("msg is nil")
 	}
 	return a.router.Handle(a, uint16(msg.GetId()), msg.GetData())
 }
@@ -105,100 +93,69 @@ func (a *baseActorContext) Send(to *iface.Pid, msgId uint16, request interface{}
 	if request == nil {
 		return fmt.Errorf("request is nil")
 	}
-
 	if a.system == nil {
 		return fmt.Errorf("system is not initialized")
 	}
 
-	ser := a.system.GetSerializer()
-
-	// 序列化 request
-	requestData, err := ser.Marshal(request)
-	if err != nil {
-		return fmt.Errorf("marshal request failed: %w", err)
+	message := a.buildMessage(to, msgId, request)
+	if message == nil {
+		return fmt.Errorf("build message failed")
 	}
 
-	var message *iface.Message
-	switch m := request.(type) {
-	case *iface.Message:
-		message = m
-	default:
-		// 构建消息
-		message = &iface.Message{
-			To:   to,
-			From: a.pid,
-			Id:   uint32(msgId),
-			Data: requestData,
-		}
-	}
-
-	n := a.system.GetNode()
-	if n == nil {
-		return a.system.Send(message)
-	} else {
-		// 调用 node.Send
+	if n := a.system.GetNode(); n != nil {
 		return n.GetRemote().Send(message)
 	}
+	return a.system.Send(message)
 }
 
 func (a *baseActorContext) Request(to *iface.Pid, msgId uint16, request interface{}, reply interface{}) error {
-	if to == nil {
-		return fmt.Errorf("target pid is nil")
+	if to == nil || request == nil || reply == nil {
+		return fmt.Errorf("invalid parameters")
 	}
-	if request == nil {
-		return fmt.Errorf("request is nil")
-	}
-	if reply == nil {
-		return fmt.Errorf("reply is nil")
-	}
-
 	if a.system == nil {
 		return fmt.Errorf("system is not initialized")
 	}
 
-	ser := a.system.GetSerializer()
-
-	// 序列化 request
-	requestData, err := ser.Marshal(request)
-	if err != nil {
-		return fmt.Errorf("marshal request failed: %w", err)
-	}
-
-	var message *iface.Message
-	switch m := request.(type) {
-	case *iface.Message:
-		message = m
-	default:
-		// 构建消息
-		message = &iface.Message{
-			To:   to,
-			From: a.pid,
-			Id:   uint32(msgId),
-			Data: requestData,
-		}
+	message := a.buildMessage(to, msgId, request)
+	if message == nil {
+		return fmt.Errorf("build message failed")
 	}
 
 	timeout := 5 * time.Second
 	var response *iface.RespondMessage
-	n := a.system.GetNode()
-	if n == nil {
-		response = a.system.Request(message, timeout)
-	} else {
-		// 调用 node.Request（使用默认超时时间 5 秒）
+	if n := a.system.GetNode(); n != nil {
 		response = n.GetRemote().Request(message, timeout)
+	} else {
+		response = a.system.Request(message, timeout)
 	}
 
-	// 检查响应错误
-	if response.GetError() != "" {
-		return fmt.Errorf("request failed: %s", response.GetError())
+	if errMsg := response.GetError(); errMsg != "" {
+		return fmt.Errorf("request failed: %s", errMsg)
 	}
 
-	// 反序列化响应到 reply
-	if len(response.GetData()) > 0 {
-		if err = ser.Unmarshal(response.GetData(), reply); err != nil {
+	if data := response.GetData(); len(data) > 0 {
+		if err := a.system.GetSerializer().Unmarshal(data, reply); err != nil {
 			return fmt.Errorf("unmarshal reply failed: %w", err)
 		}
 	}
-
 	return nil
+}
+
+func (a *baseActorContext) buildMessage(to *iface.Pid, msgId uint16, request interface{}) *iface.Message {
+	if m, ok := request.(*iface.Message); ok {
+		return m
+	}
+
+	ser := a.system.GetSerializer()
+	requestData, err := ser.Marshal(request)
+	if err != nil {
+		return nil
+	}
+
+	return &iface.Message{
+		To:   to,
+		From: a.pid,
+		Id:   uint32(msgId),
+		Data: requestData,
+	}
 }

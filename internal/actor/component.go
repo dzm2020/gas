@@ -26,18 +26,17 @@ func (a *Component) Name() string {
 }
 
 func (a *Component) Start(ctx context.Context) error {
-	system := NewSystem()
-	system.SetSerializer(a.node.GetSerializer())
-	system.SetNode(a.node)
-	a.node.SetActorSystem(system)
+	a.system = NewSystem()
+	a.system.SetSerializer(a.node.GetSerializer())
+	a.system.SetNode(a.node)
+	a.node.SetActorSystem(a.system)
 	return nil
 }
 
 func (a *Component) Stop(ctx context.Context) error {
-	actorSystem := a.system
-	if actorSystem == nil {
+	if a.system == nil {
 		return nil
 	}
 	a.node.SetActorSystem(nil)
-	return actorSystem.Shutdown(time.Second * 10)
+	return a.system.Shutdown(10 * time.Second)
 }

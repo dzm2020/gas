@@ -105,14 +105,12 @@ func (s *System) GetProcess(pid *iface.Pid) iface.IProcess {
 	if pid == nil {
 		return nil
 	}
-	name := pid.GetName()
-	if name != "" {
+	if name := pid.GetName(); name != "" {
 		p, _ := s.nameDict.Get(name)
 		return p
 	}
-	serviceId := pid.GetServiceId()
-	if serviceId > 0 {
-		p, _ := s.processDict.Get(serviceId)
+	if id := pid.GetServiceId(); id > 0 {
+		p, _ := s.processDict.Get(id)
 		return p
 	}
 	return nil
@@ -189,19 +187,10 @@ func (s *System) unregisterProcess(pid *iface.Pid) {
 // GetAllProcesses 获取所有进程
 func (s *System) GetAllProcesses() []iface.IProcess {
 	var processes []iface.IProcess
-	// 使用 nameDict 来获取所有进程（避免重复）
-	// 因为同一个进程可能同时存在于 processDict 和 nameDict 中
-	seen := make(map[uint64]bool)
-
-	// 从 processDict 获取所有进程
-	s.processDict.Range(func(key uint64, value iface.IProcess) bool {
-		if !seen[key] {
-			processes = append(processes, value)
-			seen[key] = true
-		}
+	s.processDict.Range(func(_ uint64, value iface.IProcess) bool {
+		processes = append(processes, value)
 		return true
 	})
-
 	return processes
 }
 

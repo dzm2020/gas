@@ -89,15 +89,8 @@ func (m *Mailbox) run() {
 	}
 }
 
-// invokerMessage
-// @Description: 从队列中读取消息，并调用invoker处理
-// @receiver m
-// @return error
 func (m *Mailbox) invokerMessage(msg interface{}) error {
-	if err := m.invoker.InvokerMessage(msg); err != nil {
-		return err
-	}
-	return nil
+	return m.invoker.InvokerMessage(msg)
 }
 
 // IsEmpty 检查 mailbox 队列是否为空
