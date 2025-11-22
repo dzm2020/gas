@@ -41,20 +41,31 @@ func (a *baseActorContext) ID() *iface.Pid {
 
 func (a *baseActorContext) InvokerMessage(msg interface{}) error {
 	a.msg = msg
+
 	switch m := msg.(type) {
-	case *TaskMessage:
-		_task := chain(a.middlerWares, m.task)
+	case *iface.TaskMessage:
+		_task := chain(a.middlerWares, m.Task)
 		return _task(a)
 	case *iface.Message:
+		if !a.router.HasRoute(uint16(m.GetId())) {
+			break
+		}
 		_, err := a.execHandler(m)
 		return err
-	case *SyncMessage:
+	case *iface.SyncMessage:
+		if !a.router.HasRoute(uint16(m.GetId())) {
+			break
+		}
 		data, err := a.execHandler(m.Message)
 		m.Response(data, err)
 		return err
-	default:
-		return a.actor.OnMessage(a, msg)
 	}
+
+	if err := a.actor.OnMessage(a, msg); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (a *baseActorContext) execHandler(msg *iface.Message) (data []byte, err error) {
@@ -107,12 +118,18 @@ func (a *baseActorContext) Send(to *iface.Pid, msgId uint16, request interface{}
 		return fmt.Errorf("marshal request failed: %w", err)
 	}
 
-	// 构建消息
-	message := &iface.Message{
-		To:   to,
-		From: a.pid,
-		Id:   uint32(msgId),
-		Data: requestData,
+	var message *iface.Message
+	switch m := request.(type) {
+	case *iface.Message:
+		message = m
+	default:
+		// 构建消息
+		message = &iface.Message{
+			To:   to,
+			From: a.pid,
+			Id:   uint32(msgId),
+			Data: requestData,
+		}
 	}
 
 	n := a.system.GetNode()
@@ -147,12 +164,18 @@ func (a *baseActorContext) Request(to *iface.Pid, msgId uint16, request interfac
 		return fmt.Errorf("marshal request failed: %w", err)
 	}
 
-	// 构建消息
-	message := &iface.Message{
-		To:   to,
-		From: a.pid,
-		Id:   uint32(msgId),
-		Data: requestData,
+	var message *iface.Message
+	switch m := request.(type) {
+	case *iface.Message:
+		message = m
+	default:
+		// 构建消息
+		message = &iface.Message{
+			To:   to,
+			From: a.pid,
+			Id:   uint32(msgId),
+			Data: requestData,
+		}
 	}
 
 	timeout := 5 * time.Second

@@ -1,23 +1,19 @@
-package actor
-
-import (
-	"gas/internal/iface"
-)
+package iface
 
 type TaskMessage struct {
-	task iface.Task
+	Task Task
 }
 
 type SyncMessage struct {
-	*iface.Message
-	response func(message *iface.RespondMessage)
+	*Message
+	response func(message *RespondMessage)
 }
 
 func (m *SyncMessage) Response(data []byte, err error) {
 	if m.response == nil {
 		return
 	}
-	response := &iface.RespondMessage{
+	response := &RespondMessage{
 		Data: data,
 	}
 	if err != nil {
@@ -26,6 +22,6 @@ func (m *SyncMessage) Response(data []byte, err error) {
 	m.response(response)
 }
 
-func (m *SyncMessage) SetResponse(f func(*iface.RespondMessage)) {
+func (m *SyncMessage) SetResponse(f func(*RespondMessage)) {
 	m.response = f
 }

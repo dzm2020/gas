@@ -1,6 +1,8 @@
 package gate
 
 import (
+	"fmt"
+	"gas/internal/gate/protocol"
 	"gas/internal/iface"
 )
 
@@ -37,4 +39,15 @@ func (agent *Agent) Close() {
 		return
 	}
 	_ = agent.Connection.Close()
+}
+
+func (agent *Agent) Send(msg *iface.Message) error {
+	if agent.Connection == nil {
+		return fmt.Errorf("connection is nil")
+	}
+	// 创建响应消息（使用相同的 cmd 和 act）
+	cmd, act := protocol.ParseId(uint16(msg.GetId()))
+	responseMsg := protocol.New(cmd, act, msg.GetData())
+	responseMsg.Index = 0 // 可以根据需要设置 Index
+	return agent.Connection.Send(responseMsg)
 }

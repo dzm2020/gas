@@ -75,3 +75,9 @@ type Head struct {
 func CmdAct(cmd, act uint8) uint16 {
 	return uint16(cmd)<<8 + uint16(act)
 }
+
+func ParseId(msgId uint16) (uint8, uint8) {
+	cmd := uint8(msgId >> 8)
+	act := uint8(msgId & 0xFF)
+	return cmd, act
+}

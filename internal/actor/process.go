@@ -34,7 +34,7 @@ func (p *Process) PushTask(task iface.Task) error {
 	if p.isExit.Load() {
 		return errors.New("process is exiting")
 	}
-	return p.mailbox.PostMessage(&TaskMessage{
+	return p.mailbox.PostMessage(&iface.TaskMessage{
 		task: task,
 	})
 }
@@ -84,7 +84,7 @@ func (p *Process) pushTaskAndWait(timeout time.Duration, task iface.Task) error 
 	}
 
 	// 直接调用 mailbox，跳过退出检查
-	if err := p.mailbox.PostMessage(&TaskMessage{task: syncTask}); err != nil {
+	if err := p.mailbox.PostMessage(&iface.TaskMessage{task: syncTask}); err != nil {
 		return err
 	}
 	_, err := waiter.Wait()

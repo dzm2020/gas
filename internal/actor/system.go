@@ -149,7 +149,7 @@ func (s *System) Request(message *iface.Message, timeout time.Duration) *iface.R
 	}
 	waiter := newChanWaiter[*iface.RespondMessage](timeout)
 
-	msg := &SyncMessage{Message: message}
+	msg := &iface.SyncMessage{Message: message}
 	msg.SetResponse(func(message *iface.RespondMessage) {
 		waiter.Done(message)
 	})
