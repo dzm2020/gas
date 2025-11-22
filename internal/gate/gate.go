@@ -2,7 +2,6 @@ package gate
 
 import (
 	"fmt"
-	"gas/internal/actor"
 	"gas/internal/iface"
 	"gas/pkg/network"
 	"gas/pkg/utils/glog"
@@ -15,7 +14,7 @@ func New(node iface.INode, factory Factory, opts ...Option) *Gate {
 		factory:     factory,
 		listener:    nil,
 		opts:        loadOptions(opts...),
-		actorSystem: node.GetSystem().(*actor.System),
+		actorSystem: node.GetActorSystem(),
 	}
 	return gate
 }
@@ -24,7 +23,7 @@ type Gate struct {
 	factory     Factory
 	listener    network.IListener
 	opts        *Options
-	actorSystem *actor.System
+	actorSystem iface.ISystem
 }
 
 func (m *Gate) Run() {

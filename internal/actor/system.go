@@ -70,11 +70,11 @@ func (s *System) newPid() *iface.Pid {
 }
 
 // Spawn 创建新的 actor 进程
-func (s *System) Spawn(actor iface.IActor, options ...Option) (*iface.Pid, iface.IProcess) {
+func (s *System) Spawn(actor iface.IActor, options ...iface.Option) (*iface.Pid, iface.IProcess) {
 	if s.shuttingDown.Load() {
 		return nil, nil
 	}
-	opts := loadOptions(options...)
+	opts := iface.loadOptions(options...)
 	pid := s.newPid()
 	pid.Name = opts.Name
 
@@ -198,7 +198,7 @@ func (s *System) GetAllProcesses() []iface.IProcess {
 }
 
 // Shutdown 优雅关闭 Actor 系统
-// timeout: 最大等待时间，如果为 0 则使用默认值 30 秒
+// timeout: 最大等待时间，如果为 0 则使用默认值 10 秒
 func (s *System) Shutdown(timeout time.Duration) error {
 	// 标记为关闭状态，拒绝新的消息和进程创建
 	if !s.shuttingDown.CompareAndSwap(false, true) {
@@ -206,7 +206,7 @@ func (s *System) Shutdown(timeout time.Duration) error {
 	}
 
 	if timeout == 0 {
-		timeout = 30 * time.Second
+		timeout = 10 * time.Second
 	}
 	deadline := time.Now().Add(timeout)
 

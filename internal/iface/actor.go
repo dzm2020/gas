@@ -6,6 +6,7 @@ import (
 )
 
 type Task func(ctx IContext) error
+type TaskMiddleware func(Task) Task
 
 type IContext interface {
 	ID() *Pid
@@ -41,7 +42,20 @@ type ISystem interface {
 	Send(message *Message) error
 	Request(message *Message, timeout time.Duration) *RespondMessage
 	GetAllProcesses() []IProcess
-	//Spawn(producer Producer, options ...Option) (*Pid, IProcess)
+	Spawn(actor IActor, options ...Option) (*Pid, IProcess)
+}
+
+type IRouter interface {
+	Register(msgId uint16, handler interface{}) error
+	Handle(ctx IContext, msgId uint16, data []byte) ([]byte, error) // 返回 response 数据和错误，异步调用时 response 为 nil
+	HasRoute(msgId uint16) bool                                     // 判断指定消息ID的路由是否存在
+}
+
+// NewErrorResponse 创建错误响应消息
+func NewErrorResponse(errMsg string) *RespondMessage {
+	return &RespondMessage{
+		Error: errMsg,
+	}
 }
 
 var _ IActor = (*Actor)(nil)

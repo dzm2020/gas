@@ -1,10 +1,22 @@
 package iface
 
-import discovery "gas/pkg/discovery/iface"
+import (
+	"gas/internal/config"
+	"gas/pkg/component"
+	discovery "gas/pkg/discovery/iface"
+	"gas/pkg/utils/serializer"
+)
 
 type INode interface {
 	GetId() uint64
-	GetSystem() ISystem
+	SetSerializer(ser serializer.ISerializer)
+	GetSerializer() serializer.ISerializer
+	GetActorSystem() ISystem
+	SetActorSystem(system ISystem)
 	GetRemote() IRemote
-	GetDiscovery() discovery.IDiscovery
+	SetRemote(IRemote)
+	GetConfig() *config.Config
+	Self() *discovery.Node
+	StarUp(profileFilePath string, comps ...component.Component) error
+	Shutdown() error
 }

@@ -8,12 +8,6 @@ import (
 	"sync"
 )
 
-type IRouter interface {
-	Register(msgId uint16, handler interface{}) error
-	Handle(ctx iface.IContext, msgId uint16, data []byte) ([]byte, error) // 返回 response 数据和错误，异步调用时 response 为 nil
-	HasRoute(msgId uint16) bool                                           // 判断指定消息ID的路由是否存在
-}
-
 var ErrMessageHandlerNotFound = errors.New("actor message handler not found")
 
 type Router struct {

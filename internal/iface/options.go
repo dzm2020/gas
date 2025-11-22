@@ -1,4 +1,4 @@
-package actor
+package iface
 
 type Option func(*Options)
 

@@ -3,6 +3,7 @@ package remote
 import (
 	"fmt"
 	"gas/internal/iface"
+	discovery "gas/pkg/discovery/iface"
 	messageQue "gas/pkg/messageQue/iface"
 	"gas/pkg/utils/glog"
 	"gas/pkg/utils/serializer"
@@ -20,14 +21,17 @@ type Remote struct {
 	// 订阅管理：节点ID -> 订阅对象（每个节点只订阅一次）
 	subscriptionsMu sync.RWMutex
 	subscriptions   map[uint64]messageQue.ISubscription
+
+	discovery discovery.IDiscovery
 }
 
 // New 创建远程通信管理器
-func New(que messageQue.IMessageQue, nodeSubjectPrefix string, serializer serializer.ISerializer) *Remote {
+func New(que messageQue.IMessageQue, discovery discovery.IDiscovery, nodeSubjectPrefix string, serializer serializer.ISerializer) *Remote {
 	if nodeSubjectPrefix == "" {
 		nodeSubjectPrefix = "cluster.node."
 	}
 	return &Remote{
+		discovery:         discovery,
 		messageQue:        que,
 		serializer:        serializer,
 		nodeSubjectPrefix: nodeSubjectPrefix,
@@ -35,7 +39,26 @@ func New(que messageQue.IMessageQue, nodeSubjectPrefix string, serializer serial
 	}
 }
 
-// SetActorSystem 设置 Actor 系统
+// SetSerializer 设置序列化器
+func (r *Remote) SetSerializer(ser serializer.ISerializer) {
+	r.serializer = ser
+}
+
+func (r *Remote) registry(node *discovery.Node) error {
+	// 注册到服务发现
+	if err := r.discovery.Add(node); err != nil {
+		return err
+	}
+
+	// 注册到远程通信管理器
+	nodeId := node.GetID()
+	if err := r.Subscribe(nodeId); err != nil {
+		_ = r.discovery.Remove(nodeId)
+		return err
+	}
+	return nil
+}
+
 func (r *Remote) SetNode(node iface.INode) {
 	r.node = node
 }
@@ -69,8 +92,7 @@ func (r *Remote) Subscribe(nodeId uint64) error {
 	return nil
 }
 
-// UnregisterNode 注销节点并移除订阅
-func (r *Remote) UnregisterNode(nodeId uint64) error {
+func (r *Remote) Unsubscribe(nodeId uint64) error {
 	r.subscriptionsMu.Lock()
 	defer r.subscriptionsMu.Unlock()
 
@@ -163,13 +185,27 @@ func (r *Remote) Request(message *iface.Message, timeout time.Duration) *iface.R
 	return response
 }
 
-// Close 关闭所有订阅
-func (r *Remote) Close() {
+// Shutdown 关闭所有订阅
+func (r *Remote) Shutdown() error {
 	r.subscriptionsMu.Lock()
 	defer r.subscriptionsMu.Unlock()
-
+	//  取消订阅
 	for nodeId, sub := range r.subscriptions {
 		_ = sub.Unsubscribe()
 		delete(r.subscriptions, nodeId)
 	}
+	nodeId := r.node.GetId()
+
+	if err := r.discovery.Remove(nodeId); err != nil {
+		return err
+	}
+
+	//  注销节点
+	if err := r.discovery.Close(); err != nil {
+		return err
+	}
+	if err := r.messageQue.Close(); err != nil {
+		return err
+	}
+	return nil
 }
