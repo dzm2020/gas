@@ -115,14 +115,14 @@ func (r *Remote) onRemoteHandler(data []byte, reply func([]byte) error) {
 		r.sendError(reply, "node not initialized")
 		return
 	}
-	if r.node.GetSystem() == nil {
+	if r.node.GetActorSystem() == nil {
 		r.sendError(reply, "actor system not initialized")
 		return
 	}
 
 	if reply != nil {
 		// Request 模式
-		response := r.node.GetSystem().Request(message, 5*time.Second)
+		response := r.node.GetActorSystem().Request(message, 5*time.Second)
 		responseData, err := r.serializer.Marshal(response)
 		if err != nil {
 			r.sendError(reply, fmt.Sprintf("marshal response failed: %v", err))
@@ -133,7 +133,7 @@ func (r *Remote) onRemoteHandler(data []byte, reply func([]byte) error) {
 		}
 	} else {
 		// Send 模式
-		if err := r.node.GetSystem().Send(message); err != nil {
+		if err := r.node.GetActorSystem().Send(message); err != nil {
 			glog.Errorf("remote: send message to actor failed: %v", err)
 		}
 	}

@@ -23,7 +23,7 @@ type routerEntry struct {
 	responseType reflect.Type // 同步调用时的 response 类型
 }
 
-func NewRouter() IRouter {
+func NewRouter() iface.IRouter {
 	return &Router{
 		routes: make(map[uint16]routerEntry),
 	}

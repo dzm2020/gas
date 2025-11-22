@@ -14,7 +14,7 @@ type IMessageInvoker interface {
 	InvokerMessage(message interface{}) error
 }
 
-func newBaseActorContext(pid *iface.Pid, actor iface.IActor, middlerWares []TaskMiddleware, r IRouter, system *System) *baseActorContext {
+func newBaseActorContext(pid *iface.Pid, actor iface.IActor, middlerWares []iface.TaskMiddleware, r iface.IRouter, system *System) *baseActorContext {
 	ctx := &baseActorContext{
 		pid:          pid,
 		actor:        actor,
@@ -29,9 +29,9 @@ type baseActorContext struct {
 	pid          *iface.Pid
 	name         string
 	actor        iface.IActor
-	middlerWares []TaskMiddleware
+	middlerWares []iface.TaskMiddleware
 	msg          interface{}
-	router       IRouter
+	router       iface.IRouter
 	system       *System
 }
 

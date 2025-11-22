@@ -29,6 +29,7 @@ func (a *Component) Start(ctx context.Context) error {
 	system := NewSystem()
 	system.SetSerializer(a.node.GetSerializer())
 	system.SetNode(a.node)
+	a.node.SetActorSystem(system)
 	return nil
 }
 

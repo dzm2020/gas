@@ -1,6 +1,7 @@
 package nats
 
 import (
+	"fmt"
 	"gas/pkg/messageQue/iface"
 	"strings"
 	"time"
@@ -13,12 +14,16 @@ func New(servers []string, opts ...Option) (*Client, error) {
 	options := loadOptions(opts...)
 	natsOpts := buildNatsOptions(options)
 	// 连接 NATS 集群
-	conn, err := nats.Connect(strings.Join(servers, ","), natsOpts...)
+	client, err := nats.Connect(strings.Join(servers, ","), natsOpts...)
 	if err != nil {
 		return nil, err
 	}
+	if client.Status() != nats.CONNECTED {
+		return nil, fmt.Errorf("nats connect failed: %s", client.Status().String())
+	}
+
 	return &Client{
-		conn: conn,
+		conn: client,
 	}, nil
 }
 
@@ -86,7 +91,3 @@ type Subscription struct {
 func (n *Subscription) Unsubscribe() error {
 	return n.sub.Unsubscribe()
 }
-
-
-
-

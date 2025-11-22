@@ -13,6 +13,7 @@ func NewComponent(name string, node iface.INode, factory Factory, opts ...Option
 	return &Component{
 		gate: gate,
 		name: name,
+		node: node,
 	}
 }
 
@@ -23,6 +24,7 @@ var _ component.Component = (*Component)(nil)
 type Component struct {
 	gate *Gate
 	name string
+	node iface.INode
 }
 
 // Name 返回组件名称
@@ -35,6 +37,7 @@ func (g *Component) Start(ctx context.Context) error {
 	if g.gate == nil {
 		return fmt.Errorf("gate is nil")
 	}
+	g.gate.actorSystem = g.node.GetActorSystem()
 	g.gate.Run()
 	return nil
 }

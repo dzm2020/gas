@@ -1,8 +1,6 @@
 package gate
 
 import (
-	"fmt"
-	"gas/internal/gate/protocol"
 	"gas/internal/iface"
 )
 
@@ -16,34 +14,27 @@ type IAgent interface {
 
 type Agent struct {
 	iface.Actor
-	connection *Connection
-	ctx        iface.IContext
+	*Connection
+	ctx iface.IContext
 }
 
 func (agent *Agent) OnConnectionOpen(ctx iface.IContext, connection *Connection) error {
-	agent.connection = connection
+	agent.Connection = connection
 	return nil
 }
 
 func (agent *Agent) OnConnectionClose(ctx iface.IContext) error {
-	agent.connection = nil
+	agent.Connection = nil
 	return nil
 }
 
-func (agent *Agent) SendMessage(msg *protocol.Message) error {
-	if agent.connection == nil {
-		return fmt.Errorf("gate: connection is nil")
-	}
-	return agent.connection.Send(msg)
-}
-
 func (agent *Agent) GetConnection() *Connection {
-	return agent.connection
+	return agent.Connection
 }
 
 func (agent *Agent) Close() {
-	if agent.connection == nil {
+	if agent.Connection == nil {
 		return
 	}
-	_ = agent.connection.Close()
+	_ = agent.Connection.Close()
 }

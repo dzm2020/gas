@@ -3,6 +3,7 @@ package gate
 import (
 	"gas/internal/actor"
 	"gas/internal/gate/codec"
+	"gas/internal/iface"
 	"time"
 )
 
@@ -10,7 +11,7 @@ type Option func(*Options)
 
 type Options struct {
 	ProtoAddr      string
-	Router         actor.IRouter
+	Router         iface.IRouter
 	Codec          codec.ICodec
 	MaxConn        int32
 	ReadBufferSize uint32
@@ -62,7 +63,7 @@ func WithProtoAddr(addr string) Option {
 	}
 }
 
-func WithRouter(router actor.IRouter) Option {
+func WithRouter(router iface.IRouter) Option {
 	return func(o *Options) {
 		o.Router = router
 	}

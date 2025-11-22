@@ -18,6 +18,14 @@ import (
 	"github.com/duke-git/lancet/v2/maputil"
 )
 
+func loadOptions(options ...iface.Option) *iface.Options {
+	opts := &iface.Options{}
+	for _, option := range options {
+		option(opts)
+	}
+	return opts
+}
+
 // System Actor 系统，管理所有进程和消息传递
 type System struct {
 	uniqId       atomic.Uint64
@@ -74,7 +82,7 @@ func (s *System) Spawn(actor iface.IActor, options ...iface.Option) (*iface.Pid,
 	if s.shuttingDown.Load() {
 		return nil, nil
 	}
-	opts := iface.loadOptions(options...)
+	opts := loadOptions(options...)
 	pid := s.newPid()
 	pid.Name = opts.Name
 

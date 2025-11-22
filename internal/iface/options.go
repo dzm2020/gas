@@ -9,14 +9,6 @@ type Options struct {
 	Router      IRouter
 }
 
-func loadOptions(options ...Option) *Options {
-	opts := &Options{}
-	for _, option := range options {
-		option(opts)
-	}
-	return opts
-}
-
 func WithParams(params []interface{}) Option {
 	return func(op *Options) {
 		op.Params = params
