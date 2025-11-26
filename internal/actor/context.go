@@ -14,13 +14,25 @@ type IMessageInvoker interface {
 	InvokerMessage(message interface{}) error
 }
 
-func newBaseActorContext(pid *iface.Pid, actor iface.IActor, middlerWares []iface.TaskMiddleware, r iface.IRouter, system *System) *baseActorContext {
+// contextConfig context 配置
+type contextConfig struct {
+	pid          *iface.Pid
+	actor        iface.IActor
+	middlewares  []iface.TaskMiddleware
+	router       iface.IRouter
+	system       *System
+	process      iface.IProcess
+}
+
+func newBaseActorContext(cfg *contextConfig) *baseActorContext {
 	ctx := &baseActorContext{
-		pid:          pid,
-		actor:        actor,
-		middlerWares: middlerWares,
-		router:       r,
-		system:       system,
+		pid:          cfg.pid,
+		actor:        cfg.actor,
+		middlerWares: cfg.middlewares,
+		router:       cfg.router,
+		system:       cfg.system,
+		process:      cfg.process,
+		timerMgr:     newTimerManager(),
 	}
 	return ctx
 }
@@ -33,6 +45,8 @@ type baseActorContext struct {
 	msg          interface{}
 	router       iface.IRouter
 	system       *System
+	process      iface.IProcess // 保存自己的 process 引用
+	timerMgr     *timerManager  // 定时器管理器
 }
 
 func (a *baseActorContext) ID() *iface.Pid {
@@ -80,6 +94,10 @@ func (a *baseActorContext) GetSerializer() serializer.ISerializer {
 }
 
 func (a *baseActorContext) Exit() {
+	// 取消所有定时器
+	if a.timerMgr != nil {
+		a.timerMgr.CancelAllTimers()
+	}
 	if a.system != nil {
 		a.system.unregisterProcess(a.pid)
 	}
@@ -158,4 +176,30 @@ func (a *baseActorContext) buildMessage(to *iface.Pid, msgId uint16, request int
 		Id:   uint32(msgId),
 		Data: requestData,
 	}
+}
+
+// RegisterTimer 注册定时器，时间到后通过 pushTask 通知 baseActorContext 然后执行回调
+// 这是 IContext 接口要求的方法，内部调用 AfterFunc
+func (a *baseActorContext) RegisterTimer(duration time.Duration, callback iface.Task) (int64, error) {
+	return a.timerMgr.AfterFunc(a.process, duration, callback)
+}
+
+// AfterFunc 注册一次性定时器
+func (a *baseActorContext) AfterFunc(duration time.Duration, callback iface.Task) (int64, error) {
+	return a.timerMgr.AfterFunc(a.process, duration, callback)
+}
+
+// TickFunc 注册周期性定时器，每隔指定时间间隔执行一次回调
+func (a *baseActorContext) TickFunc(interval time.Duration, callback iface.Task) (int64, error) {
+	return a.timerMgr.TickFunc(a.process, interval, callback)
+}
+
+// CancelTimer 取消定时器
+func (a *baseActorContext) CancelTimer(timerID int64) bool {
+	return a.timerMgr.CancelTimer(timerID)
+}
+
+// CancelAllTimers 取消所有定时器
+func (a *baseActorContext) CancelAllTimers() {
+	a.timerMgr.CancelAllTimers()
 }

@@ -2,17 +2,19 @@ package gate
 
 import (
 	"fmt"
+	"gas/internal/gate/codec"
 	"gas/internal/iface"
 	"gas/pkg/network"
 	"gas/pkg/utils/glog"
 	"gas/pkg/utils/workers"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 func New(node iface.INode, factory Factory, opts ...Option) *Gate {
 	gate := &Gate{
 		factory:     factory,
-		listener:    nil,
 		opts:        loadOptions(opts...),
 		actorSystem: node.GetActorSystem(),
 	}
@@ -20,63 +22,74 @@ func New(node iface.INode, factory Factory, opts ...Option) *Gate {
 }
 
 type Gate struct {
-	factory     Factory
-	listener    network.IListener
+	network.EmptyHandler
 	opts        *Options
+	factory     Factory
+	server      network.IServer
 	actorSystem iface.ISystem
 }
 
 func (m *Gate) Run() {
-	m.listener = network.NewListener(m.opts.ProtoAddr, network.WithHandler(m))
+	var err error
+	m.server, err = network.NewServer(m.opts.ProtoAddr, network.WithHandler(m), network.WithCodec(codec.New()))
+	if err != nil {
+		glog.Error("gate run err", zap.Error(err))
+	}
 	workers.Submit(func() {
-		if err := m.listener.Serve(); err != nil {
-			glog.Errorf("gate run listening on %s err:%v", m.listener.Addr(), err)
+		if err = m.server.Start(); err != nil {
+			glog.Errorf("gate run listening on %s err:%v", m.server.Addr().String(), err)
 		}
 	}, nil)
 
-	glog.Infof("gate run listening on %s", m.listener.Addr())
+	glog.Infof("gate run listening on %s", m.server.Addr().String())
 }
 
-func (m *Gate) OnOpen(entity network.IEntity) (err error) {
-	if network.Count() > m.opts.MaxConn {
+func (m *Gate) OnConnect(entity network.IConnection) (err error) {
+	if network.ConnectionCount() > int64(m.opts.MaxConn) {
 		return fmt.Errorf("maximum number of connections exceeded")
 	}
-	connection := NewConnection(m, entity)
-	entity.SetContext(connection)
-	if err = connection.OnConnect(); err != nil {
-		return
+
+	factory := m.factory
+	if factory == nil {
+		return fmt.Errorf("gate: agent factory is nil")
 	}
-	return
+	//  创建agent
+	_, agent := m.actorSystem.Spawn(factory())
+	//  绑定
+	entity.SetContext(agent)
+	//  执行初始化
+	return agent.PushTask(func(ctx iface.IContext) error {
+		_agent := ctx.Actor().(IAgent)
+		return _agent.OnConnectionOpen(ctx, entity)
+	})
 }
 
-func (m *Gate) OnTraffic(entity network.IEntity) (err error) {
-	connection, _ := entity.Context().(*Connection)
-	if connection == nil {
+func (m *Gate) OnMessage(entity network.IConnection, msg interface{}) error {
+	agent, _ := entity.Context().(iface.IProcess)
+	if agent == nil {
 		return fmt.Errorf("no bind connection")
 	}
-	if err = connection.OnTraffic(); err != nil {
-		return err
-	}
-	return
+	return agent.PushMessage(msg)
 }
-func (m *Gate) OnClose(entity network.IEntity, wrong error) (err error) {
-	connection, _ := entity.Context().(*Connection)
-	if connection == nil {
-		return fmt.Errorf("no bind connection")
-	}
-	if err = connection.OnClose(wrong); err != nil {
+
+func (m *Gate) OnClose(entity network.IConnection, wrong error) {
+	agent, _ := entity.Context().(iface.IProcess)
+	if agent == nil {
 		return
 	}
-
-	return
+	_ = agent.PushTask(func(ctx iface.IContext) (wrong error) {
+		_agent := ctx.Actor().(IAgent)
+		wrong = _agent.OnConnectionClose(ctx)
+		return
+	})
 }
 
 func (m *Gate) GracefulStop() {
-	if m.listener == nil {
+	if m.server == nil {
 		return
 	}
 
-	_ = m.listener.Close()
+	_ = m.server.Stop()
 
 	const checkInterval = 50 * time.Millisecond
 
@@ -90,7 +103,7 @@ func (m *Gate) GracefulStop() {
 	defer ticker.Stop()
 
 	for {
-		if network.Count() == 0 {
+		if network.ConnectionCount() == 0 {
 			return
 		}
 

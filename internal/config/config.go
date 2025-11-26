@@ -28,11 +28,11 @@ type Config struct {
 		Port    int               `json:"port"`    // 节点端口
 		Tags    []string          `json:"tags"`    // 节点标签
 		Meta    map[string]string `json:"meta"`    // 节点元数据
-	} `json:"node"`
+	} `json:"game-node"`
 
 	// Cluster 配置
 	Cluster struct {
-		NodeSubjectPrefix string `json:"nodeSubjectPrefix"` // 节点主题前缀，默认为 "cluster.node."
+		NodeSubjectPrefix string `json:"nodeSubjectPrefix"` // 节点主题前缀，默认为 "cluster.game-node."
 	} `json:"cluster"`
 }
 
@@ -65,7 +65,7 @@ func Default() *Config {
 			Type:    "nats",
 			Servers: []string{"nats://127.0.0.1:4222"},
 			Nats: messageQueConfig.NatsConfig{
-				Name:                 "gas-node",
+				Name:                 "gas-game-node",
 				MaxReconnects:        -1,    // 无限重连
 				ReconnectWaitMs:      2000,  // 2秒
 				TimeoutMs:            5000,  // 5秒
@@ -88,7 +88,7 @@ func Default() *Config {
 			Meta    map[string]string `json:"meta"`
 		}{
 			Id:      1,
-			Name:    "node-1",
+			Name:    "game-node-1",
 			Address: "127.0.0.1",
 			Port:    9000,
 			Tags:    []string{},
@@ -97,7 +97,7 @@ func Default() *Config {
 		Cluster: struct {
 			NodeSubjectPrefix string `json:"nodeSubjectPrefix"`
 		}{
-			NodeSubjectPrefix: "cluster.node.",
+			NodeSubjectPrefix: "cluster.game-node.",
 		},
 	}
 }

@@ -31,7 +31,7 @@ func (r *Component) Name() string {
 
 func (r *Component) Start(ctx context.Context) error {
 	if r.node == nil {
-		return fmt.Errorf("node is nil")
+		return fmt.Errorf("game-node is nil")
 	}
 
 	config := r.node.GetConfig()

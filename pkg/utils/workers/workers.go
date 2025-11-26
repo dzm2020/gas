@@ -9,8 +9,6 @@
 package workers
 
 import (
-	"fmt"
-	"runtime/debug"
 	"sync/atomic"
 
 	"github.com/panjf2000/ants/v2"
@@ -44,7 +42,6 @@ func Try(fn func(), reFun func(err interface{})) {
 			if reFun != nil {
 				reFun(err)
 			}
-			fmt.Printf("panic:%s\n", string(debug.Stack()))
 		}
 	}()
 	fn()

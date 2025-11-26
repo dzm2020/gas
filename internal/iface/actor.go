@@ -15,6 +15,16 @@ type IContext interface {
 	Request(to *Pid, msgId uint16, request interface{}, reply interface{}) error
 	Exit()
 	GetSerializer() serializer.ISerializer
+	// RegisterTimer 注册定时器，时间到后通过 pushTask 通知 baseActorContext 然后执行回调
+	RegisterTimer(duration time.Duration, callback Task) (int64, error)
+	// AfterFunc 注册一次性定时器
+	AfterFunc(duration time.Duration, callback Task) (int64, error)
+	// TickFunc 注册周期性定时器，每隔指定时间间隔执行一次回调
+	TickFunc(interval time.Duration, callback Task) (int64, error)
+	// CancelTimer 取消定时器
+	CancelTimer(timerID int64) bool
+	// CancelAllTimers 取消所有定时器
+	CancelAllTimers()
 }
 
 type IActor interface {

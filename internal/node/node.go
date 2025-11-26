@@ -49,9 +49,15 @@ func (m *Node) GetId() uint64 {
 func (m *Node) SetActorSystem(system iface.ISystem) {
 	m.actorSystem = system
 }
-
+func (m *Node) GetActorSystem() iface.ISystem {
+	return m.actorSystem
+}
 func (m *Node) SetRemote(remote iface.IRemote) {
 	m.remote = remote
+}
+
+func (m *Node) GetRemote() iface.IRemote {
+	return m.remote
 }
 
 // SetSerializer 设置序列化器
@@ -62,6 +68,15 @@ func (m *Node) SetSerializer(ser serializer.ISerializer) {
 // GetSerializer 获取序列化器
 func (m *Node) GetSerializer() serializer.ISerializer {
 	return m.serializer
+}
+
+func (m *Node) GetConfig() *config.Config {
+	return m.config
+}
+
+// Self 获取当前节点信息
+func (m *Node) Self() *discovery.Node {
+	return m.node
 }
 
 func (m *Node) StarUp(profileFilePath string, comps ...component.Component) error {
@@ -106,7 +121,7 @@ func (m *Node) StarUp(profileFilePath string, comps ...component.Component) erro
 		return fmt.Errorf("start components failed: %w", err)
 	}
 
-	glog.Infof("node started: id=%d, name=%s, address=%s:%d", m.node.GetID(), m.node.GetName(), m.node.GetAddress(), m.node.GetPort())
+	glog.Infof("game-node started: id=%d, name=%s, address=%s:%d", m.node.GetID(), m.node.GetName(), m.node.GetAddress(), m.node.GetPort())
 
 	// 阻塞等待进程终止信号
 	sigChan := make(chan os.Signal, 1)
@@ -114,22 +129,6 @@ func (m *Node) StarUp(profileFilePath string, comps ...component.Component) erro
 	<-sigChan
 
 	return m.Shutdown()
-}
-
-func (m *Node) GetConfig() *config.Config {
-	return m.config
-}
-
-// Self 获取当前节点信息
-func (m *Node) Self() *discovery.Node {
-	return m.node
-}
-
-func (m *Node) GetActorSystem() iface.ISystem {
-	return m.actorSystem
-}
-func (m *Node) GetRemote() iface.IRemote {
-	return m.remote
 }
 
 // Send 发送消息到指定的 actor
@@ -177,7 +176,7 @@ func (m *Node) validateMessage(message *iface.Message) error {
 		return fmt.Errorf("target pid is nil")
 	}
 	if m.Self().GetID() == 0 {
-		return fmt.Errorf("self node not registered")
+		return fmt.Errorf("self game-node not registered")
 	}
 	return nil
 }
@@ -197,13 +196,13 @@ func (m *Node) Shutdown() error {
 		return nil
 	}
 
-	glog.Infof("node stopping: id=%d, name=%s", nodeId, nodeName)
+	glog.Infof("game-node stopping: id=%d, name=%s", nodeId, nodeName)
 
 	// 停止所有组件（按逆序停止：subscription -> messageQue -> discovery -> actor）
 	ctx := context.Background()
 	if m.componentManager != nil {
 		if err := m.componentManager.Stop(ctx); err != nil {
-			glog.Errorf("node: stop components failed: %v", err)
+			glog.Errorf("game-node: stop components failed: %v", err)
 		}
 	}
 
@@ -212,7 +211,6 @@ func (m *Node) Shutdown() error {
 	m.actorSystem = nil
 	m.componentManager = nil
 
-	glog.Infof("node stopped: id=%d", nodeId)
+	glog.Infof("game-node stopped: id=%d", nodeId)
 	return nil
 }
-

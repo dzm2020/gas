@@ -27,7 +27,7 @@ type Component struct {
 func New(name string, config *Config, node iface.INode) *Component {
 	if config == nil {
 		config = &Config{
-			Actors: []ActorConfig{},
+			Service: []ServiceConfig{},
 		}
 	}
 	return &Component{
@@ -44,7 +44,7 @@ func (c *Component) Name() string {
 
 func (c *Component) Start(ctx context.Context) error {
 	if c.node == nil {
-		return fmt.Errorf("node is nil")
+		return fmt.Errorf("game-node is nil")
 	}
 
 	actorSystem := c.node.GetActorSystem()
@@ -56,7 +56,7 @@ func (c *Component) Start(ctx context.Context) error {
 	defer c.mu.Unlock()
 
 	// 启动所有配置的 actor
-	for _, actorConfig := range c.config.Actors {
+	for _, actorConfig := range c.config.Service {
 		if actorConfig.Actor == nil {
 			glog.Warnf("app: actor '%s' has nil actor instance, skipping", actorConfig.Name)
 			continue

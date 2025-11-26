@@ -39,7 +39,7 @@ func New(initialCap int) *Buffer {
 	return &Buffer{
 		buf:   make([]byte, initialCap),
 		cap:   initialCap,
-		limit: initialCap,
+		limit: initialCap * 10,
 	}
 }
 

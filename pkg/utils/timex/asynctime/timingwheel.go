@@ -9,11 +9,12 @@
 package asynctime
 
 import (
-	"github.com/RussellLuo/timingwheel"
 	"time"
+
+	"github.com/RussellLuo/timingwheel"
 )
 
-var tw = timingwheel.NewTimingWheel(10*time.Millisecond, 3600)
+var tw = timingwheel.NewTimingWheel(1*time.Millisecond, 3600)
 
 func init() {
 	tw.Start()

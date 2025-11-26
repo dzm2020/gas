@@ -41,7 +41,7 @@ func TestAppStart(t *testing.T) {
 
 	// 创建 app 配置
 	config := &app.Config{
-		Actors: []app.ActorConfig{
+		Service: []app.ServiceConfig{
 			{
 				Name:   "example-actor-1",
 				Actor:  &ExampleActor{},

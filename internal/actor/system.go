@@ -86,10 +86,24 @@ func (s *System) Spawn(actor iface.IActor, options ...iface.Option) (*iface.Pid,
 	pid := s.newPid()
 	pid.Name = opts.Name
 
-	context := newBaseActorContext(pid, actor, opts.Middlewares, opts.Router, s)
 	mailBox := NewMailbox()
-	mailBox.RegisterHandlers(context, NewDefaultDispatcher(50))
-	process := NewProcess(context, mailBox)
+	// 先创建 process，传入 nil context（稍后设置）
+	process := NewProcess(nil, mailBox)
+	// 创建 context 配置
+	cfg := &contextConfig{
+		pid:         pid,
+		actor:       actor,
+		middlewares: opts.Middlewares,
+		router:      opts.Router,
+		system:      s,
+		process:     process,
+	}
+	// 创建 context
+	context := newBaseActorContext(cfg)
+	// 设置 process 的 context
+	process.(*Process).setContext(context)
+	// 注册 mailbox 的 handlers
+	mailBox.RegisterHandlers(context, NewDefaultDispatcher(1024))
 
 	s.registerProcess(pid, process)
 

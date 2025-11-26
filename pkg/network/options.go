@@ -1,31 +1,70 @@
 package network
 
 import (
-	"github.com/panjf2000/gnet/v2"
+	"time"
 )
 
 type Option func(*Options)
+type Options struct {
+	handler      IHandler      // 业务回调
+	codec        ICodec        // 协议编解码器
+	timeout      time.Duration // 连接超时时间（0表示不检测超时）
+	sendChanSize int           // 发送队列缓冲大小
+	readBufSize  int           // 读缓冲区大小
+}
 
 func loadOptions(options ...Option) *Options {
-	opts := defaultOptions()
+	opts := &Options{
+		sendChanSize: defaultSendChanBuf,
+		readBufSize:  defaultTCPReadBuf,
+		timeout:      defaultTimeout,
+	}
 	for _, option := range options {
 		option(opts)
 	}
 	return opts
 }
 
-func defaultOptions() *Options {
-	opts := &Options{}
-	return opts
+// WithSendChanSize 设置发送队列缓冲大小
+func WithSendChanSize(size int) Option {
+	return func(opts *Options) {
+		opts.sendChanSize = size
+	}
 }
 
-type Options struct {
-	opts    []gnet.Option
-	handler IHandler
+// WithReadBufSize 设置读缓冲区大小
+func WithReadBufSize(size int) Option {
+	return func(opts *Options) {
+		opts.readBufSize = size
+	}
 }
 
+// WithHandler 设置业务回调处理器
 func WithHandler(handler IHandler) Option {
-	return func(op *Options) {
-		op.handler = handler
+	return func(opts *Options) {
+		if handler == nil {
+			return
+		}
+		opts.handler = handler
+	}
+}
+
+// WithCodec 设置协议编解码器
+func WithCodec(codec ICodec) Option {
+	return func(opts *Options) {
+		if codec == nil {
+			return
+		}
+		opts.codec = codec
+	}
+}
+
+// WithTimeout 设置连接超时时间
+func WithTimeout(timeout time.Duration) Option {
+	return func(opts *Options) {
+		if timeout <= 0 {
+			return
+		}
+		opts.timeout = timeout
 	}
 }

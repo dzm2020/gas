@@ -4,50 +4,47 @@ import (
 	"fmt"
 	"gas/internal/gate/protocol"
 	"gas/internal/iface"
+	"gas/pkg/network"
 )
 
 type Factory func() IAgent
 
 type IAgent interface {
 	iface.IActor
-	OnConnectionOpen(ctx iface.IContext, connection *Connection) error
+	OnConnectionOpen(ctx iface.IContext, connection network.IConnection) error
 	OnConnectionClose(ctx iface.IContext) error
 }
 
 type Agent struct {
 	iface.Actor
-	*Connection
+	network.IConnection
 	ctx iface.IContext
 }
 
-func (agent *Agent) OnConnectionOpen(ctx iface.IContext, connection *Connection) error {
-	agent.Connection = connection
+func (agent *Agent) OnConnectionOpen(ctx iface.IContext, connection network.IConnection) error {
+	agent.IConnection = connection
 	return nil
 }
 
 func (agent *Agent) OnConnectionClose(ctx iface.IContext) error {
-	agent.Connection = nil
+	agent.IConnection = nil
 	return nil
 }
 
-func (agent *Agent) GetConnection() *Connection {
-	return agent.Connection
-}
-
 func (agent *Agent) Close() {
-	if agent.Connection == nil {
+	if agent.IConnection == nil {
 		return
 	}
-	_ = agent.Connection.Close()
+	_ = agent.IConnection.Close(nil)
 }
 
 func (agent *Agent) Send(msg *iface.Message) error {
-	if agent.Connection == nil {
+	if agent.IConnection == nil {
 		return fmt.Errorf("connection is nil")
 	}
 	// 创建响应消息（使用相同的 cmd 和 act）
 	cmd, act := protocol.ParseId(uint16(msg.GetId()))
 	responseMsg := protocol.New(cmd, act, msg.GetData())
 	responseMsg.Index = 0 // 可以根据需要设置 Index
-	return agent.Connection.Send(responseMsg)
+	return agent.IConnection.Send(responseMsg)
 }

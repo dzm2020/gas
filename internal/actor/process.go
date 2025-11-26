@@ -23,6 +23,11 @@ type Process struct {
 	isExit  atomic.Bool
 }
 
+// setContext 设置 context（内部使用）
+func (p *Process) setContext(ctx iface.IContext) {
+	p.ctx = ctx
+}
+
 func (p *Process) Context() iface.IContext {
 	return p.ctx
 }
@@ -35,7 +40,7 @@ func (p *Process) PushTask(task iface.Task) error {
 		return errors.New("process is exiting")
 	}
 	return p.mailbox.PostMessage(&iface.TaskMessage{
-		task: task,
+		Task: task,
 	})
 }
 
@@ -82,7 +87,7 @@ func (p *Process) pushTaskAndWait(timeout time.Duration, task iface.Task) error 
 		return e
 	}
 
-	if err := p.mailbox.PostMessage(&iface.TaskMessage{task: syncTask}); err != nil {
+	if err := p.mailbox.PostMessage(&iface.TaskMessage{Task: syncTask}); err != nil {
 		return err
 	}
 	_, err := waiter.Wait()

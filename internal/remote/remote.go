@@ -28,7 +28,7 @@ type Remote struct {
 // New 创建远程通信管理器
 func New(que messageQue.IMessageQue, discovery discovery.IDiscovery, nodeSubjectPrefix string, serializer serializer.ISerializer) *Remote {
 	if nodeSubjectPrefix == "" {
-		nodeSubjectPrefix = "cluster.node."
+		nodeSubjectPrefix = "cluster.game-node."
 	}
 	return &Remote{
 		discovery:         discovery,
@@ -80,7 +80,7 @@ func (r *Remote) Subscribe(nodeId uint64) error {
 	nodeSubject := fmt.Sprintf("%s%d", r.nodeSubjectPrefix, nodeId)
 	subscription, err := r.messageQue.Subscribe(nodeSubject, handler)
 	if err != nil {
-		return fmt.Errorf("subscribe to node %d failed: %w", nodeId, err)
+		return fmt.Errorf("subscribe to game-node %d failed: %w", nodeId, err)
 	}
 
 	// 保存订阅
@@ -112,7 +112,7 @@ func (r *Remote) onRemoteHandler(data []byte, reply func([]byte) error) {
 		return
 	}
 	if r.node == nil {
-		r.sendError(reply, "node not initialized")
+		r.sendError(reply, "game-node not initialized")
 		return
 	}
 	if r.node.GetActorSystem() == nil {
@@ -160,7 +160,7 @@ func (r *Remote) Send(message *iface.Message) error {
 	}
 	subject := fmt.Sprintf("%s%d", r.nodeSubjectPrefix, toNodeId)
 	if err := r.messageQue.Publish(subject, data); err != nil {
-		return fmt.Errorf("publish to remote node %d failed: %w", toNodeId, err)
+		return fmt.Errorf("publish to remote game-node %d failed: %w", toNodeId, err)
 	}
 	return nil
 }
@@ -175,7 +175,7 @@ func (r *Remote) Request(message *iface.Message, timeout time.Duration) *iface.R
 	subject := fmt.Sprintf("%s%d", r.nodeSubjectPrefix, toNodeId)
 	responseData, err := r.messageQue.Request(subject, data, timeout)
 	if err != nil {
-		return iface.NewErrorResponse(fmt.Sprintf("request to remote node %d failed: %v", toNodeId, err))
+		return iface.NewErrorResponse(fmt.Sprintf("request to remote game-node %d failed: %v", toNodeId, err))
 	}
 
 	response := &iface.RespondMessage{}
