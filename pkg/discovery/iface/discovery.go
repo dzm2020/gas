@@ -2,11 +2,11 @@ package iface
 
 type IDiscovery interface {
 	GetById(nodeId uint64) *Node
-	GetByKind(kind string) []*Node
+	GetService(service string) []*Node
 	GetAll() []*Node
 	Add(node *Node) error
 	Remove(nodeId uint64) error
-	Watch(name string, handler UpdateHandler) error
-	Unwatch(name string, handler UpdateHandler) bool
+	Subscribe(name string, handler ServiceChangeListener) error
+	Unsubscribe(name string, handler ServiceChangeListener)
 	Close() error
 }

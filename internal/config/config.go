@@ -32,7 +32,7 @@ type Config struct {
 
 	// Cluster 配置
 	Cluster struct {
-		NodeSubjectPrefix string `json:"nodeSubjectPrefix"` // 节点主题前缀，默认为 "cluster.game-node."
+		Name string `json:"name"` // 集群名
 	} `json:"cluster"`
 }
 

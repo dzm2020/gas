@@ -12,10 +12,10 @@ import (
 )
 
 type consulRegistrar struct {
-	client *api.Client
-	opts   *Options
-	stopCh <-chan struct{}
-
+	client   *api.Client
+	opts     *Options
+	stopCh   <-chan struct{}
+	status   string
 	wg       sync.WaitGroup
 	healthMu sync.RWMutex
 	healthCh map[uint64]chan string
@@ -45,17 +45,24 @@ func (r *consulRegistrar) Add(node *iface.Node) error {
 		Check:   check,
 	}
 	if err := r.client.Agent().ServiceRegister(registration); err != nil {
+		glog.Error("consul registrar: failed to register node",
+			zap.Uint64("nodeId", node.GetID()),
+			zap.String("name", node.GetName()),
+			zap.Error(err))
 		return err
 	}
 
 	ch := make(chan string, 1)
 	if !r.setHealthChan(node.GetID(), ch) {
-		//  update service
-		return nil
+		glog.Debug("consul registrar: node already registered", zap.Uint64("nodeId", node.GetID()))
+		return nil // service already registered
 	}
 
 	r.wg.Add(1)
 	go r.healthCheck(node.GetID(), ch)
+	glog.Info("consul registrar: node registered successfully",
+		zap.Uint64("nodeId", node.GetID()),
+		zap.String("name", node.GetName()))
 	return nil
 }
 
@@ -67,12 +74,21 @@ func (r *consulRegistrar) UpdateStatus(nodeID uint64, status string) {
 	select {
 	case ch <- status:
 	default:
+		glog.Warn("consul registrar: failed to update node status, channel full", zap.Uint64("nodeId", nodeID))
 	}
 }
 
 func (r *consulRegistrar) Remove(nodeID uint64) error {
+	if r.getHealthChan(nodeID) == nil {
+		return nil
+	}
 	r.deleteHealthChan(nodeID)
-	return r.client.Agent().ServiceDeregister(convertor.ToString(nodeID))
+	if err := r.client.Agent().ServiceDeregister(convertor.ToString(nodeID)); err != nil {
+		glog.Error("consul registrar: failed to remove node", zap.Uint64("nodeId", nodeID), zap.Error(err))
+		return err
+	}
+	glog.Info("consul registrar: node removed successfully", zap.Uint64("nodeId", nodeID))
+	return nil
 }
 
 func (r *consulRegistrar) healthCheck(nodeID uint64, ch <-chan string) {
@@ -92,7 +108,9 @@ func (r *consulRegistrar) healthCheck(nodeID uint64, ch <-chan string) {
 		_ = r.Remove(nodeID)
 	}()
 
-	_ = r.updateTTL(nodeID, "pass")
+	r.status = "pass"
+
+	_ = r.updateTTL(nodeID, r.status)
 
 	for {
 		select {
@@ -102,11 +120,14 @@ func (r *consulRegistrar) healthCheck(nodeID uint64, ch <-chan string) {
 			if !ok {
 				return
 			}
+			r.status = status
 			if err := r.updateTTL(nodeID, status); err != nil {
+				glog.Error("consul registrar: failed to update TTL", zap.Uint64("nodeId", nodeID), zap.Error(err))
 				return
 			}
 		case <-ticker.C:
-			if err := r.updateTTL(nodeID, "pass"); err != nil {
+			if err := r.updateTTL(nodeID, r.status); err != nil {
+				glog.Error("consul registrar: failed to update TTL on tick", zap.Uint64("nodeId", nodeID), zap.Error(err))
 				return
 			}
 		}
@@ -119,11 +140,11 @@ func (r *consulRegistrar) updateTTL(nodeID uint64, status string) error {
 
 func (r *consulRegistrar) setHealthChan(nodeID uint64, ch chan string) bool {
 	r.healthMu.Lock()
+	defer r.healthMu.Unlock()
 	if _, ok := r.healthCh[nodeID]; ok {
 		return false
 	}
 	r.healthCh[nodeID] = ch
-	r.healthMu.Unlock()
 	return true
 }
 
@@ -135,20 +156,23 @@ func (r *consulRegistrar) getHealthChan(nodeID uint64) chan string {
 
 func (r *consulRegistrar) deleteHealthChan(nodeID uint64) {
 	r.healthMu.Lock()
+	defer r.healthMu.Unlock()
 	if ch, ok := r.healthCh[nodeID]; ok {
 		close(ch)
 		delete(r.healthCh, nodeID)
 	}
-	r.healthMu.Unlock()
 }
 
 func (r *consulRegistrar) shutdown() {
+	var nodes []uint64
 	r.healthMu.Lock()
-	for id, ch := range r.healthCh {
-		close(ch)
-		delete(r.healthCh, id)
+	for id, _ := range r.healthCh {
+		nodes = append(nodes, id)
 	}
 	r.healthMu.Unlock()
+	for _, id := range nodes {
+		_ = r.Remove(id)
+	}
 }
 
 func (r *consulRegistrar) Wait() {

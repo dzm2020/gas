@@ -2,18 +2,22 @@ package consul
 
 import (
 	"gas/pkg/discovery/iface"
+	"gas/pkg/utils/glog"
 	"sync"
 
 	"github.com/duke-git/lancet/v2/convertor"
 	"github.com/hashicorp/consul/api"
+	"go.uber.org/zap"
 )
 
 var _ iface.IDiscovery = (*Provider)(nil)
 
 func New(options ...Option) (*Provider, error) {
 	opts := loadOptions(options...)
+
 	client, err := newConsulClient(opts.Address)
 	if err != nil {
+		glog.Error("consul provider: failed to create consul client", zap.String("address", opts.Address), zap.Error(err))
 		return nil, err
 	}
 
@@ -22,9 +26,12 @@ func New(options ...Option) (*Provider, error) {
 		client:          client,
 		opts:            opts,
 		stopCh:          stopCh,
-		watchers:        make(map[string]*consulWatcher),
+		nodes:           make(map[uint64]*iface.Node),
 		consulRegistrar: newConsulRegistrar(client, opts, stopCh),
 	}
+	provider.serviceWatcher = newServiceWatcher(client, opts, stopCh, provider.onNodeChange)
+
+	glog.Info("consul provider: created successfully", zap.String("address", opts.Address))
 	return provider, nil
 }
 
@@ -35,8 +42,11 @@ type Provider struct {
 	stopOnce sync.Once
 	stopCh   chan struct{}
 
-	watchersMu sync.RWMutex
-	watchers   map[string]*consulWatcher
+	serviceWatcher *serviceWatcher
+
+	// 节点存储
+	nodesMu sync.RWMutex
+	nodes   map[uint64]*iface.Node
 
 	*consulRegistrar
 }
@@ -46,124 +56,84 @@ func newConsulClient(addr string) (*api.Client, error) {
 	cfg.Address = addr
 	client, err := api.NewClient(cfg)
 	if err != nil {
+		glog.Error("consul provider: failed to create consul client", zap.String("address", addr), zap.Error(err))
 		return nil, err
 	}
 	if _, err = client.Status().Leader(); err != nil {
+		glog.Error("consul provider: failed to connect to consul leader", zap.String("address", addr), zap.Error(err))
 		return nil, err
 	}
+	glog.Debug("consul provider: connected to consul", zap.String("address", addr))
 	return client, nil
 }
 
-func (c *Provider) Watch(service string, handler iface.UpdateHandler) error {
-	c.watchersMu.Lock()
-
-	// 如果已经存在该 service 的 watcher，将回调添加到 watcher 中
-	if watcher, exists := c.watchers[service]; exists {
-		c.watchersMu.Unlock()
-		return watcher.WatchNode(service, handler)
-	}
-
-	// 为每个 service 创建独立的 watcher
-
-	watcher := newConsulWatcher(c.client, service, c.opts, c.stopCh)
-	// 建立 service 和 watcher 的映射
-	c.watchers[service] = watcher
-	c.watchersMu.Unlock()
-
-	// 开始监听
-	if err := watcher.WatchNode(service, handler); err != nil {
-		return err
-	}
-
-	// 启动 watcher
-	watcher.start()
+func (c *Provider) Subscribe(service string, listener iface.ServiceChangeListener) error {
+	watcher := c.serviceWatcher.GetOrCreateWatcher(service)
+	watcher.Add(listener)
+	glog.Info("consul provider: subscribed to service", zap.String("service", service))
 	return nil
 }
 
-// Unwatch 移除指定 service 的 handler
-// 如果 handler 为 nil，则移除该 service 的所有 handlers 并停止监听
-// 返回是否成功移除
-func (c *Provider) Unwatch(service string, handler iface.UpdateHandler) bool {
-	c.watchersMu.Lock()
-	defer c.watchersMu.Unlock()
-
-	watcher, exists := c.watchers[service]
-	if !exists {
-		return false
+func (c *Provider) Unsubscribe(service string, listener iface.ServiceChangeListener) {
+	watcher := c.serviceWatcher.GetWatcher(service)
+	if watcher == nil {
+		return
 	}
-
-	// 如果 handler 为 nil，移除整个 watcher
-	if handler == nil {
-		delete(c.watchers, service)
-		return true
-	}
-
-	// 移除指定的 handler
-	removed := watcher.RemoveHandler(handler)
-
-	// 如果所有 handlers 都被移除了，删除 watcher
-	if watcher.HandlerCount() == 0 {
-		delete(c.watchers, service)
-	}
-
-	return removed
+	_ = watcher.Remove(listener)
 }
 
-// GetById 从所有 watcher 的合并 nodelist 中获取节点
-func (c *Provider) GetById(nodeId uint64) *iface.Node {
-	c.watchersMu.RLock()
-	defer c.watchersMu.RUnlock()
+// onNodeChange 节点变化回调，更新节点存储
+func (c *Provider) onNodeChange(topology *iface.Topology) {
+	c.nodesMu.Lock()
+	defer c.nodesMu.Unlock()
 
-	// 遍历所有 watcher，查找节点
-	for _, watcher := range c.watchers {
-		if node := watcher.GetById(nodeId); node != nil {
-			return node
+	for _, node := range topology.Joined {
+		if node != nil {
+			c.nodes[node.GetID()] = convertor.DeepClone(node)
 		}
 	}
+	for _, node := range topology.Alive {
+		if node != nil {
+			c.nodes[node.GetID()] = convertor.DeepClone(node)
+		}
+	}
+	for _, node := range topology.Left {
+		if node != nil {
+			delete(c.nodes, node.GetID())
+		}
+	}
+}
+
+func (c *Provider) GetById(nodeId uint64) *iface.Node {
+	c.nodesMu.RLock()
+	defer c.nodesMu.RUnlock()
+	if node, exists := c.nodes[nodeId]; exists {
+		return convertor.DeepClone(node)
+	}
 	return nil
 }
 
-// GetByKind 从所有 watcher 的合并 nodelist 中按标签类型获取节点
-func (c *Provider) GetByKind(kind string) []*iface.Node {
-	c.watchersMu.RLock()
-	defer c.watchersMu.RUnlock()
+func (c *Provider) GetService(service string) []*iface.Node {
+	c.nodesMu.RLock()
+	defer c.nodesMu.RUnlock()
 
 	result := make([]*iface.Node, 0)
-	nodeMap := make(map[uint64]*iface.Node)
-
-	// 合并所有 watcher 的节点
-	for _, watcher := range c.watchers {
-		nodes := watcher.GetByKind(kind)
-		for _, node := range nodes {
-			if _, exists := nodeMap[node.GetID()]; !exists {
-				nodeMap[node.GetID()] = node
-				result = append(result, node)
-			}
+	for _, node := range c.nodes {
+		if node.GetName() == service {
+			result = append(result, convertor.DeepClone(node))
 		}
 	}
-
 	return result
 }
 
-// GetAll 从所有 watcher 的合并 nodelist 中获取所有节点
 func (c *Provider) GetAll() []*iface.Node {
-	c.watchersMu.RLock()
-	defer c.watchersMu.RUnlock()
+	c.nodesMu.RLock()
+	defer c.nodesMu.RUnlock()
 
-	result := make([]*iface.Node, 0)
-	nodeMap := make(map[uint64]*iface.Node)
-
-	// 合并所有 watcher 的节点
-	for _, watcher := range c.watchers {
-		nodes := watcher.GetAll()
-		for _, node := range nodes {
-			if _, exists := nodeMap[node.GetID()]; !exists {
-				nodeMap[node.GetID()] = node
-				result = append(result, convertor.DeepClone(node))
-			}
-		}
+	result := make([]*iface.Node, 0, len(c.nodes))
+	for _, node := range c.nodes {
+		result = append(result, convertor.DeepClone(node))
 	}
-
 	return result
 }
 
@@ -172,14 +142,8 @@ func (c *Provider) Close() error {
 		close(c.stopCh)
 		c.consulRegistrar.shutdown()
 	})
-
-	// 等待所有 watcher 完成
-	c.watchersMu.RLock()
-	for _, watcher := range c.watchers {
-		watcher.Wait()
-	}
-	c.watchersMu.RUnlock()
-
+	c.serviceWatcher.Wait()
 	c.consulRegistrar.Wait()
+	glog.Info("consul provider: closed")
 	return nil
 }

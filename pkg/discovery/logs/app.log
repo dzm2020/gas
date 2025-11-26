@@ -1,0 +1,41 @@
+{"L":"error","T":"2025/11/26 17:15:49.441152+0800","C":"consul/provider.go:63","M":"consul provider: failed to connect to consul leader","address":"127.0.0.1:8500","error":"Get \"http://127.0.0.1:8500/v1/status/leader\": dial tcp 127.0.0.1:8500: connectex: No connection could be made because the target machine actively refused it."}
+{"L":"error","T":"2025/11/26 17:15:49.451638+0800","C":"consul/provider.go:20","M":"consul provider: failed to create consul client","address":"127.0.0.1:8500","error":"Get \"http://127.0.0.1:8500/v1/status/leader\": dial tcp 127.0.0.1:8500: connectex: No connection could be made because the target machine actively refused it."}
+{"L":"info","T":"2025/11/26 17:16:28.131591+0800","C":"consul/provider.go:34","M":"consul provider: created successfully","address":"127.0.0.1:8500"}
+{"L":"info","T":"2025/11/26 17:16:28.147651+0800","C":"consul/registrar.go:63","M":"consul registrar: node registered successfully","nodeId":1001,"name":"test-service"}
+{"L":"error","T":"2025/11/26 17:16:28.647845+0800","C":"consul/registrar.go:125","M":"consul registrar: failed to update TTL on tick","nodeId":1001,"error":"Invalid status: "}
+{"L":"info","T":"2025/11/26 17:16:28.657909+0800","C":"consul/registrar.go:87","M":"consul registrar: node removed successfully","nodeId":1001}
+{"L":"info","T":"2025/11/26 17:16:29.148267+0800","C":"consul/provider.go:152","M":"consul provider: closed"}
+{"L":"info","T":"2025/11/26 17:17:11.051810+0800","C":"consul/provider.go:34","M":"consul provider: created successfully","address":"127.0.0.1:8500"}
+{"L":"info","T":"2025/11/26 17:17:11.067111+0800","C":"consul/registrar.go:63","M":"consul registrar: node registered successfully","nodeId":1001,"name":"test-service"}
+{"L":"info","T":"2025/11/26 17:17:12.071571+0800","C":"consul/registrar.go:87","M":"consul registrar: node removed successfully","nodeId":1001}
+{"L":"info","T":"2025/11/26 17:17:12.071571+0800","C":"consul/provider.go:152","M":"consul provider: closed"}
+{"L":"info","T":"2025/11/26 17:17:33.328926+0800","C":"consul/provider.go:34","M":"consul provider: created successfully","address":"127.0.0.1:8500"}
+{"L":"info","T":"2025/11/26 17:17:33.343477+0800","C":"consul/registrar.go:63","M":"consul registrar: node registered successfully","nodeId":1001,"name":"test-service"}
+{"L":"info","T":"2025/11/26 17:17:43.346166+0800","C":"consul/registrar.go:87","M":"consul registrar: node removed successfully","nodeId":1001}
+{"L":"info","T":"2025/11/26 17:17:43.346166+0800","C":"consul/provider.go:152","M":"consul provider: closed"}
+{"L":"info","T":"2025/11/26 17:18:04.705108+0800","C":"consul/provider.go:34","M":"consul provider: created successfully","address":"127.0.0.1:8500"}
+{"L":"info","T":"2025/11/26 17:18:04.719922+0800","C":"consul/registrar.go:63","M":"consul registrar: node registered successfully","nodeId":1001,"name":"test-service"}
+{"L":"info","T":"2025/11/26 17:18:14.732368+0800","C":"consul/registrar.go:87","M":"consul registrar: node removed successfully","nodeId":1001}
+{"L":"info","T":"2025/11/26 17:18:14.732368+0800","C":"consul/provider.go:152","M":"consul provider: closed"}
+{"L":"info","T":"2025/11/26 17:19:47.848210+0800","C":"consul/serviceWatcher.go:50","M":"consul serviceWatcher: starting"}
+{"L":"info","T":"2025/11/26 17:19:47.856314+0800","C":"consul/provider.go:34","M":"consul provider: created successfully","address":"127.0.0.1:8500"}
+{"L":"info","T":"2025/11/26 17:19:47.857471+0800","C":"consul/serviceWatcher.go:105","M":"consul serviceWatcher: created watcher for new service","service":"consul"}
+{"L":"info","T":"2025/11/26 17:19:47.861191+0800","C":"consul/watcher.go:94","M":"consul watcher: service topology changed","service":"consul","joined":1,"alive":0,"left":0,"total":1}
+{"L":"info","T":"2025/11/26 17:19:47.862224+0800","C":"consul/serviceWatcher.go:105","M":"consul serviceWatcher: created watcher for new service","service":"test-service"}
+{"L":"info","T":"2025/11/26 17:19:47.862568+0800","C":"consul/registrar.go:63","M":"consul registrar: node registered successfully","nodeId":1001,"name":"test-service"}
+{"L":"info","T":"2025/11/26 17:19:47.867906+0800","C":"consul/watcher.go:94","M":"consul watcher: service topology changed","service":"test-service","joined":1,"alive":0,"left":0,"total":1}
+{"L":"info","T":"2025/11/26 17:20:02.866961+0800","C":"consul/watcher.go:94","M":"consul watcher: service topology changed","service":"test-service","joined":0,"alive":0,"left":1,"total":0}
+{"L":"error","T":"2025/11/26 17:20:02.867976+0800","C":"consul/registrar.go:84","M":"consul registrar: failed to remove node","nodeId":1001,"error":"Unexpected response code: 404 (Unknown service ID \"1001\". Ensure that the service ID is passed, not the service name.)"}
+{"L":"info","T":"2025/11/26 17:20:02.867976+0800","C":"consul/registrar.go:87","M":"consul registrar: node removed successfully","nodeId":1001}
+{"L":"info","T":"2025/11/26 17:20:03.889860+0800","C":"consul/serviceWatcher.go:67","M":"consul serviceWatcher: stopped"}
+{"L":"info","T":"2025/11/26 17:20:03.889860+0800","C":"consul/provider.go:147","M":"consul provider: closed"}
+{"L":"info","T":"2025/11/26 17:25:39.425390+0800","C":"consul/provider.go:34","M":"consul provider: created successfully","address":"127.0.0.1:8500"}
+{"L":"info","T":"2025/11/26 17:25:39.425390+0800","C":"consul/serviceWatcher.go:65","M":"consul serviceWatcher start"}
+{"L":"info","T":"2025/11/26 17:25:39.439863+0800","C":"consul/registrar.go:63","M":"consul registrar: node registered successfully","nodeId":1001,"name":"test-service"}
+{"L":"info","T":"2025/11/26 17:25:39.439863+0800","C":"consul/serviceWatcher.go:110","M":"consul serviceWatcher: created watcher for new service","service":"test-service"}
+{"L":"info","T":"2025/11/26 17:25:39.442204+0800","C":"consul/watcher.go:94","M":"consul watcher: service topology changed","service":"test-service","joined":1,"alive":0,"left":0,"total":1}
+{"L":"info","T":"2025/11/26 17:25:54.445965+0800","C":"consul/watcher.go:94","M":"consul watcher: service topology changed","service":"test-service","joined":0,"alive":0,"left":1,"total":0}
+{"L":"info","T":"2025/11/26 17:26:03.651121+0800","C":"consul/registrar.go:87","M":"consul registrar: node removed successfully","nodeId":1001}
+{"L":"info","T":"2025/11/26 17:26:03.651623+0800","C":"consul/serviceWatcher.go:62","M":"consul serviceWatcher close"}
+{"L":"error","T":"2025/11/26 17:31:02.578737+0800","C":"consul/registrar.go:84","M":"consul registrar: failed to remove node","nodeId":1001,"error":"Unexpected response code: 404 (Unknown service ID \"1001\". Ensure that the service ID is passed, not the service name.)"}
+{"L":"info","T":"2025/11/26 17:31:02.579239+0800","C":"consul/provider.go:147","M":"consul provider: closed"}

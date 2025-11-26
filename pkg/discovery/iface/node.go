@@ -39,4 +39,4 @@ type Topology struct {
 	Left   []*Node
 }
 
-type UpdateHandler func(_ *Topology)
+type ServiceChangeListener func(_ *Topology)
