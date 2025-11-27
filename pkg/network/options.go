@@ -11,6 +11,7 @@ type Options struct {
 	timeout      time.Duration // 连接超时时间（0表示不检测超时）
 	sendChanSize int           // 发送队列缓冲大小
 	readBufSize  int           // 读缓冲区大小
+	maxConn      int
 }
 
 func loadOptions(options ...Option) *Options {
@@ -18,6 +19,7 @@ func loadOptions(options ...Option) *Options {
 		sendChanSize: defaultSendChanBuf,
 		readBufSize:  defaultTCPReadBuf,
 		timeout:      defaultTimeout,
+		maxConn:      10000,
 	}
 	for _, option := range options {
 		option(opts)
@@ -66,5 +68,15 @@ func WithTimeout(timeout time.Duration) Option {
 			return
 		}
 		opts.timeout = timeout
+	}
+}
+
+// WithMaxConn 设置最大连接数
+func WithMaxConn(maxConn int) Option {
+	return func(opts *Options) {
+		if maxConn <= 0 {
+			return
+		}
+		opts.maxConn = maxConn
 	}
 }

@@ -140,10 +140,6 @@ func (c *Provider) GetAll() []*iface.Node {
 func (c *Provider) Close() error {
 	c.stopOnce.Do(func() {
 		close(c.stopCh)
-		c.consulRegistrar.shutdown()
 	})
-	c.serviceWatcher.Wait()
-	c.consulRegistrar.Wait()
-	glog.Info("consul provider: closed")
 	return nil
 }

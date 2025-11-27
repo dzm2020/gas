@@ -47,7 +47,7 @@ func (r *Component) Start(ctx context.Context) error {
 		return fmt.Errorf("create message queue failed: %w", err)
 	}
 	//  组合成remote
-	nodeSubjectPrefix := config.Cluster.NodeSubjectPrefix
+	nodeSubjectPrefix := config.Cluster.Name
 	r.remote = New(messageQueue, discoveryInstance, nodeSubjectPrefix, r.node.GetSerializer())
 	r.remote.SetSerializer(r.node.GetSerializer())
 	r.remote.SetNode(r.node)

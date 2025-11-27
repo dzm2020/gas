@@ -1,8 +1,10 @@
 package consul
 
 import (
+	"context"
 	"gas/pkg/discovery/iface"
 	"gas/pkg/lib/glog"
+	"gas/pkg/lib/workers"
 	"sync"
 	"time"
 
@@ -16,7 +18,6 @@ type serviceWatcher struct {
 	opts      *Options
 	stopCh    <-chan struct{}
 	waitIndex uint64
-	wg        sync.WaitGroup
 
 	// watchers 管理
 	watchersMu sync.RWMutex
@@ -47,25 +48,17 @@ func newServiceWatcher(
 
 // Start 启动服务列表监听
 func (sw *serviceWatcher) Start() {
-
-	sw.wg.Add(1)
-	go sw.watch()
+	workers.Go(func(ctx context.Context) {
+		sw.watch(ctx)
+	})
 }
 
 // watch 持续监听服务列表变化
-func (sw *serviceWatcher) watch() {
-	defer func() {
-		if rec := recover(); rec != nil {
-			glog.Error("consul serviceWatcher watch panic", zap.Any("error", rec))
-		}
-		sw.wg.Done()
-		glog.Info("consul serviceWatcher close")
-	}()
-
-	glog.Info("consul serviceWatcher start")
-
+func (sw *serviceWatcher) watch(ctx context.Context) {
 	for {
 		select {
+		case <-ctx.Done():
+			return
 		case <-sw.stopCh:
 			return
 		default:
@@ -138,24 +131,4 @@ func (sw *serviceWatcher) GetOrCreateWatcher(service string) *consulWatcher {
 	}
 	watcher.start()
 	return watcher
-}
-
-// WaitAllWatchers 等待所有 watchers 完成
-func (sw *serviceWatcher) WaitAllWatchers() {
-	sw.watchersMu.RLock()
-	watchers := make([]*consulWatcher, 0, len(sw.watchers))
-	for _, watcher := range sw.watchers {
-		watchers = append(watchers, watcher)
-	}
-	sw.watchersMu.RUnlock()
-
-	for _, watcher := range watchers {
-		watcher.Wait()
-	}
-}
-
-// Wait 等待监听 goroutine 完成
-func (sw *serviceWatcher) Wait() {
-	sw.wg.Wait()
-	sw.WaitAllWatchers()
 }

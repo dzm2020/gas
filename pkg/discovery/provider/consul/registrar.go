@@ -1,8 +1,10 @@
 package consul
 
 import (
+	"context"
 	"gas/pkg/discovery/iface"
 	"gas/pkg/lib/glog"
+	"gas/pkg/lib/workers"
 	"sync"
 	"time"
 
@@ -58,8 +60,9 @@ func (r *consulRegistrar) Add(node *iface.Node) error {
 		return nil // service already registered
 	}
 
-	r.wg.Add(1)
-	go r.healthCheck(node.GetID(), ch)
+	workers.Go(func(ctx context.Context) {
+		r.healthCheck(ctx, node.GetID(), ch)
+	})
 	glog.Info("consul registrar: node registered successfully",
 		zap.Uint64("nodeId", node.GetID()),
 		zap.String("name", node.GetName()))
@@ -91,21 +94,16 @@ func (r *consulRegistrar) Remove(nodeID uint64) error {
 	return nil
 }
 
-func (r *consulRegistrar) healthCheck(nodeID uint64, ch <-chan string) {
-	defer func() {
-		if rec := recover(); rec != nil {
-			glog.Error("consul registrar healthCheck panic", zap.Uint64("nodeID", nodeID), zap.Any("error", rec))
-		}
-		r.wg.Done()
-	}()
+func (r *consulRegistrar) healthCheck(ctx context.Context, nodeID uint64, ch <-chan string) {
+
 	interval := r.opts.HealthTTL / 2
 	if interval <= 0 {
 		interval = time.Second
 	}
 	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
 	defer func() {
 		_ = r.Remove(nodeID)
+		ticker.Stop()
 	}()
 
 	r.status = "pass"
@@ -114,6 +112,8 @@ func (r *consulRegistrar) healthCheck(nodeID uint64, ch <-chan string) {
 
 	for {
 		select {
+		case <-ctx.Done():
+			return
 		case <-r.stopCh:
 			return
 		case status, ok := <-ch:
@@ -161,20 +161,4 @@ func (r *consulRegistrar) deleteHealthChan(nodeID uint64) {
 		close(ch)
 		delete(r.healthCh, nodeID)
 	}
-}
-
-func (r *consulRegistrar) shutdown() {
-	var nodes []uint64
-	r.healthMu.Lock()
-	for id, _ := range r.healthCh {
-		nodes = append(nodes, id)
-	}
-	r.healthMu.Unlock()
-	for _, id := range nodes {
-		_ = r.Remove(id)
-	}
-}
-
-func (r *consulRegistrar) Wait() {
-	r.wg.Wait()
 }

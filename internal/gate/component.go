@@ -2,18 +2,15 @@ package gate
 
 import (
 	"context"
-	"fmt"
-	"gas/internal/iface"
 	"gas/pkg/component"
 )
 
 // NewComponent 创建 Gate 组件
-func NewComponent(name string, node iface.INode, factory Factory, opts ...Option) *Component {
-	gate := New(node, factory, opts...)
+func NewComponent(name string, factory Factory, opts ...Option) *Component {
+	gate := New(factory, opts...)
 	return &Component{
 		gate: gate,
 		name: name,
-		node: node,
 	}
 }
 
@@ -24,7 +21,6 @@ var _ component.Component = (*Component)(nil)
 type Component struct {
 	gate *Gate
 	name string
-	node iface.INode
 }
 
 // Name 返回组件名称
@@ -34,18 +30,11 @@ func (g *Component) Name() string {
 
 // Start 启动 Gate 组件
 func (g *Component) Start(ctx context.Context) error {
-	if g.gate == nil {
-		return fmt.Errorf("gate is nil")
-	}
 	g.gate.Run(ctx)
 	return nil
 }
 
 // Stop 停止 Gate 组件
 func (g *Component) Stop(ctx context.Context) error {
-	if g.gate == nil {
-		return nil
-	}
-	g.gate.GracefulStop()
-	return nil
+	return g.gate.GracefulStop()
 }

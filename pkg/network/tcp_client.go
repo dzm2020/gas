@@ -42,7 +42,6 @@ func (c *TCPClient) Connect() error {
 	// 创建TCP连接
 	c.TCPConnection = newTCPConnection(conn, Connect, c.options)
 	c.connected.Store(true)
-
 	return nil
 }
 

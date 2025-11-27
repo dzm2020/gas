@@ -1,6 +1,7 @@
 package network
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"gas/pkg/lib/glog"
@@ -18,26 +19,22 @@ type UDPConnection struct {
 	conn            *net.UDPConn // 底层UDP连接（全局共享）
 	readChan        chan []byte
 	remoteAddr      *net.UDPAddr // 远程地址（虚拟连接的核心标识）
-	context         *workers.WaitContext
 }
 
-func newUDPConnection(ctx *workers.WaitContext, conn *net.UDPConn, typ ConnectionType, remoteAddr *net.UDPAddr, server *UDPServer) *UDPConnection {
+func newUDPConnection(conn *net.UDPConn, typ ConnectionType, remoteAddr *net.UDPAddr, server *UDPServer) *UDPConnection {
 	udpConn := &UDPConnection{
 		baseConnection: initBaseConnection(typ, server.options),
 		conn:           conn,
 		remoteAddr:     remoteAddr,
 		server:         server,
 		readChan:       make(chan []byte, 100),
-		context:        workers.WithWaitContext(ctx),
 	}
 
 	glog.Infof("udp connection open %v local:%v remote:%v typ:%v", udpConn.ID(), udpConn.LocalAddr(), udpConn.RemoteAddr(), udpConn.Type())
 
 	AddConnection(udpConn)
-	udpConn.context.Add(1)
-	workers.Go(func(context *workers.WaitContext) {
-		defer udpConn.context.Done()
-		udpConn.readLoop()
+	workers.Go(func(ctx context.Context) {
+		udpConn.readLoop(ctx)
 	})
 	return udpConn
 }
@@ -61,7 +58,7 @@ func (c *UDPConnection) Send(msg interface{}) error {
 	return nil
 }
 
-func (c *UDPConnection) readLoop() {
+func (c *UDPConnection) readLoop(ctx context.Context) {
 	var err error
 	defer func() {
 		_ = c.Close(err)
@@ -74,7 +71,9 @@ func (c *UDPConnection) readLoop() {
 
 	for {
 		select {
-		case <-c.context.IsFinish():
+		case <-ctx.Done():
+			return
+		case <-c.closeChan:
 			return
 		case <-c.timeoutTicker.C:
 			if c.isTimeout() {
@@ -103,14 +102,11 @@ func (c *UDPConnection) Close(err error) error {
 	if !c.closeBase() {
 		return errors.New("udp connection already closed")
 	}
-	c.context.Cancel()
-	c.context.Add(1)
-	workers.Go(func(context *workers.WaitContext) {
-		defer c.context.Done()
+	close(c.closeChan)
+	workers.Go(func(context.Context) {
 		c.server.removeConnection(c.remoteAddr.String())
 		_ = c.baseConnection.Close(c, err)
 	})
-	c.context.Wait()
 	glog.Info("udp connection close", zap.Int64("conn_id", c.ID()), zap.Error(err))
 	return nil
 }

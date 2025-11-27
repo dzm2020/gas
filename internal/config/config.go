@@ -95,9 +95,9 @@ func Default() *Config {
 			Meta:    make(map[string]string),
 		},
 		Cluster: struct {
-			NodeSubjectPrefix string `json:"nodeSubjectPrefix"`
+			Name string `json:"name"`
 		}{
-			NodeSubjectPrefix: "cluster.game-node.",
+			Name: "cluster.game-node.",
 		},
 	}
 }

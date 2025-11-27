@@ -1,9 +1,10 @@
 package consul
 
 import (
+	"context"
 	"gas/pkg/discovery/iface"
 	"gas/pkg/lib/glog"
-	"sync"
+	"gas/pkg/lib/workers"
 	"time"
 
 	"github.com/duke-git/lancet/v2/convertor"
@@ -29,25 +30,21 @@ type consulWatcher struct {
 	opts      *Options
 	stopCh    <-chan struct{}
 	waitIndex uint64
-	wg        sync.WaitGroup
 	list      *iface.NodeList
 	service   string
 }
 
 func (w *consulWatcher) start() {
-	w.wg.Add(1)
-	go w.loop(w.service)
+	workers.Go(func(ctx context.Context) {
+		w.loop(ctx, w.service)
+	})
 }
 
-func (w *consulWatcher) loop(service string) {
-	defer func() {
-		if rec := recover(); rec != nil {
-			glog.Error("consul watcher loop panic", zap.String("service", service), zap.Any("error", rec))
-		}
-		w.wg.Done()
-	}()
+func (w *consulWatcher) loop(ctx context.Context, service string) {
 	for {
 		select {
+		case <-ctx.Done():
+			return
 		case <-w.stopCh:
 			return
 		default:
@@ -108,8 +105,4 @@ func (w *consulWatcher) fetch(service string, listener func(*iface.Topology)) er
 
 	w.list = list
 	return nil
-}
-
-func (w *consulWatcher) Wait() {
-	w.wg.Wait()
 }

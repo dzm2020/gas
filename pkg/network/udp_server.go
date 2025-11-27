@@ -3,6 +3,7 @@ package network
 import (
 	"context"
 	"errors"
+	"fmt"
 	"gas/pkg/lib/glog"
 	"gas/pkg/lib/workers"
 	"net"
@@ -22,7 +23,6 @@ type UDPServer struct {
 	closeChan   chan struct{} // 关闭信号
 	connections map[string]*UDPConnection
 	rwMutex     sync.RWMutex // 保护connections并发
-	context     *workers.WaitContext
 }
 
 // NewUDPServer 创建UDP服务器
@@ -37,43 +37,19 @@ func NewUDPServer(proto, addr string, option ...Option) *UDPServer {
 	}
 }
 
-func (s *UDPServer) Start(ctx context.Context) error {
-	defer func() {
-		_ = s.Stop()
-	}()
-
-	s.context = workers.WithContext(ctx)
-
+func (s *UDPServer) Start() error {
 	if !s.running.CompareAndSwap(false, true) {
 		return errors.New("udp server already running")
 	}
-
 	if err := s.listen(); err != nil {
-		glog.Error("udp server listen error", zap.String("proto", s.proto),
-			zap.String("addr", s.addr), zap.Error(err))
 		return err
 	}
+	workers.Go(func(ctx context.Context) {
+		s.readLoop(ctx)
+	})
+	glog.Info("udp server listen", zap.String("proto", s.proto), zap.String("addr", s.addr))
+	return nil
 
-	glog.Info("udp server listen", zap.String("proto", s.proto),
-		zap.String("addr", s.addr))
-
-	readBuf := make([]byte, s.options.readBufSize)
-	for {
-		select {
-		case <-s.context.IsFinish():
-			return nil
-		default:
-			n, remoteAddr, err := s.conn.ReadFromUDP(readBuf)
-			if err != nil {
-				return err
-			}
-			if n == 0 {
-				continue
-			}
-
-			s.handlePacket(remoteAddr, readBuf, n)
-		}
-	}
 }
 
 func (s *UDPServer) listen() error {
@@ -83,6 +59,28 @@ func (s *UDPServer) listen() error {
 	}
 	s.conn, err = net.ListenUDP(s.proto, udpAddr)
 	return err
+}
+
+func (s *UDPServer) readLoop(ctx context.Context) {
+	readBuf := make([]byte, s.options.readBufSize)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-s.closeChan:
+			return
+		default:
+			n, remoteAddr, w := s.conn.ReadFromUDP(readBuf)
+			if w != nil {
+				glog.Error("udp read err", zap.Error(w))
+				continue
+			}
+			if n == 0 {
+				continue
+			}
+			s.handlePacket(remoteAddr, readBuf, n)
+		}
+	}
 }
 
 // copyUDPAddr 复制 UDPAddr（避免并发问题）
@@ -108,7 +106,7 @@ func (s *UDPServer) handlePacket(remoteAddr *net.UDPAddr, readBuf []byte, n int)
 		s.rwMutex.Lock()
 		// 双重检查，避免并发创建
 		if udpConn, exists = s.connections[connKey]; !exists {
-			udpConn = newUDPConnection(s.context, s.conn, Accept, remoteAddrCopy, s)
+			udpConn = newUDPConnection(s.conn, Accept, remoteAddrCopy, s)
 			s.connections[connKey] = udpConn
 		}
 		s.rwMutex.Unlock()
@@ -123,8 +121,8 @@ func (s *UDPServer) removeConnection(connKey string) {
 	delete(s.connections, connKey)
 }
 
-func (s *UDPServer) Addr() net.Addr {
-	return s.conn.LocalAddr()
+func (s *UDPServer) Addr() string {
+	return fmt.Sprintf("%s:%s", s.proto, s.addr)
 }
 
 func (s *UDPServer) Stop() error {
@@ -132,12 +130,10 @@ func (s *UDPServer) Stop() error {
 		return errors.New("udp server not running")
 	}
 
-	s.context.Cancel()
+	close(s.closeChan)
 
 	if s.conn != nil {
 		_ = s.conn.Close()
 	}
-
-	s.context.Wait()
 	return nil
 }

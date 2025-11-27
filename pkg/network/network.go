@@ -3,7 +3,6 @@ package network
 import (
 	"fmt"
 	"gas/pkg/lib/netx"
-	"gas/pkg/lib/workers"
 	"net"
 	"sync/atomic"
 	"time"
@@ -62,11 +61,11 @@ type IConnection interface {
 // IServer 服务器接口（TCP/UDP服务器的抽象）
 type IServer interface {
 	// Start 启动服务器（阻塞直到停止）
-	Start(ctx *workers.WaitContext) error
-	// Stop 停止服务器（优雅关闭）
+	Start() error
+	// Stop 停止服务器（优雅关闭，等待所有连接退出）
 	Stop() error
 
-	Addr() net.Addr
+	Addr() string
 }
 
 // ------------------------------ 基础常量与默认配置 ------------------------------

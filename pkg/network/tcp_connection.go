@@ -1,6 +1,7 @@
 package network
 
 import (
+	"context"
 	"errors"
 	"gas/pkg/lib/buffer"
 	"gas/pkg/lib/glog"
@@ -18,30 +19,24 @@ type TCPConnection struct {
 	sendChan        chan []byte // 发送队列（读写分离核心）
 	buf             []byte      // 粘包缓冲（未解析完整的消息数据）
 	buffer          buffer.IBuffer
-	context         *workers.WaitContext
 }
 
-func newTCPConnection(ctx *workers.WaitContext, conn net.Conn, typ ConnectionType, options *Options) *TCPConnection {
+func newTCPConnection(conn net.Conn, typ ConnectionType, options *Options) *TCPConnection {
 	tcpConn := &TCPConnection{
 		baseConnection: initBaseConnection(typ, options),
 		sendChan:       make(chan []byte, options.sendChanSize),
 		buf:            make([]byte, options.readBufSize),
 		buffer:         buffer.New(options.readBufSize),
 		conn:           conn,
-		context:        workers.WithWaitContext(ctx),
 	}
 	AddConnection(tcpConn)
 
-	tcpConn.context.Add(1)
-	workers.Go(func(ctx *workers.WaitContext) {
-		defer tcpConn.context.Done()
-		tcpConn.readLoop()
+	workers.Go(func(ctx context.Context) {
+		tcpConn.readLoop(ctx)
 	})
 
-	tcpConn.context.Add(1)
-	workers.Go(func(ctx *workers.WaitContext) {
-		defer tcpConn.context.Done()
-		tcpConn.writeLoop()
+	workers.Go(func(ctx context.Context) {
+		tcpConn.writeLoop(ctx)
 	})
 	glog.Infof("tcp connection open %v local:%v remote:%v typ:%v", tcpConn.ID(), tcpConn.LocalAddr(), tcpConn.RemoteAddr(), tcpConn.Type())
 	return tcpConn
@@ -69,7 +64,7 @@ func (c *TCPConnection) Send(msg interface{}) error {
 	return nil
 }
 
-func (c *TCPConnection) readLoop() {
+func (c *TCPConnection) readLoop(ctx context.Context) {
 	var err error
 	defer func() {
 		_ = c.Close(err)
@@ -82,19 +77,12 @@ func (c *TCPConnection) readLoop() {
 
 	for {
 		select {
-		case <-c.context.IsFinish():
+		case <-ctx.Done():
 			return // 主动关闭，无错误
+		case <-c.closeChan:
+			return
 		default:
-			workers.Try(func() {
-				err = c.read()
-			}, func(panicErr interface{}) {
-				glog.Error("tcp connection read panic",
-					zap.Any("panic", panicErr),
-					zap.Int64("conn_id", c.ID()),
-				)
-				err = errors.New("read panic")
-			})
-			if err != nil {
+			if err = c.read(); err != nil {
 				return
 			}
 		}
@@ -128,7 +116,7 @@ func (c *TCPConnection) read() error {
 	return nil
 }
 
-func (c *TCPConnection) writeLoop() {
+func (c *TCPConnection) writeLoop(ctx context.Context) {
 	var err error
 	defer func() {
 		_ = c.Close(err)
@@ -141,7 +129,9 @@ func (c *TCPConnection) writeLoop() {
 
 	for {
 		select {
-		case <-c.context.IsFinish():
+		case <-ctx.Done():
+			return
+		case <-c.closeChan:
 			return
 		case data, ok := <-c.sendChan:
 			if !ok {
@@ -164,16 +154,14 @@ func (c *TCPConnection) Close(err error) error {
 	if !c.closeBase() {
 		return errors.New("tcp connection already closed")
 	}
-	c.context.Cancel()
-	c.context.Add(1)
-	workers.Submit(func() {
+
+	close(c.closeChan)
+
+	workers.Go(func(ctx context.Context) {
 		_ = c.conn.Close()
 		_ = c.baseConnection.Close(c, err)
-		c.context.Done()
-	}, func(err interface{}) {
-		glog.Error("tcp connection close panic", zap.Any("panic", err), zap.Int64("conn_id", c.ID()))
 	})
-	c.context.Wait()
+
 	glog.Info("tcp connection close", zap.Int64("conn_id", c.ID()), zap.Error(err))
 	return nil
 }
