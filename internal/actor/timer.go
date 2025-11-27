@@ -3,7 +3,7 @@ package actor
 import (
 	"fmt"
 	"gas/internal/iface"
-	"gas/pkg/utils/timex/asynctime"
+	"gas/pkg/lib/timex/asynctime"
 	"time"
 
 	"github.com/RussellLuo/timingwheel"
@@ -125,4 +125,3 @@ func (tm *timerManager) CancelAllTimers() {
 		delete(tm.timers, timerID)
 	}
 }
-

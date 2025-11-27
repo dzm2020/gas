@@ -10,17 +10,6 @@ package protocol
 
 const HeadLen = 13
 
-const (
-	CmdSystem uint8 = 0
-)
-
-const (
-	_            uint8 = iota
-	ActHandshake       // 握手   用于交换密钥 版本等信息
-	ActHeartbeat       // 心跳
-	ActKick            // 强制关闭连接
-)
-
 func New(cmd, act uint8, data []byte) *Message {
 	return &Message{
 		Head: &Head{

@@ -2,7 +2,7 @@ package consul
 
 import (
 	"gas/pkg/discovery/iface"
-	"gas/pkg/utils/glog"
+	"gas/pkg/lib/glog"
 	"reflect"
 	"sync"
 

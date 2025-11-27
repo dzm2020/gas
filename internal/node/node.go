@@ -6,7 +6,7 @@ import (
 	"gas/internal/config"
 	"gas/internal/iface"
 	"gas/internal/remote"
-	"gas/pkg/utils/serializer"
+	"gas/pkg/lib/serializer"
 	"os"
 	"os/signal"
 	"syscall"
@@ -15,7 +15,7 @@ import (
 	"gas/internal/actor"
 	"gas/pkg/component"
 	discovery "gas/pkg/discovery/iface"
-	"gas/pkg/utils/glog"
+	"gas/pkg/lib/glog"
 )
 
 // New 创建节点实例

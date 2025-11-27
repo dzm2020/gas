@@ -2,7 +2,7 @@ package consul
 
 import (
 	"gas/pkg/discovery/iface"
-	"gas/pkg/utils/glog"
+	"gas/pkg/lib/glog"
 	"sync"
 	"time"
 
@@ -89,7 +89,7 @@ func (w *consulWatcher) fetch(service string, listener func(*iface.Topology)) er
 
 	list := iface.NewNodeList(nodeDict)
 	topology := list.UpdateTopology(w.list)
-	
+
 	if len(topology.Left) > 0 || len(topology.Joined) > 0 {
 		glog.Info("consul watcher: service topology changed",
 			zap.String("service", service),
@@ -105,7 +105,7 @@ func (w *consulWatcher) fetch(service string, listener func(*iface.Topology)) er
 			zap.String("service", service),
 			zap.Int("total", len(nodeDict)))
 	}
-	
+
 	w.list = list
 	return nil
 }

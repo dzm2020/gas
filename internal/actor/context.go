@@ -6,7 +6,7 @@ package actor
 import (
 	"fmt"
 	"gas/internal/iface"
-	"gas/pkg/utils/serializer"
+	"gas/pkg/lib/serializer"
 	"time"
 )
 
@@ -16,12 +16,12 @@ type IMessageInvoker interface {
 
 // contextConfig context 配置
 type contextConfig struct {
-	pid          *iface.Pid
-	actor        iface.IActor
-	middlewares  []iface.TaskMiddleware
-	router       iface.IRouter
-	system       *System
-	process      iface.IProcess
+	pid         *iface.Pid
+	actor       iface.IActor
+	middlewares []iface.TaskMiddleware
+	router      iface.IRouter
+	system      *System
+	process     iface.IProcess
 }
 
 func newBaseActorContext(cfg *contextConfig) *baseActorContext {

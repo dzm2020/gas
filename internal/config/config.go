@@ -3,8 +3,8 @@ package config
 import (
 	"fmt"
 	discoveryConfig "gas/pkg/discovery"
+	"gas/pkg/lib/serializer"
 	messageQueConfig "gas/pkg/messageQue"
-	"gas/pkg/utils/serializer"
 	"os"
 )
 

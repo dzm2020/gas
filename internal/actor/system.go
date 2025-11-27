@@ -11,7 +11,7 @@ package actor
 import (
 	"errors"
 	"gas/internal/iface"
-	"gas/pkg/utils/serializer"
+	"gas/pkg/lib/serializer"
 	"sync/atomic"
 	"time"
 

@@ -1,8 +1,8 @@
 package actor
 
 import (
-	"gas/pkg/utils/glog"
-	"gas/pkg/utils/mpsc"
+	"gas/pkg/lib/glog"
+	"gas/pkg/lib/mpsc"
 	"runtime"
 	"sync/atomic"
 

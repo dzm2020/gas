@@ -7,12 +7,12 @@ import (
 	"gas/pkg/network"
 )
 
-type Factory func() IAgent
+type Factory func() iface.IProcess
 
 type IAgent interface {
 	iface.IActor
-	OnConnectionOpen(ctx iface.IContext, connection network.IConnection) error
-	OnConnectionClose(ctx iface.IContext) error
+	OnConnect(ctx iface.IContext, connection network.IConnection) error
+	OnClose(ctx iface.IContext) error
 }
 
 type Agent struct {
@@ -21,23 +21,20 @@ type Agent struct {
 	ctx iface.IContext
 }
 
-func (agent *Agent) OnConnectionOpen(ctx iface.IContext, connection network.IConnection) error {
+func (agent *Agent) OnConnect(ctx iface.IContext, connection network.IConnection) error {
 	agent.IConnection = connection
 	return nil
 }
-
-func (agent *Agent) OnConnectionClose(ctx iface.IContext) error {
+func (agent *Agent) OnClose(ctx iface.IContext) error {
 	agent.IConnection = nil
 	return nil
 }
-
 func (agent *Agent) Close() {
 	if agent.IConnection == nil {
 		return
 	}
 	_ = agent.IConnection.Close(nil)
 }
-
 func (agent *Agent) Send(msg *iface.Message) error {
 	if agent.IConnection == nil {
 		return fmt.Errorf("connection is nil")

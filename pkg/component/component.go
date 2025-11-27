@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"gas/pkg/utils/glog"
+	"gas/pkg/lib/glog"
 )
 
 // Component 组件接口，所有需要管理生命周期的组件都应实现此接口

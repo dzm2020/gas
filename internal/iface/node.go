@@ -4,7 +4,7 @@ import (
 	"gas/internal/config"
 	"gas/pkg/component"
 	discovery "gas/pkg/discovery/iface"
-	"gas/pkg/utils/serializer"
+	"gas/pkg/lib/serializer"
 )
 
 type INode interface {

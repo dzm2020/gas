@@ -1,7 +1,7 @@
 package iface
 
 import (
-	"gas/pkg/utils/serializer"
+	"gas/pkg/lib/serializer"
 	"time"
 )
 

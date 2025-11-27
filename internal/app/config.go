@@ -7,8 +7,8 @@ import (
 // Config app 组件配置
 type Config struct {
 	// Actors actor 配置列表
-	Service []ServiceConfig `json:"services"`
-	Name    string          `json:"name"`
+	Services []ServiceConfig `json:"services"`
+	Name     string          `json:"name"`
 }
 
 // ServiceConfig actor 配置

@@ -1,8 +1,10 @@
 package network
 
 import (
+	"context"
 	"errors"
-	"gas/pkg/utils/glog"
+	"gas/pkg/lib/glog"
+	"gas/pkg/lib/workers"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -20,6 +22,7 @@ type UDPServer struct {
 	closeChan   chan struct{} // 关闭信号
 	connections map[string]*UDPConnection
 	rwMutex     sync.RWMutex // 保护connections并发
+	context     *workers.WaitContext
 }
 
 // NewUDPServer 创建UDP服务器
@@ -34,13 +37,12 @@ func NewUDPServer(proto, addr string, option ...Option) *UDPServer {
 	}
 }
 
-func (s *UDPServer) Start() error {
+func (s *UDPServer) Start(ctx context.Context) error {
 	defer func() {
-		if r := recover(); r != nil {
-			glog.Error("udp server start panic", zap.Any("panic", r), zap.String("addr", s.addr))
-		}
 		_ = s.Stop()
 	}()
+
+	s.context = workers.WithContext(ctx)
 
 	if !s.running.CompareAndSwap(false, true) {
 		return errors.New("udp server already running")
@@ -58,7 +60,7 @@ func (s *UDPServer) Start() error {
 	readBuf := make([]byte, s.options.readBufSize)
 	for {
 		select {
-		case <-s.closeChan:
+		case <-s.context.IsFinish():
 			return nil
 		default:
 			n, remoteAddr, err := s.conn.ReadFromUDP(readBuf)
@@ -106,7 +108,7 @@ func (s *UDPServer) handlePacket(remoteAddr *net.UDPAddr, readBuf []byte, n int)
 		s.rwMutex.Lock()
 		// 双重检查，避免并发创建
 		if udpConn, exists = s.connections[connKey]; !exists {
-			udpConn = newUDPConnection(s.conn, Accept, remoteAddrCopy, s)
+			udpConn = newUDPConnection(s.context, s.conn, Accept, remoteAddrCopy, s)
 			s.connections[connKey] = udpConn
 		}
 		s.rwMutex.Unlock()
@@ -129,9 +131,13 @@ func (s *UDPServer) Stop() error {
 	if !s.running.CompareAndSwap(true, false) {
 		return errors.New("udp server not running")
 	}
-	close(s.closeChan)
+
+	s.context.Cancel()
+
 	if s.conn != nil {
 		_ = s.conn.Close()
 	}
+
+	s.context.Wait()
 	return nil
 }

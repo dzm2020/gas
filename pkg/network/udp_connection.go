@@ -3,8 +3,8 @@ package network
 import (
 	"errors"
 	"fmt"
-	"gas/pkg/utils/glog"
-	"gas/pkg/utils/workers"
+	"gas/pkg/lib/glog"
+	"gas/pkg/lib/workers"
 	"net"
 
 	"go.uber.org/zap"
@@ -18,24 +18,26 @@ type UDPConnection struct {
 	conn            *net.UDPConn // 底层UDP连接（全局共享）
 	readChan        chan []byte
 	remoteAddr      *net.UDPAddr // 远程地址（虚拟连接的核心标识）
+	context         *workers.WaitContext
 }
 
-func newUDPConnection(conn *net.UDPConn, typ ConnectionType, remoteAddr *net.UDPAddr, server *UDPServer) *UDPConnection {
+func newUDPConnection(ctx *workers.WaitContext, conn *net.UDPConn, typ ConnectionType, remoteAddr *net.UDPAddr, server *UDPServer) *UDPConnection {
 	udpConn := &UDPConnection{
 		baseConnection: initBaseConnection(typ, server.options),
 		conn:           conn,
 		remoteAddr:     remoteAddr,
 		server:         server,
 		readChan:       make(chan []byte, 100),
+		context:        workers.WithWaitContext(ctx),
 	}
 
 	glog.Infof("udp connection open %v local:%v remote:%v typ:%v", udpConn.ID(), udpConn.LocalAddr(), udpConn.RemoteAddr(), udpConn.Type())
 
 	AddConnection(udpConn)
-	workers.Submit(func() {
+	udpConn.context.Add(1)
+	workers.Go(func(context *workers.WaitContext) {
+		defer udpConn.context.Done()
 		udpConn.readLoop()
-	}, func(err interface{}) {
-		glog.Error("udp connection readLoop panic", zap.Any("panic", err), zap.Int64("conn_id", udpConn.ID()))
 	})
 	return udpConn
 }
@@ -72,7 +74,7 @@ func (c *UDPConnection) readLoop() {
 
 	for {
 		select {
-		case <-c.closeChanSignal():
+		case <-c.context.IsFinish():
 			return
 		case <-c.timeoutTicker.C:
 			if c.isTimeout() {
@@ -101,12 +103,14 @@ func (c *UDPConnection) Close(err error) error {
 	if !c.closeBase() {
 		return errors.New("udp connection already closed")
 	}
-	workers.Submit(func() {
+	c.context.Cancel()
+	c.context.Add(1)
+	workers.Go(func(context *workers.WaitContext) {
+		defer c.context.Done()
 		c.server.removeConnection(c.remoteAddr.String())
 		_ = c.baseConnection.Close(c, err)
-	}, func(err interface{}) {
-		glog.Error("udp connection close panic", zap.Any("panic", err), zap.Int64("conn_id", c.ID()))
 	})
+	c.context.Wait()
 	glog.Info("udp connection close", zap.Int64("conn_id", c.ID()), zap.Error(err))
 	return nil
 }

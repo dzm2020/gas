@@ -37,8 +37,7 @@ func (g *Component) Start(ctx context.Context) error {
 	if g.gate == nil {
 		return fmt.Errorf("gate is nil")
 	}
-	g.gate.actorSystem = g.node.GetActorSystem()
-	g.gate.Run()
+	g.gate.Run(ctx)
 	return nil
 }
 
