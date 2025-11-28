@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"gas/internal/gate/codec"
 	"gas/internal/iface"
-	"gas/pkg/lib/glog"
+	"gas/pkg/glog"
 	"gas/pkg/network"
 
 	"go.uber.org/zap"

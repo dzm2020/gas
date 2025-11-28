@@ -3,8 +3,8 @@ package consul
 import (
 	"context"
 	"gas/pkg/discovery/iface"
-	"gas/pkg/lib/glog"
-	"gas/pkg/lib/workers"
+	"gas/pkg/glog"
+	"gas/pkg/lib"
 	"sync"
 	"time"
 
@@ -60,7 +60,7 @@ func (r *consulRegistrar) Add(node *iface.Node) error {
 		return nil // service already registered
 	}
 
-	workers.Go(func(ctx context.Context) {
+	lib.Go(func(ctx context.Context) {
 		r.healthCheck(ctx, node.GetID(), ch)
 	})
 	glog.Info("consul registrar: node registered successfully",

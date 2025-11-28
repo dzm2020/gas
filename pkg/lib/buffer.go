@@ -1,4 +1,4 @@
-package buffer
+package lib
 
 import (
 	"errors"

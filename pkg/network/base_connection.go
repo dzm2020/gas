@@ -25,15 +25,15 @@ func initBaseConnection(typ ConnectionType, options *Options) *baseConnection {
 	bc := &baseConnection{
 		id:         generateConnID(),
 		lastActive: time.Now(),
-		timeout:    options.timeout,
+		timeout:    options.keepAlive,
 		closeChan:  make(chan struct{}),
 		handler:    options.handler,
 		codec:      options.codec,
 		typ:        typ,
 	}
-	// 只有当 timeout > 0 时才创建 ticker
-	if options.timeout > 0 {
-		bc.timeoutTicker = time.NewTicker(options.timeout / 2)
+	// 只有当 keepAlive > 0 时才创建 ticker
+	if options.keepAlive > 0 {
+		bc.timeoutTicker = time.NewTicker(options.keepAlive / 2)
 	}
 	return bc
 }
@@ -85,7 +85,7 @@ func (b *baseConnection) Type() ConnectionType {
 
 func (b *baseConnection) isTimeout() bool {
 	if b.timeout <= 0 {
-		return false // timeout 为 0 表示不检测超时
+		return false // keepAlive 为 0 表示不检测超时
 	}
 	return time.Since(b.getLastActive()) > b.timeout
 }

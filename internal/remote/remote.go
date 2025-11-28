@@ -4,10 +4,9 @@ import (
 	"fmt"
 	"gas/internal/iface"
 	discovery "gas/pkg/discovery/iface"
-	"gas/pkg/lib/glog"
-	"gas/pkg/lib/serializer"
+	"gas/pkg/glog"
+	"gas/pkg/lib"
 	messageQue "gas/pkg/messageQue/iface"
-	"sync"
 	"time"
 )
 
@@ -15,36 +14,20 @@ import (
 type Remote struct {
 	node       iface.INode
 	messageQue messageQue.IMessageQue
-	serializer serializer.ISerializer
+	serializer lib.ISerializer
 	// 节点主题前缀
 	nodeSubjectPrefix string
-	// 订阅管理：节点ID -> 订阅对象（每个节点只订阅一次）
-	subscriptionsMu sync.RWMutex
-	subscriptions   map[uint64]messageQue.ISubscription
 
 	discovery discovery.IDiscovery
 }
 
-// New 创建远程通信管理器
-func New(que messageQue.IMessageQue, discovery discovery.IDiscovery, nodeSubjectPrefix string, serializer serializer.ISerializer) *Remote {
-	if nodeSubjectPrefix == "" {
-		nodeSubjectPrefix = "cluster.game-node."
-	}
-	return &Remote{
-		discovery:         discovery,
-		messageQue:        que,
-		serializer:        serializer,
-		nodeSubjectPrefix: nodeSubjectPrefix,
-		subscriptions:     make(map[uint64]messageQue.ISubscription),
-	}
-}
-
 // SetSerializer 设置序列化器
-func (r *Remote) SetSerializer(ser serializer.ISerializer) {
+func (r *Remote) SetSerializer(ser lib.ISerializer) {
 	r.serializer = ser
 }
 
-func (r *Remote) registry(node *discovery.Node) error {
+func (r *Remote) init() error {
+	node := r.node.Self()
 	// 注册到服务发现
 	if err := r.discovery.Add(node); err != nil {
 		return err
@@ -52,7 +35,7 @@ func (r *Remote) registry(node *discovery.Node) error {
 
 	// 注册到远程通信管理器
 	nodeId := node.GetID()
-	if err := r.Subscribe(nodeId); err != nil {
+	if err := r.subscribe(nodeId); err != nil {
 		_ = r.discovery.Remove(nodeId)
 		return err
 	}
@@ -64,43 +47,18 @@ func (r *Remote) SetNode(node iface.INode) {
 }
 
 // Subscribe 注册节点并订阅消息
-func (r *Remote) Subscribe(nodeId uint64) error {
-	// 检查是否已经订阅
-	r.subscriptionsMu.RLock()
-	if _, exists := r.subscriptions[nodeId]; exists {
-		r.subscriptionsMu.RUnlock()
-		return nil
-	}
-	r.subscriptionsMu.RUnlock()
-
+func (r *Remote) subscribe(nodeId uint64) error {
 	// 订阅消息主题
 	handler := func(data []byte, reply func([]byte) error) {
 		r.onRemoteHandler(data, reply)
 	}
 	nodeSubject := fmt.Sprintf("%s%d", r.nodeSubjectPrefix, nodeId)
-	subscription, err := r.messageQue.Subscribe(nodeSubject, handler)
+	_, err := r.messageQue.Subscribe(nodeSubject, handler)
 	if err != nil {
 		return fmt.Errorf("subscribe to game-node %d failed: %w", nodeId, err)
 	}
 
-	// 保存订阅
-	r.subscriptionsMu.Lock()
-	r.subscriptions[nodeId] = subscription
-	r.subscriptionsMu.Unlock()
-
 	glog.Infof("subscribe  nodeSubject %s ", nodeSubject)
-	return nil
-}
-
-func (r *Remote) Unsubscribe(nodeId uint64) error {
-	r.subscriptionsMu.Lock()
-	defer r.subscriptionsMu.Unlock()
-
-	if sub, exists := r.subscriptions[nodeId]; exists {
-		_ = sub.Unsubscribe()
-		delete(r.subscriptions, nodeId)
-	}
-
 	return nil
 }
 
@@ -128,7 +86,7 @@ func (r *Remote) onRemoteHandler(data []byte, reply func([]byte) error) {
 			r.sendError(reply, fmt.Sprintf("marshal response failed: %v", err))
 			return
 		}
-		if err := reply(responseData); err != nil {
+		if err = reply(responseData); err != nil {
 			glog.Errorf("remote: send reply failed: %v", err)
 		}
 	} else {
@@ -203,11 +161,6 @@ func (r *Remote) SendByService(service string, message *iface.Message, strategy 
 		return fmt.Errorf("route strategy returned nil node for service: %s", service)
 	}
 
-	// 确保已订阅该节点
-	if err := r.Subscribe(selectedNode.GetID()); err != nil {
-		return fmt.Errorf("subscribe to node %d failed: %w", selectedNode.GetID(), err)
-	}
-
 	// 设置消息的目标节点ID
 	if message.To == nil {
 		message.To = &iface.Pid{}
@@ -236,11 +189,6 @@ func (r *Remote) RequestByService(service string, message *iface.Message, timeou
 		return iface.NewErrorResponse(fmt.Sprintf("route strategy returned nil node for service: %s", service))
 	}
 
-	// 确保已订阅该节点
-	if err := r.Subscribe(selectedNode.GetID()); err != nil {
-		return iface.NewErrorResponse(fmt.Sprintf("subscribe to node %d failed: %v", selectedNode.GetID(), err))
-	}
-
 	// 设置消息的目标节点ID
 	if message.To == nil {
 		message.To = &iface.Pid{}
@@ -262,13 +210,6 @@ func (r *Remote) Broadcast(service string, message *iface.Message) error {
 	var lastErr error
 	// 向所有节点发送消息
 	for _, node := range nodes {
-		// 确保已订阅该节点
-		if err := r.Subscribe(node.GetID()); err != nil {
-			glog.Errorf("subscribe to node %d failed: %v", node.GetID(), err)
-			lastErr = err
-			continue
-		}
-
 		// 为每个节点创建消息副本并设置目标节点ID
 		nodeMessage := &iface.Message{
 			To: &iface.Pid{
@@ -290,26 +231,11 @@ func (r *Remote) Broadcast(service string, message *iface.Message) error {
 			lastErr = err
 		}
 	}
-
 	return lastErr
 }
 
 // Shutdown 关闭所有订阅
 func (r *Remote) Shutdown() error {
-	r.subscriptionsMu.Lock()
-	defer r.subscriptionsMu.Unlock()
-	//  取消订阅
-	for nodeId, sub := range r.subscriptions {
-		_ = sub.Unsubscribe()
-		delete(r.subscriptions, nodeId)
-	}
-	nodeId := r.node.GetId()
-
-	if err := r.discovery.Remove(nodeId); err != nil {
-		return err
-	}
-
-	//  注销节点
 	if err := r.discovery.Close(); err != nil {
 		return err
 	}

@@ -11,7 +11,7 @@ package actor
 import (
 	"errors"
 	"gas/internal/iface"
-	"gas/pkg/lib/serializer"
+	"gas/pkg/lib"
 	"sync/atomic"
 	"time"
 
@@ -31,7 +31,7 @@ type System struct {
 	uniqId       atomic.Uint64
 	nameDict     *maputil.ConcurrentMap[string, iface.IProcess]
 	processDict  *maputil.ConcurrentMap[uint64, iface.IProcess]
-	serializer   serializer.ISerializer
+	serializer   lib.ISerializer
 	node         iface.INode
 	shuttingDown atomic.Bool
 }
@@ -42,7 +42,7 @@ func NewSystem() *System {
 		uniqId:      atomic.Uint64{},
 		nameDict:    maputil.NewConcurrentMap[string, iface.IProcess](10),
 		processDict: maputil.NewConcurrentMap[uint64, iface.IProcess](10),
-		serializer:  serializer.Json,
+		serializer:  lib.Json,
 	}
 }
 
@@ -57,12 +57,12 @@ func (s *System) GetNode() iface.INode {
 }
 
 // GetSerializer 获取序列化器
-func (s *System) GetSerializer() serializer.ISerializer {
+func (s *System) GetSerializer() lib.ISerializer {
 	return s.serializer
 }
 
 // SetSerializer 设置序列化器
-func (s *System) SetSerializer(ser serializer.ISerializer) {
+func (s *System) SetSerializer(ser lib.ISerializer) {
 	s.serializer = ser
 }
 

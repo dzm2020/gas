@@ -3,8 +3,8 @@ package consul
 import (
 	"context"
 	"gas/pkg/discovery/iface"
-	"gas/pkg/lib/glog"
-	"gas/pkg/lib/workers"
+	"gas/pkg/glog"
+	"gas/pkg/lib"
 	"sync"
 	"time"
 
@@ -48,7 +48,7 @@ func newServiceWatcher(
 
 // Start 启动服务列表监听
 func (sw *serviceWatcher) Start() {
-	workers.Go(func(ctx context.Context) {
+	lib.Go(func(ctx context.Context) {
 		sw.watch(ctx)
 	})
 }
@@ -75,11 +75,13 @@ func (sw *serviceWatcher) watch(ctx context.Context) {
 }
 
 // fetch 获取服务列表并更新 watchers
-func (sw *serviceWatcher) fetch() error {
-	services, meta, err := sw.client.Catalog().Services(&api.QueryOptions{
+func (sw *serviceWatcher) fetch(ctx context.Context) error {
+	options := &api.QueryOptions{
 		WaitIndex: sw.waitIndex,
 		WaitTime:  sw.opts.WatchWaitTime,
-	})
+	}
+	options = options.WithContext(ctx)
+	services, meta, err := sw.client.Catalog().Services(options)
 	if err != nil {
 		return err
 	}

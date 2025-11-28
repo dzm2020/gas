@@ -3,11 +3,12 @@ package gate
 import (
 	"context"
 	"gas/pkg/component"
+	"gas/pkg/network"
 )
 
 // NewComponent 创建 Gate 组件
-func NewComponent(name string, factory Factory, opts ...Option) *Component {
-	gate := New(factory, opts...)
+func NewComponent(address string, name string, factory Factory, opts ...network.Option) *Component {
+	gate := New(address, factory, opts...)
 	return &Component{
 		gate: gate,
 		name: name,
@@ -30,11 +31,10 @@ func (g *Component) Name() string {
 
 // Start 启动 Gate 组件
 func (g *Component) Start(ctx context.Context) error {
-	g.gate.Run(ctx)
-	return nil
+	return g.gate.Run()
 }
 
 // Stop 停止 Gate 组件
 func (g *Component) Stop(ctx context.Context) error {
-	return g.gate.GracefulStop()
+	return g.gate.Stop()
 }

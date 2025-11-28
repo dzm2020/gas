@@ -3,7 +3,7 @@ package actor
 import (
 	"fmt"
 	"gas/internal/iface"
-	"gas/pkg/lib/timex/asynctime"
+	"gas/pkg/lib"
 	"time"
 
 	"github.com/RussellLuo/timingwheel"
@@ -38,7 +38,7 @@ func (tm *timerManager) AfterFunc(process iface.IProcess, duration time.Duration
 	timerID := tm.timerID
 
 	// 创建定时器，到期后通过 PushTask 推送回调任务
-	timer := asynctime.AfterFunc(duration, func() {
+	timer := lib.AfterFunc(duration, func() {
 		// 定时器到期后，从映射中移除
 		delete(tm.timers, timerID)
 		// 通过 PushTask 推送回调任务
@@ -79,7 +79,7 @@ func (tm *timerManager) TickFunc(process iface.IProcess, interval time.Duration,
 		}
 
 		// 创建下一个周期的定时器
-		timer := asynctime.AfterFunc(interval, func() {
+		timer := lib.AfterFunc(interval, func() {
 			// 检查定时器是否还存在
 			if _, exists := tm.tickerTimers[timerID]; !exists {
 				return

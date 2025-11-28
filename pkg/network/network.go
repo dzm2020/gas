@@ -2,7 +2,7 @@ package network
 
 import (
 	"fmt"
-	"gas/pkg/lib/netx"
+	"gas/pkg/lib"
 	"net"
 	"sync/atomic"
 	"time"
@@ -75,7 +75,7 @@ const (
 	// 默认TCP读缓冲区大小
 	defaultTCPReadBuf = 4096
 	// UDP默认超时时间（无数据时自动关闭虚拟连接）
-	defaultTimeout = 5 * time.Second
+	defaultKeepAlive = 5 * time.Second
 )
 
 type ConnectionType int
@@ -107,7 +107,7 @@ func (e *EmptyCodec) Decode(b []byte) (interface{}, int, error) {
 }
 
 func NewServer(protoAddr string, option ...Option) (IServer, error) {
-	proto, addr, err := netx.ParseProtoAddr(protoAddr)
+	proto, addr, err := lib.ParseProtoAddr(protoAddr)
 	if err != nil {
 		return nil, err
 	}

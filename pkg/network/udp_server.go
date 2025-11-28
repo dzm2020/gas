@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"gas/pkg/lib/glog"
-	"gas/pkg/lib/workers"
+	"gas/pkg/glog"
+	"gas/pkg/lib"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -44,7 +44,7 @@ func (s *UDPServer) Start() error {
 	if err := s.listen(); err != nil {
 		return err
 	}
-	workers.Go(func(ctx context.Context) {
+	lib.Go(func(ctx context.Context) {
 		s.readLoop(ctx)
 	})
 	glog.Info("udp server listen", zap.String("proto", s.proto), zap.String("addr", s.addr))
@@ -73,10 +73,10 @@ func (s *UDPServer) readLoop(ctx context.Context) {
 			n, remoteAddr, w := s.conn.ReadFromUDP(readBuf)
 			if w != nil {
 				glog.Error("udp read err", zap.Error(w))
-				continue
+				return
 			}
 			if n == 0 {
-				continue
+				return
 			}
 			s.handlePacket(remoteAddr, readBuf, n)
 		}

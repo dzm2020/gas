@@ -6,7 +6,7 @@
  * @Date: 2024/11/26 14:06
  */
 
-package xerror
+package lib
 
 import (
 	"fmt"

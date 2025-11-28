@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"gas/internal/iface"
 	"gas/pkg/component"
-	"gas/pkg/lib/glog"
+	"gas/pkg/glog"
 )
 
 // Ensure Component implements component.Component interface

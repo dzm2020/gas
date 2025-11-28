@@ -1,8 +1,8 @@
 package actor
 
 import (
-	"gas/pkg/lib/glog"
-	"gas/pkg/lib/mpsc"
+	"gas/pkg/glog"
+	"gas/pkg/lib"
 	"runtime"
 	"sync/atomic"
 
@@ -24,14 +24,14 @@ var _ IMailbox = &Mailbox{}
 
 type Mailbox struct {
 	invoker      IMessageInvoker
-	queue        *mpsc.Queue
+	queue        *lib.Mpsc
 	dispatch     IDispatcher
 	dispatchStat atomic.Int32
 }
 
 func NewMailbox() *Mailbox {
 	m := &Mailbox{
-		queue: mpsc.NewQueue(),
+		queue: lib.NewMpsc(),
 	}
 	return m
 }

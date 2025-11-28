@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"gas/pkg/lib/glog"
-	"gas/pkg/lib/workers"
+	"gas/pkg/glog"
+	"gas/pkg/lib"
 	"net"
 	"sync/atomic"
 
@@ -40,7 +40,7 @@ func (s *TCPServer) Start() error {
 	}
 	glog.Info("tcp server listening", zap.String("proto", s.proto), zap.String("addr", s.addr))
 
-	workers.Go(func(ctx context.Context) {
+	lib.Go(func(ctx context.Context) {
 		s.acceptLoop(ctx)
 	})
 	return nil
@@ -52,21 +52,23 @@ func (s *TCPServer) acceptLoop(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		default:
-			s.accept()
+			if !s.accept() {
+				return
+			}
 		}
 	}
 }
 
-func (s *TCPServer) accept() {
+func (s *TCPServer) accept() bool {
 	if !s.running.Load() {
-		return
+		return false
 	}
 	conn, err := s.listener.Accept()
 	if err != nil {
-		glog.Error("tcp server accept failed", zap.String("addr", s.addr), zap.Error(err))
-		return
+		return false
 	}
 	_ = newTCPConnection(conn, Accept, s.options)
+	return true
 }
 
 func (s *TCPServer) Addr() string {

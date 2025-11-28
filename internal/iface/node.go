@@ -4,13 +4,15 @@ import (
 	"gas/internal/config"
 	"gas/pkg/component"
 	discovery "gas/pkg/discovery/iface"
-	"gas/pkg/lib/serializer"
+	"gas/pkg/lib"
+
+	"go.uber.org/zap/zapcore"
 )
 
 type INode interface {
 	GetId() uint64
-	SetSerializer(ser serializer.ISerializer)
-	GetSerializer() serializer.ISerializer
+	SetSerializer(ser lib.ISerializer)
+	GetSerializer() lib.ISerializer
 	GetActorSystem() ISystem
 	SetActorSystem(system ISystem)
 	GetRemote() IRemote
@@ -18,5 +20,5 @@ type INode interface {
 	GetConfig() *config.Config
 	Self() *discovery.Node
 	StarUp(profileFilePath string, comps ...component.Component) error
-	Shutdown() error
+	SetPanicHook(panicHook func(entry zapcore.Entry))
 }

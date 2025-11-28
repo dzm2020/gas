@@ -8,7 +8,7 @@ type Option func(*Options)
 type Options struct {
 	handler      IHandler      // 业务回调
 	codec        ICodec        // 协议编解码器
-	timeout      time.Duration // 连接超时时间（0表示不检测超时）
+	keepAlive    time.Duration // 连接超时时间（0表示不检测超时）
 	sendChanSize int           // 发送队列缓冲大小
 	readBufSize  int           // 读缓冲区大小
 	maxConn      int
@@ -18,7 +18,7 @@ func loadOptions(options ...Option) *Options {
 	opts := &Options{
 		sendChanSize: defaultSendChanBuf,
 		readBufSize:  defaultTCPReadBuf,
-		timeout:      defaultTimeout,
+		keepAlive:    defaultKeepAlive,
 		maxConn:      10000,
 	}
 	for _, option := range options {
@@ -61,13 +61,13 @@ func WithCodec(codec ICodec) Option {
 	}
 }
 
-// WithTimeout 设置连接超时时间
-func WithTimeout(timeout time.Duration) Option {
+// WithKeepAlive 设置连接超时时间
+func WithKeepAlive(keepAlive time.Duration) Option {
 	return func(opts *Options) {
-		if timeout <= 0 {
+		if keepAlive <= 0 {
 			return
 		}
-		opts.timeout = timeout
+		opts.keepAlive = keepAlive
 	}
 }
 

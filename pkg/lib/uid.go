@@ -6,7 +6,7 @@
  * @Date: 2024/12/16 14:02
  */
 
-package snowflake
+package lib
 
 import (
 	"errors"

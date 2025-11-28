@@ -3,8 +3,8 @@ package consul
 import (
 	"context"
 	"gas/pkg/discovery/iface"
-	"gas/pkg/lib/glog"
-	"gas/pkg/lib/workers"
+	"gas/pkg/glog"
+	"gas/pkg/lib"
 	"reflect"
 	"sync"
 
@@ -77,7 +77,7 @@ func (m *serviceListenerManager) Notify(topology *iface.Topology) {
 
 	for _, listener := range listeners {
 		if listener != nil {
-			workers.Go(func(ctx context.Context) {
+			lib.Go(func(ctx context.Context) {
 				defer func() {
 					if rec := recover(); rec != nil {
 						glog.Error("consul watcher listener panic", zap.Any("error", rec))

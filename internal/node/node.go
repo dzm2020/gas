@@ -6,22 +6,25 @@ import (
 	"gas/internal/config"
 	"gas/internal/iface"
 	"gas/internal/remote"
-	"gas/pkg/lib/serializer"
+	"gas/pkg/glog"
+	"gas/pkg/lib"
 	"os"
 	"os/signal"
+	"runtime/debug"
 	"syscall"
 	"time"
 
 	"gas/internal/actor"
 	"gas/pkg/component"
 	discovery "gas/pkg/discovery/iface"
-	"gas/pkg/lib/glog"
+
+	"go.uber.org/zap/zapcore"
 )
 
 // New 创建节点实例
 func New() *Node {
 	node := &Node{
-		serializer: serializer.Json,
+		serializer: lib.Json,
 	}
 	return node
 }
@@ -36,7 +39,9 @@ type Node struct {
 	// 组件管理器
 	componentManager *component.Manager
 
-	serializer serializer.ISerializer
+	serializer lib.ISerializer
+
+	panicHook func(entry zapcore.Entry)
 }
 
 func (m *Node) GetId() uint64 {
@@ -61,12 +66,12 @@ func (m *Node) GetRemote() iface.IRemote {
 }
 
 // SetSerializer 设置序列化器
-func (m *Node) SetSerializer(ser serializer.ISerializer) {
+func (m *Node) SetSerializer(ser lib.ISerializer) {
 	m.serializer = ser
 }
 
 // GetSerializer 获取序列化器
-func (m *Node) GetSerializer() serializer.ISerializer {
+func (m *Node) GetSerializer() lib.ISerializer {
 	return m.serializer
 }
 
@@ -100,24 +105,29 @@ func (m *Node) StarUp(profileFilePath string, comps ...component.Component) erro
 
 	m.componentManager = component.New()
 
-	// 注册组件
+	// 注册组件（注意顺序：glog 应该最先初始化，因为其他组件可能会使用日志）
 	components := []component.Component{
+		NewGlogComponent("log", m),
 		actor.NewComponent("actorSystem", m),
 		remote.NewComponent("remote", m),
 	}
 
+	lib.SetPanicHandler(func(err interface{}) {
+		glog.Panicf("panic handler: %v stack:%v", err, string(debug.Stack()))
+	})
+
 	//  注册外部传入的
 	components = append(components, comps...)
 
-	for _, c := range components {
-		if err := m.componentManager.Register(c); err != nil {
-			return fmt.Errorf("register %s component failed: %w", c.Name(), err)
+	for _, com := range components {
+		if err = m.componentManager.Register(com); err != nil {
+			return fmt.Errorf("register %s component failed: %w", com.Name(), err)
 		}
 	}
 
 	// 启动所有组件
 	ctx := context.Background()
-	if err := m.componentManager.Start(ctx); err != nil {
+	if err = m.componentManager.Start(ctx); err != nil {
 		return fmt.Errorf("start components failed: %w", err)
 	}
 
@@ -128,7 +138,7 @@ func (m *Node) StarUp(profileFilePath string, comps ...component.Component) erro
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 	<-sigChan
 
-	return m.Shutdown()
+	return m.shutdown(context.Background())
 }
 
 // Send 发送消息到指定的 actor
@@ -186,8 +196,12 @@ func (m *Node) isLocalNode(nodeId uint64) bool {
 	return nodeId == 0 || nodeId == m.Self().GetID()
 }
 
+func (m *Node) SetPanicHook(panicHook func(entry zapcore.Entry)) {
+	m.panicHook = panicHook
+}
+
 // Shutdown 优雅关闭节点，关闭所有组件
-func (m *Node) Shutdown() error {
+func (m *Node) shutdown(ctx context.Context) error {
 	// 保存节点信息用于日志
 	nodeId := m.Self().GetID()
 	nodeName := m.node.GetName()
@@ -199,7 +213,6 @@ func (m *Node) Shutdown() error {
 	glog.Infof("game-node stopping: id=%d, name=%s", nodeId, nodeName)
 
 	// 停止所有组件（按逆序停止：subscription -> messageQue -> discovery -> actor）
-	ctx := context.Background()
 	if m.componentManager != nil {
 		if err := m.componentManager.Stop(ctx); err != nil {
 			glog.Errorf("game-node: stop components failed: %v", err)
@@ -211,6 +224,7 @@ func (m *Node) Shutdown() error {
 	m.actorSystem = nil
 	m.componentManager = nil
 
+	timeoutCtx, _ := context.WithTimeout(context.Background(), time.Second*30)
 	glog.Infof("game-node stopped: id=%d", nodeId)
-	return nil
+	return lib.ShutdownGoroutines(timeoutCtx)
 }

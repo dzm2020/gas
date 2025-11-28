@@ -6,7 +6,7 @@
  * @Date: 2024/11/28 14:06
  */
 
-package asynctime
+package lib
 
 import (
 	"time"
@@ -22,4 +22,8 @@ func init() {
 
 func AfterFunc(d time.Duration, f func()) *timingwheel.Timer {
 	return tw.AfterFunc(d, f)
+}
+
+func Now() int64 {
+	return time.Now().Unix()
 }

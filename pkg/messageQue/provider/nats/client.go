@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"gas/pkg/messageQue/iface"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -23,7 +24,8 @@ func New(servers []string, opts ...Option) (*Client, error) {
 	}
 
 	return &Client{
-		conn: client,
+		conn:          client,
+		subscriptions: make(map[iface.ISubscription]struct{}),
 	}, nil
 }
 
@@ -34,13 +36,16 @@ func NewWithNatsOptions(servers []string, natsOpts ...nats.Option) (*Client, err
 		return nil, err
 	}
 	return &Client{
-		conn: conn,
+		conn:          conn,
+		subscriptions: make(map[iface.ISubscription]struct{}),
 	}, nil
 }
 
 // Client 实现 Cluster 接口的 NATS 具体实现
 type Client struct {
-	conn *nats.Conn
+	conn          *nats.Conn
+	mu            sync.RWMutex
+	subscriptions map[iface.ISubscription]struct{}
 }
 
 // Publish 实现 Cluster 接口的 Publish 方法
@@ -64,7 +69,13 @@ func (n *Client) Subscribe(subject string, handler iface.MsgHandler) (iface.ISub
 	if err != nil {
 		return nil, err
 	}
-	return &Subscription{sub: sub}, nil
+	subscription := &Subscription{sub: sub}
+
+	n.mu.Lock()
+	n.subscriptions[subscription] = struct{}{}
+	n.mu.Unlock()
+
+	return subscription, nil
 }
 
 // Request 实现 Cluster 接口的 Request 方法
@@ -76,8 +87,25 @@ func (n *Client) Request(subject string, data []byte, timeout time.Duration) ([]
 	return reply.Data, nil
 }
 
+func (n *Client) removeSub(subscription iface.ISubscription) {
+	n.mu.Lock()
+	delete(n.subscriptions, subscription)
+	n.mu.Unlock()
+}
+
 // Close 实现 Cluster 接口的 Close 方法
 func (n *Client) Close() error {
+	// 关闭所有 subscription
+	var subscriptions []iface.ISubscription
+	n.mu.RLock()
+	for sub, _ := range n.subscriptions {
+		subscriptions = append(subscriptions, sub)
+	}
+	n.mu.RUnlock()
+	for _, sub := range subscriptions {
+		_ = sub.Unsubscribe()
+	}
+
 	n.conn.Close()
 	return nil
 }
@@ -85,21 +113,11 @@ func (n *Client) Close() error {
 // Subscription 实现 iface.ISubscription 接口
 type Subscription struct {
 	sub *nats.Subscription
+	c   *Client
 }
 
 // Unsubscribe 实现 Subscription 接口
 func (n *Subscription) Unsubscribe() error {
+	n.c.removeSub(n)
 	return n.sub.Unsubscribe()
 }
-
-
-
-
-
-
-
-
-
-
-
-

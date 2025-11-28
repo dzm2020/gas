@@ -6,7 +6,7 @@ package actor
 import (
 	"fmt"
 	"gas/internal/iface"
-	"gas/pkg/lib/serializer"
+	"gas/pkg/lib"
 	"time"
 )
 
@@ -86,11 +86,11 @@ func (a *baseActorContext) Actor() iface.IActor {
 	return a.actor
 }
 
-func (a *baseActorContext) GetSerializer() serializer.ISerializer {
+func (a *baseActorContext) GetSerializer() lib.ISerializer {
 	if a.system != nil {
 		return a.system.GetSerializer()
 	}
-	return serializer.Json // 默认序列化器
+	return lib.Json // 默认序列化器
 }
 
 func (a *baseActorContext) Exit() {

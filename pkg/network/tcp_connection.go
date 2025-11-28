@@ -3,9 +3,8 @@ package network
 import (
 	"context"
 	"errors"
-	"gas/pkg/lib/buffer"
-	"gas/pkg/lib/glog"
-	"gas/pkg/lib/workers"
+	"gas/pkg/glog"
+	"gas/pkg/lib"
 	"net"
 	"time"
 
@@ -17,25 +16,25 @@ type TCPConnection struct {
 	conn            net.Conn
 	server          *TCPServer  // 所属服务器
 	sendChan        chan []byte // 发送队列（读写分离核心）
-	buf             []byte      // 粘包缓冲（未解析完整的消息数据）
-	buffer          buffer.IBuffer
+	tmpBuf          []byte
+	buffer          lib.IBuffer
 }
 
 func newTCPConnection(conn net.Conn, typ ConnectionType, options *Options) *TCPConnection {
 	tcpConn := &TCPConnection{
 		baseConnection: initBaseConnection(typ, options),
 		sendChan:       make(chan []byte, options.sendChanSize),
-		buf:            make([]byte, options.readBufSize),
-		buffer:         buffer.New(options.readBufSize),
+		tmpBuf:         make([]byte, options.readBufSize),
+		buffer:         lib.New(options.readBufSize),
 		conn:           conn,
 	}
 	AddConnection(tcpConn)
 
-	workers.Go(func(ctx context.Context) {
+	lib.Go(func(ctx context.Context) {
 		tcpConn.readLoop(ctx)
 	})
 
-	workers.Go(func(ctx context.Context) {
+	lib.Go(func(ctx context.Context) {
 		tcpConn.writeLoop(ctx)
 	})
 	glog.Infof("tcp connection open %v local:%v remote:%v typ:%v", tcpConn.ID(), tcpConn.LocalAddr(), tcpConn.RemoteAddr(), tcpConn.Type())
@@ -90,7 +89,7 @@ func (c *TCPConnection) readLoop(ctx context.Context) {
 }
 
 func (c *TCPConnection) read() error {
-	n, readErr := c.conn.Read(c.buf)
+	n, readErr := c.conn.Read(c.tmpBuf)
 	if readErr != nil {
 		return readErr
 	}
@@ -98,7 +97,7 @@ func (c *TCPConnection) read() error {
 		return errors.New("tcp read zero bytes")
 	}
 
-	if _, readErr = c.buffer.Write(c.buf[:n]); readErr != nil {
+	if _, readErr = c.buffer.Write(c.tmpBuf[:n]); readErr != nil {
 		return readErr
 	}
 
@@ -137,13 +136,14 @@ func (c *TCPConnection) writeLoop(ctx context.Context) {
 			if !ok {
 				return // 通道已关闭
 			}
+			//  todo 循环读取chan内容写入到buffer中 再写入到连接
 			_, err = c.conn.Write(data)
 			if err != nil {
 				return
 			}
 		case <-timeoutChan:
 			if c.isTimeout() {
-				err = errors.New("tcp connection timeout")
+				err = errors.New("tcp connection keepAlive")
 				return
 			}
 		}
@@ -155,9 +155,7 @@ func (c *TCPConnection) Close(err error) error {
 		return errors.New("tcp connection already closed")
 	}
 
-	close(c.closeChan)
-
-	workers.Go(func(ctx context.Context) {
+	lib.Go(func(ctx context.Context) {
 		_ = c.conn.Close()
 		_ = c.baseConnection.Close(c, err)
 	})

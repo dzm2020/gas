@@ -3,8 +3,8 @@ package consul
 import (
 	"context"
 	"gas/pkg/discovery/iface"
-	"gas/pkg/lib/glog"
-	"gas/pkg/lib/workers"
+	"gas/pkg/glog"
+	"gas/pkg/lib"
 	"time"
 
 	"github.com/duke-git/lancet/v2/convertor"
@@ -35,7 +35,7 @@ type consulWatcher struct {
 }
 
 func (w *consulWatcher) start() {
-	workers.Go(func(ctx context.Context) {
+	lib.Go(func(ctx context.Context) {
 		w.loop(ctx, w.service)
 	})
 }
@@ -48,7 +48,7 @@ func (w *consulWatcher) loop(ctx context.Context, service string) {
 		case <-w.stopCh:
 			return
 		default:
-			if err := w.fetch(service, w.serviceListenerManager.Notify); err != nil {
+			if err := w.fetch(ctx, service, w.serviceListenerManager.Notify); err != nil {
 				select {
 				case <-time.After(time.Second):
 				case <-w.stopCh:
@@ -59,11 +59,13 @@ func (w *consulWatcher) loop(ctx context.Context, service string) {
 	}
 }
 
-func (w *consulWatcher) fetch(service string, listener func(*iface.Topology)) error {
-	services, meta, err := w.client.Health().Service(service, "", true, &api.QueryOptions{
+func (w *consulWatcher) fetch(ctx context.Context, service string, listener func(*iface.Topology)) error {
+	options := &api.QueryOptions{
 		WaitIndex: w.waitIndex,
 		WaitTime:  w.opts.WatchWaitTime,
-	})
+	}
+	options.WithContext(ctx)
+	services, meta, err := w.client.Health().Service(service, "", true, options)
 	if err != nil {
 		glog.Error("consul watcher: failed to fetch service", zap.String("service", service), zap.Error(err))
 		return err

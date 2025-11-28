@@ -6,13 +6,14 @@
  * @Date: 2024/11/29 15:04
  */
 
-package netx
+package lib
 
 import (
-	"github.com/panjf2000/gnet/v2/pkg/errors"
 	"net"
 	"net/http"
 	"strings"
+
+	"github.com/panjf2000/gnet/v2/pkg/errors"
 )
 
 func ParseProtoAddr(protoAddr string) (string, string, error) {

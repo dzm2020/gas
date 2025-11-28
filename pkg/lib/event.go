@@ -1,8 +1,9 @@
-package event
+package lib
 
 import (
-	"golang.org/x/exp/slices"
 	"reflect"
+
+	"golang.org/x/exp/slices"
 )
 
 func handlerComparable[T any](this, other T) bool {

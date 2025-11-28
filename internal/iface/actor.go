@@ -1,7 +1,7 @@
 package iface
 
 import (
-	"gas/pkg/lib/serializer"
+	"gas/pkg/lib"
 	"time"
 )
 
@@ -14,7 +14,7 @@ type IContext interface {
 	Send(to *Pid, msgId uint16, request interface{}) error
 	Request(to *Pid, msgId uint16, request interface{}, reply interface{}) error
 	Exit()
-	GetSerializer() serializer.ISerializer
+	GetSerializer() lib.ISerializer
 	// RegisterTimer 注册定时器，时间到后通过 pushTask 通知 baseActorContext 然后执行回调
 	RegisterTimer(duration time.Duration, callback Task) (int64, error)
 	// AfterFunc 注册一次性定时器
@@ -44,8 +44,8 @@ type IProcess interface {
 type ISystem interface {
 	SetNode(n INode)
 	GetNode() INode
-	GetSerializer() serializer.ISerializer
-	SetSerializer(ser serializer.ISerializer)
+	GetSerializer() lib.ISerializer
+	SetSerializer(ser lib.ISerializer)
 	GetProcess(pid *Pid) IProcess
 	GetProcessById(id uint64) IProcess
 	GetProcessByName(name string) IProcess
