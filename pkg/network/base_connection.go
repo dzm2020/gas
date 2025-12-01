@@ -68,9 +68,9 @@ func (b *baseConnection) closeChanSignal() chan struct{} {
 }
 
 // checkClosed 检查连接是否已关闭，如果已关闭返回错误
-func (b *baseConnection) checkClosed(connType string) error {
+func (b *baseConnection) checkClosed() error {
 	if b.closed.Load() {
-		return errors.New(connType + " connection closed")
+		return errors.New(" connection closed")
 	}
 	return nil
 }
@@ -102,7 +102,7 @@ func (b *baseConnection) process(connection IConnection, data []byte) (int, erro
 func (b *baseConnection) Close(connection IConnection, err error) error {
 	RemoveConnection(connection)
 	close(b.closeChan)
-	b.handler.OnClose(connection, err)
+	_ = b.handler.OnClose(connection, err)
 	b.timeoutTicker.Stop()
 	return err
 }

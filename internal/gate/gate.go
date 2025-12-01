@@ -1,13 +1,16 @@
 package gate
 
 import (
-	"fmt"
+	"errors"
 	"gas/internal/gate/codec"
 	"gas/internal/iface"
 	"gas/pkg/glog"
 	"gas/pkg/network"
+)
 
-	"go.uber.org/zap"
+var (
+	ErrAgentFactoryNil       = errors.New("gate: agent factory is nil")
+	ErrAgentNoBindConnection = errors.New("no bind connection")
 )
 
 func New(address string, factory Factory, opts ...network.Option) *Gate {
@@ -31,11 +34,9 @@ func (m *Gate) Run() error {
 	var err error
 	m.server, err = network.NewServer(m.address, append(m.opts, network.WithHandler(m), network.WithCodec(codec.New()))...)
 	if err != nil {
-		glog.Error("gate run err", zap.Error(err))
 		return err
 	}
 	if err = m.server.Start(); err != nil {
-		glog.Errorf("gate run listening on %s err:%v", m.server.Addr(), err)
 		return err
 	}
 	glog.Infof("gate run listening on %s", m.server.Addr())
@@ -45,7 +46,7 @@ func (m *Gate) Run() error {
 func (m *Gate) OnConnect(entity network.IConnection) (err error) {
 	factory := m.factory
 	if factory == nil {
-		return fmt.Errorf("gate: agent factory is nil")
+		return ErrAgentFactoryNil
 	}
 	//  创建agent
 	agent := factory()
@@ -61,17 +62,17 @@ func (m *Gate) OnConnect(entity network.IConnection) (err error) {
 func (m *Gate) OnMessage(entity network.IConnection, msg interface{}) error {
 	agent, _ := entity.Context().(iface.IProcess)
 	if agent == nil {
-		return fmt.Errorf("no bind connection")
+		return ErrAgentNoBindConnection
 	}
 	return agent.PushMessage(msg)
 }
 
-func (m *Gate) OnClose(entity network.IConnection, wrong error) {
+func (m *Gate) OnClose(entity network.IConnection, wrong error) error {
 	agent, _ := entity.Context().(iface.IProcess)
 	if agent == nil {
-		return
+		return ErrAgentNoBindConnection
 	}
-	_ = agent.PushTask(func(ctx iface.IContext) (wrong error) {
+	return agent.PushTask(func(ctx iface.IContext) (wrong error) {
 		_agent := ctx.Actor().(IAgent)
 		wrong = _agent.OnClose(ctx)
 		return

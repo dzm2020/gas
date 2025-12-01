@@ -46,7 +46,7 @@ func (c *TCPConnection) RemoteAddr() net.Addr { return c.conn.RemoteAddr() }
 
 // Send 发送消息（线程安全）
 func (c *TCPConnection) Send(msg interface{}) error {
-	if err := c.checkClosed("tcp"); err != nil {
+	if err := c.checkClosed(); err != nil {
 		return err
 	}
 	// 编码消息

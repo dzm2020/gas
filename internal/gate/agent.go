@@ -25,16 +25,20 @@ func (agent *Agent) OnConnect(ctx iface.IContext, connection network.IConnection
 	agent.IConnection = connection
 	return nil
 }
+
 func (agent *Agent) OnClose(ctx iface.IContext) error {
 	agent.IConnection = nil
+	ctx.Exit()
 	return nil
 }
-func (agent *Agent) Close() {
-	if agent.IConnection == nil {
-		return
+
+func (agent *Agent) OnStop(ctx iface.IContext) error {
+	if agent.IConnection != nil {
+		_ = agent.IConnection.Close(nil)
 	}
-	_ = agent.IConnection.Close(nil)
+	return nil
 }
+
 func (agent *Agent) Send(msg *iface.Message) error {
 	if agent.IConnection == nil {
 		return fmt.Errorf("connection is nil")

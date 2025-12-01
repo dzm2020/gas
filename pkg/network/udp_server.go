@@ -16,24 +16,26 @@ import (
 // ------------------------------ UDP服务器 ------------------------------
 
 type UDPServer struct {
-	options     *Options
-	conn        *net.UDPConn  // UDP监听连接
-	proto, addr string        // 监听地址
-	running     atomic.Bool   // 运行状态
-	closeChan   chan struct{} // 关闭信号
-	connections map[string]*UDPConnection
-	rwMutex     sync.RWMutex // 保护connections并发
+	options      *Options
+	conn         *net.UDPConn  // UDP监听连接
+	proto, addr  string        // 监听地址
+	running      atomic.Bool   // 运行状态
+	closeChan    chan struct{} // 关闭信号
+	connections  map[string]*UDPConnection
+	rwMutex      sync.RWMutex // 保护connections并发
+	protoAddress string
 }
 
 // NewUDPServer 创建UDP服务器
 func NewUDPServer(proto, addr string, option ...Option) *UDPServer {
 	opts := loadOptions(option...)
 	return &UDPServer{
-		options:     opts,
-		addr:        addr,
-		proto:       proto,
-		closeChan:   make(chan struct{}),
-		connections: make(map[string]*UDPConnection),
+		options:      opts,
+		addr:         addr,
+		proto:        proto,
+		closeChan:    make(chan struct{}),
+		connections:  make(map[string]*UDPConnection),
+		protoAddress: fmt.Sprintf("%s:%s", proto, addr),
 	}
 }
 
@@ -122,7 +124,7 @@ func (s *UDPServer) removeConnection(connKey string) {
 }
 
 func (s *UDPServer) Addr() string {
-	return fmt.Sprintf("%s:%s", s.proto, s.addr)
+	return s.protoAddress
 }
 
 func (s *UDPServer) Stop() error {

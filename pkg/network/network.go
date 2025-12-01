@@ -36,7 +36,7 @@ type IHandler interface {
 	// OnMessage 收到消息时回调（已解码为完整业务消息）
 	OnMessage(conn IConnection, msg interface{}) error
 	// OnClose 连接关闭时回调（TCP：连接断开；UDP：超时无数据或主动关闭）
-	OnClose(conn IConnection, err error)
+	OnClose(conn IConnection, err error) error
 }
 
 // IConnection 统一连接接口（TCP/UDP连接的抽象）

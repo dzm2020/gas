@@ -43,7 +43,7 @@ func (c *UDPConnection) LocalAddr() net.Addr  { return c.conn.LocalAddr() }
 func (c *UDPConnection) RemoteAddr() net.Addr { return c.remoteAddr }
 
 func (c *UDPConnection) Send(msg interface{}) error {
-	if err := c.checkClosed("udp"); err != nil {
+	if err := c.checkClosed(); err != nil {
 		return err
 	}
 	data, err := c.codec.Encode(msg)

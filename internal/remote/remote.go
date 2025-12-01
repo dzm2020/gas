@@ -143,8 +143,7 @@ func (r *Remote) Request(message *iface.Message, timeout time.Duration) *iface.R
 	return response
 }
 
-// SendByService 通过服务名发送消息到远程节点
-func (r *Remote) SendByService(service string, message *iface.Message, strategy RouteStrategy) error {
+func (r *Remote) Select(service string, strategy RouteStrategy) (*iface.Pid, error) {
 	if strategy == nil {
 		strategy = RouteRandom
 	}
@@ -152,51 +151,20 @@ func (r *Remote) SendByService(service string, message *iface.Message, strategy 
 	// 通过服务发现获取节点列表
 	nodes := r.discovery.GetService(service)
 	if len(nodes) == 0 {
-		return fmt.Errorf("no nodes found for service: %s", service)
+		return nil, fmt.Errorf("no nodes found for service: %s", service)
 	}
 
 	// 使用路由策略选择节点
 	selectedNode := strategy(nodes)
 	if selectedNode == nil {
-		return fmt.Errorf("route strategy returned nil node for service: %s", service)
+		return nil, fmt.Errorf("route strategy returned nil node for service: %s", service)
 	}
 
 	// 设置消息的目标节点ID
-	if message.To == nil {
-		message.To = &iface.Pid{}
-	}
-	message.To.NodeId = selectedNode.GetID()
-
-	// 发送消息
-	return r.Send(message)
-}
-
-// RequestByService 通过服务名向远程节点发送请求并等待回复
-func (r *Remote) RequestByService(service string, message *iface.Message, timeout time.Duration, strategy RouteStrategy) *iface.RespondMessage {
-	if strategy == nil {
-		strategy = RouteRandom
-	}
-
-	// 通过服务发现获取节点列表
-	nodes := r.discovery.GetService(service)
-	if len(nodes) == 0 {
-		return iface.NewErrorResponse(fmt.Sprintf("no nodes found for service: %s", service))
-	}
-
-	// 使用路由策略选择节点
-	selectedNode := strategy(nodes)
-	if selectedNode == nil {
-		return iface.NewErrorResponse(fmt.Sprintf("route strategy returned nil node for service: %s", service))
-	}
-
-	// 设置消息的目标节点ID
-	if message.To == nil {
-		message.To = &iface.Pid{}
-	}
-	message.To.NodeId = selectedNode.GetID()
-
-	// 发送请求
-	return r.Request(message, timeout)
+	return &iface.Pid{
+		NodeId: selectedNode.GetID(),
+		Name:   service,
+	}, nil
 }
 
 // Broadcast 向服务的所有节点广播消息
@@ -214,6 +182,7 @@ func (r *Remote) Broadcast(service string, message *iface.Message) error {
 		nodeMessage := &iface.Message{
 			To: &iface.Pid{
 				NodeId: node.GetID(),
+				Name:   service,
 			},
 			From: message.From,
 			Id:   message.Id,

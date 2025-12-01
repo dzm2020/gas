@@ -38,7 +38,8 @@ func (s *TCPServer) Start() error {
 	if s.listener, err = net.Listen(s.proto, s.addr); err != nil {
 		return err
 	}
-	glog.Info("tcp server listening", zap.String("proto", s.proto), zap.String("addr", s.addr))
+
+	glog.Info("tcp server listening start", zap.String("proto", s.proto), zap.String("addr", s.addr))
 
 	lib.Go(func(ctx context.Context) {
 		s.acceptLoop(ctx)
@@ -47,6 +48,8 @@ func (s *TCPServer) Start() error {
 }
 
 func (s *TCPServer) acceptLoop(ctx context.Context) {
+	defer glog.Info("tcp server listening end", zap.String("proto", s.proto), zap.String("addr", s.addr))
+
 	for {
 		select {
 		case <-ctx.Done():

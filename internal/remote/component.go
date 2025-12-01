@@ -46,10 +46,6 @@ func (r *Component) Start(ctx context.Context) error {
 		return fmt.Errorf("create message queue failed: %w", err)
 	}
 
-	nodeSubjectPrefix := config.Cluster.Name
-	if nodeSubjectPrefix == "" {
-		nodeSubjectPrefix = "cluster.game-node."
-	}
 	r.remote = &Remote{
 		discovery:         discoveryInstance,
 		messageQue:        messageQueue,
@@ -57,7 +53,6 @@ func (r *Component) Start(ctx context.Context) error {
 		nodeSubjectPrefix: config.Cluster.Name,
 		node:              r.node,
 	}
-
 	//  注册节点并订阅
 	if err = r.remote.init(); err != nil {
 		return err
