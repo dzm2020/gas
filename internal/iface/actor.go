@@ -25,6 +25,9 @@ type IContext interface {
 	CancelTimer(timerID int64) bool
 	// CancelAllTimers 取消所有定时器
 	CancelAllTimers()
+	SendService(service string, msgId uint16, request interface{}, strategy RouteStrategy) error
+	Node() INode
+	RegisterName(name string, isGlobal bool) error
 }
 
 type IActor interface {
@@ -52,7 +55,10 @@ type ISystem interface {
 	Send(message *Message) error
 	Request(message *Message, timeout time.Duration) *RespondMessage
 	GetAllProcesses() []IProcess
-	Spawn(actor IActor, options ...Option) (*Pid, IProcess)
+	Spawn(actor IActor, args ...interface{}) *Pid
+	PushTask(pid *Pid, f Task) error
+	PushTaskAndWait(pid *Pid, timeout time.Duration, task Task) error
+	PushMessage(pid *Pid, message interface{}) error
 }
 
 type IRouter interface {

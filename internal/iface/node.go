@@ -2,7 +2,6 @@ package iface
 
 import (
 	"gas/internal/config"
-	"gas/pkg/component"
 	discovery "gas/pkg/discovery/iface"
 	"gas/pkg/lib"
 
@@ -19,6 +18,6 @@ type INode interface {
 	SetRemote(IRemote)
 	GetConfig() *config.Config
 	Self() *discovery.Node
-	StarUp(profileFilePath string, comps ...component.Component) error
+	StarUp(comps ...Component) error
 	SetPanicHook(panicHook func(entry zapcore.Entry))
 }

@@ -1,6 +1,7 @@
 package gate
 
 import (
+	"context"
 	"errors"
 	"gas/internal/gate/codec"
 	"gas/internal/iface"
@@ -13,26 +14,22 @@ var (
 	ErrAgentNoBindConnection = errors.New("no bind connection")
 )
 
-func New(address string, factory Factory, opts ...network.Option) *Gate {
-	gate := &Gate{
-		opts:    opts,
-		address: address,
-		factory: factory,
-	}
-	return gate
-}
-
 type Gate struct {
 	network.EmptyHandler
-	address string
-	opts    []network.Option
-	factory Factory
+	Address string
+	Options []network.Option
+	Factory Factory
 	server  network.IServer
+	node    iface.INode
 }
 
-func (m *Gate) Run() error {
+func (m *Gate) Name() string {
+	return "gate"
+}
+func (m *Gate) Start(ctx context.Context, node iface.INode) error {
+	m.node = node
 	var err error
-	m.server, err = network.NewServer(m.address, append(m.opts, network.WithHandler(m), network.WithCodec(codec.New()))...)
+	m.server, err = network.NewServer(m.Address, append(m.Options, network.WithHandler(m), network.WithCodec(codec.New()))...)
 	if err != nil {
 		return err
 	}
@@ -44,42 +41,48 @@ func (m *Gate) Run() error {
 }
 
 func (m *Gate) OnConnect(entity network.IConnection) (err error) {
-	factory := m.factory
+	factory := m.Factory
 	if factory == nil {
 		return ErrAgentFactoryNil
 	}
-	//  创建agent
-	agent := factory()
+
+	system := m.node.GetActorSystem()
+
+	pid := system.Spawn(factory())
+
 	//  绑定
-	entity.SetContext(agent)
+	entity.SetContext(pid)
 	//  执行初始化
-	return agent.PushTask(func(ctx iface.IContext) error {
+	return system.PushTask(pid, func(ctx iface.IContext) error {
 		_agent := ctx.Actor().(IAgent)
 		return _agent.OnConnect(ctx, entity)
 	})
 }
 
 func (m *Gate) OnMessage(entity network.IConnection, msg interface{}) error {
-	agent, _ := entity.Context().(iface.IProcess)
-	if agent == nil {
+	pid, _ := entity.Context().(*iface.Pid)
+	if pid == nil {
 		return ErrAgentNoBindConnection
 	}
-	return agent.PushMessage(msg)
+	system := m.node.GetActorSystem()
+	return system.PushMessage(pid, msg)
 }
 
 func (m *Gate) OnClose(entity network.IConnection, wrong error) error {
-	agent, _ := entity.Context().(iface.IProcess)
-	if agent == nil {
+	pid, _ := entity.Context().(*iface.Pid)
+	if pid == nil {
 		return ErrAgentNoBindConnection
 	}
-	return agent.PushTask(func(ctx iface.IContext) (wrong error) {
+
+	system := m.node.GetActorSystem()
+	return system.PushTask(pid, func(ctx iface.IContext) (wrong error) {
 		_agent := ctx.Actor().(IAgent)
 		wrong = _agent.OnClose(ctx)
 		return
 	})
 }
 
-func (m *Gate) Stop() error {
+func (m *Gate) Stop(ctx context.Context) error {
 	if m.server != nil {
 		_ = m.server.Stop()
 	}

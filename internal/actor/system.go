@@ -18,14 +18,6 @@ import (
 	"github.com/duke-git/lancet/v2/maputil"
 )
 
-func loadOptions(options ...iface.Option) *iface.Options {
-	opts := &iface.Options{}
-	for _, option := range options {
-		option(opts)
-	}
-	return opts
-}
-
 // System Actor 系统，管理所有进程和消息传递
 type System struct {
 	uniqId       atomic.Uint64
@@ -78,25 +70,21 @@ func (s *System) newPid() *iface.Pid {
 }
 
 // Spawn 创建新的 actor 进程
-func (s *System) Spawn(actor iface.IActor, options ...iface.Option) (*iface.Pid, iface.IProcess) {
+func (s *System) Spawn(actor iface.IActor, args ...interface{}) *iface.Pid {
 	if s.shuttingDown.Load() {
-		return nil, nil
+		return nil
 	}
-	opts := loadOptions(options...)
-	pid := s.newPid()
-	pid.Name = opts.Name
 
+	pid := s.newPid()
 	mailBox := NewMailbox()
 	// 先创建 process，传入 nil context（稍后设置）
 	process := NewProcess(nil, mailBox)
 	// 创建 context 配置
 	cfg := &contextConfig{
-		pid:         pid,
-		actor:       actor,
-		middlewares: opts.Middlewares,
-		router:      opts.Router,
-		system:      s,
-		process:     process,
+		pid:     pid,
+		actor:   actor,
+		system:  s,
+		process: process,
 	}
 	// 创建 context
 	context := newBaseActorContext(cfg)
@@ -108,10 +96,10 @@ func (s *System) Spawn(actor iface.IActor, options ...iface.Option) (*iface.Pid,
 	s.registerProcess(pid, process)
 
 	_ = process.PushTask(func(ctx iface.IContext) error {
-		return ctx.Actor().OnInit(ctx, opts.Params)
+		return ctx.Actor().OnInit(ctx, args)
 	})
 
-	return pid, process
+	return pid
 }
 
 // GetProcess 根据 Pid 获取进程
@@ -180,6 +168,39 @@ func (s *System) Request(message *iface.Message, timeout time.Duration) *iface.R
 	}
 
 	return res
+}
+
+func (s *System) PushTask(pid *iface.Pid, f iface.Task) error {
+	if s.shuttingDown.Load() {
+		return errors.New("system is shutting down")
+	}
+	process := s.GetProcess(pid)
+	if process == nil {
+		return errors.New("process not found")
+	}
+	return process.PushTask(f)
+}
+
+func (s *System) PushTaskAndWait(pid *iface.Pid, timeout time.Duration, task iface.Task) error {
+	if s.shuttingDown.Load() {
+		return errors.New("system is shutting down")
+	}
+	process := s.GetProcess(pid)
+	if process == nil {
+		return errors.New("process not found")
+	}
+	return process.PushTaskAndWait(timeout, task)
+}
+
+func (s *System) PushMessage(pid *iface.Pid, message interface{}) error {
+	if s.shuttingDown.Load() {
+		return errors.New("system is shutting down")
+	}
+	process := s.GetProcess(pid)
+	if process == nil {
+		return errors.New("process not found")
+	}
+	return process.PushMessage(message)
 }
 
 // registerProcess 注册进程

@@ -3,6 +3,7 @@ package node
 import (
 	"context"
 	"fmt"
+	"gas/internal/actor"
 	"gas/internal/config"
 	"gas/internal/iface"
 	"gas/internal/remote"
@@ -14,22 +15,23 @@ import (
 	"syscall"
 	"time"
 
-	"gas/internal/actor"
-	"gas/pkg/component"
 	discovery "gas/pkg/discovery/iface"
 
 	"go.uber.org/zap/zapcore"
 )
 
 // New 创建节点实例
-func New() *Node {
+func New(profileFilePath string) *Node {
 	node := &Node{
-		serializer: lib.Json,
+		profileFilePath: profileFilePath,
+		serializer:      lib.Json,
 	}
 	return node
 }
 
 type Node struct {
+	profileFilePath string
+
 	node *discovery.Node
 
 	config *config.Config
@@ -37,7 +39,7 @@ type Node struct {
 	actorSystem iface.ISystem
 	remote      iface.IRemote
 	// 组件管理器
-	componentManager *component.Manager
+	componentManager *iface.Manager
 
 	serializer lib.ISerializer
 
@@ -84,9 +86,9 @@ func (m *Node) Self() *discovery.Node {
 	return m.node
 }
 
-func (m *Node) StarUp(profileFilePath string, comps ...component.Component) error {
+func (m *Node) StarUp(comps ...iface.Component) error {
 	// 读取配置文件
-	c, err := config.Load(profileFilePath)
+	c, err := config.Load(m.profileFilePath)
 	if err != nil {
 		return fmt.Errorf("load config failed: %w", err)
 	}
@@ -103,13 +105,13 @@ func (m *Node) StarUp(profileFilePath string, comps ...component.Component) erro
 		Meta:    c.Node.Meta,
 	}
 
-	m.componentManager = component.New()
+	m.componentManager = iface.New()
 
 	// 注册组件（注意顺序：glog 应该最先初始化，因为其他组件可能会使用日志）
-	components := []component.Component{
-		NewGlogComponent("log", m),
-		actor.NewComponent("actorSystem", m),
-		remote.NewComponent("remote", m),
+	components := []iface.Component{
+		NewGlogComponent(),
+		actor.NewComponent(),
+		remote.NewComponent(),
 	}
 
 	lib.SetPanicHandler(func(err interface{}) {
@@ -127,7 +129,7 @@ func (m *Node) StarUp(profileFilePath string, comps ...component.Component) erro
 
 	// 启动所有组件
 	ctx := context.Background()
-	if err = m.componentManager.Start(ctx); err != nil {
+	if err = m.componentManager.Start(ctx, m); err != nil {
 		return fmt.Errorf("start components failed: %w", err)
 	}
 

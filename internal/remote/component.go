@@ -11,27 +11,21 @@ import (
 // Component 远程通信组件
 type Component struct {
 	node   iface.INode
-	name   string
 	remote *Remote
 }
 
 // NewComponent 创建 remote 组件
-func NewComponent(name string, node iface.INode) *Component {
-	c := &Component{
-		name: name,
-		node: node,
-	}
+func NewComponent() *Component {
+	c := &Component{}
 	return c
 }
 
 func (r *Component) Name() string {
-	return r.name
+	return "remote"
 }
 
-func (r *Component) Start(ctx context.Context) error {
-	if r.node == nil {
-		return fmt.Errorf("game-node is nil")
-	}
+func (r *Component) Start(ctx context.Context, node iface.INode) error {
+	r.node = node
 
 	config := r.node.GetConfig()
 	// 创建服务发现实例

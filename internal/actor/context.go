@@ -4,6 +4,7 @@
 package actor
 
 import (
+	"errors"
 	"fmt"
 	"gas/internal/iface"
 	"gas/pkg/lib"
@@ -33,6 +34,7 @@ func newBaseActorContext(cfg *contextConfig) *baseActorContext {
 		system:       cfg.system,
 		process:      cfg.process,
 		timerMgr:     newTimerManager(),
+		node:         cfg.system.GetNode(),
 	}
 	return ctx
 }
@@ -47,12 +49,15 @@ type baseActorContext struct {
 	system       *System
 	process      iface.IProcess // 保存自己的 process 引用
 	timerMgr     *timerManager  // 定时器管理器
+	node         iface.INode
 }
 
 func (a *baseActorContext) ID() *iface.Pid {
 	return a.pid
 }
-
+func (a *baseActorContext) Node() iface.INode {
+	return a.node
+}
 func (a *baseActorContext) InvokerMessage(msg interface{}) error {
 	a.msg = msg
 
@@ -115,6 +120,43 @@ func (a *baseActorContext) Send(to *iface.Pid, msgId uint16, request interface{}
 		return fmt.Errorf("system is not initialized")
 	}
 
+	message := a.buildMessage(to, msgId, request)
+	if message == nil {
+		return fmt.Errorf("build message failed")
+	}
+
+	if n := a.system.GetNode(); n != nil {
+		return n.GetRemote().Send(message)
+	}
+	return a.system.Send(message)
+}
+
+func (a *baseActorContext) Select(service string, strategy iface.RouteStrategy) (*iface.Pid, error) {
+	node := a.system.GetNode()
+	if node == nil {
+		return nil, errors.New("node is nil")
+	}
+	remote := node.GetRemote()
+	if remote == nil {
+		return nil, errors.New("remote is nil")
+	}
+	return remote.Select(service, strategy)
+}
+
+func (a *baseActorContext) SendService(service string, msgId uint16, request interface{}, strategy iface.RouteStrategy) error {
+	if len(service) <= 0 {
+		return fmt.Errorf("target pid is nil")
+	}
+	if request == nil {
+		return fmt.Errorf("request is nil")
+	}
+	if a.system == nil {
+		return fmt.Errorf("system is not initialized")
+	}
+	to, err := a.Select(service, strategy)
+	if err != nil {
+		return err
+	}
 	message := a.buildMessage(to, msgId, request)
 	if message == nil {
 		return fmt.Errorf("build message failed")
@@ -202,4 +244,47 @@ func (a *baseActorContext) CancelTimer(timerID int64) bool {
 // CancelAllTimers 取消所有定时器
 func (a *baseActorContext) CancelAllTimers() {
 	a.timerMgr.CancelAllTimers()
+}
+
+func (a *baseActorContext) RegisterName(name string, isGlobal bool) error {
+	if len(name) == 0 {
+		return fmt.Errorf("name cannot be empty")
+	}
+	if a.system == nil {
+		return fmt.Errorf("system is not initialized")
+	}
+
+	// 本地注册：更新 pid 的名称并在 system 中注册
+	oldName := a.pid.Name
+	a.pid.Name = name
+
+	// 如果之前有名称，先从 nameDict 中删除旧名称
+	if oldName != "" && oldName != name {
+		a.system.nameDict.Delete(oldName)
+	}
+
+	// 在本地 system 中注册新名称
+	a.system.nameDict.Set(name, a.process)
+
+	// 如果是全局注册，还需要在远程注册
+	if isGlobal {
+		if a.node == nil {
+			return fmt.Errorf("node is not initialized")
+		}
+		remote := a.node.GetRemote()
+		if remote == nil {
+			return fmt.Errorf("remote is not initialized")
+		}
+		if err := remote.RegistryName(name); err != nil {
+			// 如果远程注册失败，回滚本地注册
+			a.system.nameDict.Delete(name)
+			a.pid.Name = oldName
+			if oldName != "" {
+				a.system.nameDict.Set(oldName, a.process)
+			}
+			return fmt.Errorf("remote registry name failed: %w", err)
+		}
+	}
+
+	return nil
 }

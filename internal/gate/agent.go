@@ -7,7 +7,7 @@ import (
 	"gas/pkg/network"
 )
 
-type Factory func() iface.IProcess
+type Factory func() iface.IActor
 
 type IAgent interface {
 	iface.IActor

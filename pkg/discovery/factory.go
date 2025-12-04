@@ -67,3 +67,4 @@ func newConsulFromConfig(config Config) (iface.IDiscovery, error) {
 
 
 
+

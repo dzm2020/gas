@@ -8,24 +8,21 @@ import (
 
 // Component actor 系统组件适配器
 type Component struct {
-	name   string
 	system *System
 	node   iface.INode
 }
 
 // NewComponent 创建 actor 组件
-func NewComponent(name string, node iface.INode) *Component {
-	return &Component{
-		name: name,
-		node: node,
-	}
+func NewComponent() *Component {
+	return &Component{}
 }
 
 func (a *Component) Name() string {
-	return a.name
+	return "actorSystem"
 }
 
-func (a *Component) Start(ctx context.Context) error {
+func (a *Component) Start(ctx context.Context, node iface.INode) error {
+	a.node = node
 	a.system = NewSystem()
 	a.system.SetSerializer(a.node.GetSerializer())
 	a.system.SetNode(a.node)

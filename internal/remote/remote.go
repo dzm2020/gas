@@ -8,6 +8,9 @@ import (
 	"gas/pkg/lib"
 	messageQue "gas/pkg/messageQue/iface"
 	"time"
+
+	"go.uber.org/zap"
+	"golang.org/x/exp/slices"
 )
 
 // Remote 远程通信管理器，负责处理跨节点的消息传递
@@ -95,6 +98,7 @@ func (r *Remote) onRemoteHandler(data []byte, reply func([]byte) error) {
 			glog.Errorf("remote: send message to actor failed: %v", err)
 		}
 	}
+	glog.Info("remote: send message to actor", zap.Any("message", message))
 }
 
 // sendError 发送错误响应
@@ -142,20 +146,36 @@ func (r *Remote) Request(message *iface.Message, timeout time.Duration) *iface.R
 	}
 	return response
 }
+func (r *Remote) RegistryName(name string) error {
+	info := r.node.Self()
+	if slices.Contains(info.GetTags(), name) {
+		return nil
+	}
+	info.Tags = append(info.Tags, name)
+	return r.discovery.Add(info)
+}
 
-func (r *Remote) Select(service string, strategy RouteStrategy) (*iface.Pid, error) {
+func (r *Remote) Select(service string, strategy iface.RouteStrategy) (*iface.Pid, error) {
 	if strategy == nil {
 		strategy = RouteRandom
 	}
 
 	// 通过服务发现获取节点列表
-	nodes := r.discovery.GetService(service)
+	nodes := r.discovery.GetAll()
 	if len(nodes) == 0 {
 		return nil, fmt.Errorf("no nodes found for service: %s", service)
 	}
 
+	var _nodes []*discovery.Node
+	for _, node := range nodes {
+		if !slices.Contains(node.Tags, service) {
+			continue
+		}
+		_nodes = append(_nodes, node)
+	}
+
 	// 使用路由策略选择节点
-	selectedNode := strategy(nodes)
+	selectedNode := strategy(_nodes)
 	if selectedNode == nil {
 		return nil, fmt.Errorf("route strategy returned nil node for service: %s", service)
 	}

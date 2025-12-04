@@ -3,7 +3,7 @@ package node
 import (
 	"context"
 	"fmt"
-	"gas/pkg/component"
+	"gas/internal/iface"
 	glog2 "gas/pkg/glog"
 
 	"go.uber.org/zap"
@@ -12,24 +12,19 @@ import (
 
 // GlogComponent glog 日志组件
 type GlogComponent struct {
-	name string
-	node *Node
+	node iface.INode
 }
 
 // NewGlogComponent 创建 glog 组件
-func NewGlogComponent(name string, node *Node) component.Component {
-	return &GlogComponent{
-		name: name,
-		node: node,
-	}
+func NewGlogComponent() iface.Component {
+	return &GlogComponent{}
 }
+
 func (g *GlogComponent) Name() string {
-	return g.name
+	return "log"
 }
-func (g *GlogComponent) Start(ctx context.Context) error {
-	if g.node == nil {
-		return fmt.Errorf("node is nil")
-	}
+func (g *GlogComponent) Start(ctx context.Context, node iface.INode) error {
+	g.node = node
 
 	cfg := g.node.GetConfig()
 	if cfg == nil {
@@ -48,9 +43,10 @@ func (g *GlogComponent) Start(ctx context.Context) error {
 		),
 		zap.Hooks(func(entry zapcore.Entry) error {
 			if entry.Level >= zap.DPanicLevel {
-				if g.node.panicHook != nil {
-					g.node.panicHook(entry)
-				}
+				//  todo
+				//if g.node.panicHook != nil {
+				//	g.node.panicHook(entry)
+				//}
 			}
 			return nil
 		}),

@@ -1,4 +1,4 @@
-package component
+package iface
 
 import (
 	"context"
@@ -8,10 +8,20 @@ import (
 	"time"
 )
 
+type BaseComponent struct {
+}
+
+func (*BaseComponent) Start(ctx context.Context) error {
+	return nil
+}
+func (*BaseComponent) Stop(ctx context.Context) error {
+	return nil
+}
+
 // Component 组件接口，所有需要管理生命周期的组件都应实现此接口
 type Component interface {
 	// Start 启动组件
-	Start(ctx context.Context) error
+	Start(ctx context.Context, node INode) error
 	// Stop 停止组件，ctx 用于控制超时
 	Stop(ctx context.Context) error
 	// Name 返回组件名称，用于日志和错误报告
@@ -64,7 +74,7 @@ func (m *Manager) Register(component Component) error {
 
 // Start 启动所有已注册的组件
 // 按注册顺序依次启动，如果某个组件启动失败，会停止已启动的组件
-func (m *Manager) Start(ctx context.Context) error {
+func (m *Manager) Start(ctx context.Context, node INode) error {
 	m.mu.Lock()
 	if m.started {
 		m.mu.Unlock()
@@ -82,7 +92,7 @@ func (m *Manager) Start(ctx context.Context) error {
 	for i, component := range m.components {
 		glog.Infof("component: starting component '%s' (%d/%d)", component.Name(), i+1, len(m.components))
 
-		if err := component.Start(ctx); err != nil {
+		if err := component.Start(ctx, node); err != nil {
 			glog.Errorf("component: failed to start component '%s': %v", component.Name(), err)
 			// 停止已启动的组件（逆序）
 			m.stopComponents(ctx, started, true)
