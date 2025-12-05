@@ -10,6 +10,7 @@ package actor
 
 import (
 	"errors"
+	"fmt"
 	"gas/internal/iface"
 	"gas/pkg/lib"
 	"sync/atomic"
@@ -135,20 +136,45 @@ func (s *System) Send(message *iface.Message) error {
 	if s.shuttingDown.Load() {
 		return errors.New("system is shutting down")
 	}
-	process := s.GetProcess(message.GetTo())
-	if process == nil {
-		return errors.New("process not found")
+	to := message.To
+	if to.GetNodeId() == s.GetNode().GetId() {
+		process := s.GetProcess(message.GetTo())
+		if process == nil {
+			return errors.New("process not found")
+		}
+		return process.PushMessage(message)
+	} else {
+		return s.GetNode().GetRemote().Send(message)
 	}
-	return process.PushMessage(message)
 }
 
 // Request 发送消息到指定进程
-func (s *System) Request(message *iface.Message, timeout time.Duration) *iface.RespondMessage {
+func (s *System) Request(message *iface.Message, reply interface{}) error {
 	if s.shuttingDown.Load() {
-		return iface.NewErrorResponse("system is shutting down")
+		return fmt.Errorf("system is shutting down")
 	}
-	waiter := newChanWaiter[*iface.RespondMessage](timeout)
 
+	to := message.To
+
+	var response *iface.RespondMessage
+	if to.GetNodeId() == s.GetNode().GetId() {
+		response = s.localRequest(message)
+	} else {
+		response = s.GetNode().GetRemote().Request(message, time.Second*3)
+	}
+	if errMsg := response.GetError(); errMsg != "" {
+		return fmt.Errorf("request failed: %s", errMsg)
+	}
+	if data := response.GetData(); len(data) > 0 {
+		if err := s.GetSerializer().Unmarshal(data, reply); err != nil {
+			return fmt.Errorf("unmarshal reply failed: %w", err)
+		}
+	}
+	return nil
+}
+
+func (s *System) localRequest(message *iface.Message) *iface.RespondMessage {
+	waiter := newChanWaiter[*iface.RespondMessage](time.Second * 3)
 	msg := &iface.SyncMessage{Message: message}
 	msg.SetResponse(func(message *iface.RespondMessage) {
 		waiter.Done(message)
@@ -166,7 +192,6 @@ func (s *System) Request(message *iface.Message, timeout time.Duration) *iface.R
 	if err != nil {
 		return iface.NewErrorResponse(err.Error())
 	}
-
 	return res
 }
 
@@ -201,6 +226,62 @@ func (s *System) PushMessage(pid *iface.Pid, message interface{}) error {
 		return errors.New("process not found")
 	}
 	return process.PushMessage(message)
+}
+
+func (s *System) Select(name string, strategy iface.RouteStrategy) (*iface.Pid, error) {
+	// 查找本地名字
+	if process := s.GetProcessByName(name); process != nil {
+		return process.Context().ID(), nil
+	}
+	// 本地找不到通过remote查找
+	node := s.GetNode()
+	if node == nil {
+		return nil, errors.New("node is nil")
+	}
+	remote := node.GetRemote()
+	if remote == nil {
+		return nil, errors.New("remote is nil")
+	}
+	return remote.Select(name, strategy)
+}
+
+func (s *System) RegisterName(pid *iface.Pid, process iface.IProcess, name string, isGlobal bool) error {
+	if len(name) == 0 {
+		return fmt.Errorf("name cannot be empty")
+	}
+
+	// 本地注册：更新 pid 的名称并在 system 中注册
+	oldName := pid.Name
+	pid.Name = name
+
+	// 如果之前有名称，先从 nameDict 中删除旧名称
+	if oldName != "" && oldName != name {
+		s.nameDict.Delete(oldName)
+	}
+
+	// 在本地 system 中注册新名称
+	s.nameDict.Set(name, process)
+
+	// 如果是全局注册，还需要在远程注册
+	if isGlobal {
+		if s.GetNode() == nil {
+			return fmt.Errorf("node is not initialized")
+		}
+		remote := s.GetNode().GetRemote()
+		if remote == nil {
+			return fmt.Errorf("remote is not initialized")
+		}
+		if err := remote.RegistryName(name); err != nil {
+			// 如果远程注册失败，回滚本地注册
+			s.nameDict.Delete(name)
+			pid.Name = oldName
+			if oldName != "" {
+				s.nameDict.Set(oldName, process)
+			}
+			return fmt.Errorf("remote registry name failed: %w", err)
+		}
+	}
+	return nil
 }
 
 // registerProcess 注册进程
@@ -240,8 +321,6 @@ func (s *System) Shutdown(timeout time.Duration) error {
 	if timeout == 0 {
 		timeout = 10 * time.Second
 	}
-	deadline := time.Now().Add(timeout)
-
 	// 获取所有进程的快照
 	processes := s.GetAllProcesses()
 
@@ -252,45 +331,5 @@ func (s *System) Shutdown(timeout time.Duration) error {
 			continue
 		}
 	}
-
-	// 第二步：等待所有进程从系统中注销（进程数量变为0）
-	if err := s.waitForAllProcessesExited(time.Until(deadline)); err != nil {
-		return err
-	}
-
 	return nil
-}
-
-// waitForAllProcessesExited 等待所有进程从系统中注销（进程数量变为0）
-func (s *System) waitForAllProcessesExited(timeout time.Duration) error {
-	ticker := time.NewTicker(10 * time.Millisecond)
-	defer ticker.Stop()
-
-	timeoutTimer := time.NewTimer(timeout)
-	defer timeoutTimer.Stop()
-
-	for {
-		// 检查进程数量是否为0
-		processCount := s.getProcessCount()
-		if processCount == 0 {
-			return nil
-		}
-
-		select {
-		case <-ticker.C:
-			continue
-		case <-timeoutTimer.C:
-			return errors.New("shutdown timeout: some processes are not exited")
-		}
-	}
-}
-
-// getProcessCount 获取当前系统中的进程数量
-func (s *System) getProcessCount() int {
-	count := 0
-	s.processDict.Range(func(key uint64, value iface.IProcess) bool {
-		count++
-		return true
-	})
-	return count
 }

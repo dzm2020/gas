@@ -21,7 +21,7 @@ type contextConfig struct {
 	actor       iface.IActor
 	middlewares []iface.TaskMiddleware
 	router      iface.IRouter
-	system      *System
+	system      iface.ISystem
 	process     iface.IProcess
 }
 
@@ -44,9 +44,9 @@ type baseActorContext struct {
 	name         string
 	actor        iface.IActor
 	middlerWares []iface.TaskMiddleware
-	msg          interface{}
+	msg          *iface.Message
 	router       iface.IRouter
-	system       *System
+	system       iface.ISystem
 	process      iface.IProcess // 保存自己的 process 引用
 	timerMgr     *timerManager  // 定时器管理器
 	node         iface.INode
@@ -58,33 +58,50 @@ func (a *baseActorContext) ID() *iface.Pid {
 func (a *baseActorContext) Node() iface.INode {
 	return a.node
 }
+func (a *baseActorContext) GetRouter() iface.IRouter {
+	return a.router
+}
+func (a *baseActorContext) System() iface.ISystem {
+	return a.system
+}
+func (a *baseActorContext) SetRouter(router iface.IRouter) {
+	a.router = router
+}
+func (a *baseActorContext) Message() *iface.Message {
+	return a.msg
+}
 func (a *baseActorContext) InvokerMessage(msg interface{}) error {
-	a.msg = msg
 
 	switch m := msg.(type) {
 	case *iface.TaskMessage:
 		return chain(a.middlerWares, m.Task)(a)
 	case *iface.Message:
-		if a.router != nil && a.router.HasRoute(uint16(m.GetId())) {
-			_, err := a.execHandler(m)
+		a.msg = m
+		if a.router != nil && a.router.HasRoute(int64(m.GetId())) {
+			data, err := a.execHandler(m)
+			m.Response(data, err)
 			return err
 		}
+		return a.actor.OnMessage(a, m)
 	case *iface.SyncMessage:
-		if a.router != nil && a.router.HasRoute(uint16(m.GetId())) {
+		a.msg = m.Message
+		if a.router != nil && a.router.HasRoute(int64(m.GetId())) {
 			data, err := a.execHandler(m.Message)
 			m.Response(data, err)
 			return err
 		}
+		return a.actor.OnMessage(a, m)
+	default:
+		return errors.New("not implement")
 	}
-
-	return a.actor.OnMessage(a, msg)
 }
 
 func (a *baseActorContext) execHandler(msg *iface.Message) ([]byte, error) {
 	if msg == nil {
 		return nil, fmt.Errorf("msg is nil")
 	}
-	return a.router.Handle(a, uint16(msg.GetId()), msg.GetData())
+	session := msg.GetSession()
+	return a.router.Handle(a, msg.GetId(), session, msg.GetData())
 }
 
 func (a *baseActorContext) Actor() iface.IActor {
@@ -110,114 +127,57 @@ func (a *baseActorContext) Exit() {
 }
 
 func (a *baseActorContext) Send(to *iface.Pid, msgId uint16, request interface{}) error {
-	if to == nil {
-		return fmt.Errorf("target pid is nil")
-	}
-	if request == nil {
-		return fmt.Errorf("request is nil")
-	}
-	if a.system == nil {
-		return fmt.Errorf("system is not initialized")
-	}
-
-	message := a.buildMessage(to, msgId, request)
-	if message == nil {
-		return fmt.Errorf("build message failed")
-	}
-
-	if n := a.system.GetNode(); n != nil {
-		return n.GetRemote().Send(message)
-	}
-	return a.system.Send(message)
-}
-
-func (a *baseActorContext) Select(service string, strategy iface.RouteStrategy) (*iface.Pid, error) {
-	node := a.system.GetNode()
-	if node == nil {
-		return nil, errors.New("node is nil")
-	}
-	remote := node.GetRemote()
-	if remote == nil {
-		return nil, errors.New("remote is nil")
-	}
-	return remote.Select(service, strategy)
-}
-
-func (a *baseActorContext) SendService(service string, msgId uint16, request interface{}, strategy iface.RouteStrategy) error {
-	if len(service) <= 0 {
-		return fmt.Errorf("target pid is nil")
-	}
-	if request == nil {
-		return fmt.Errorf("request is nil")
-	}
-	if a.system == nil {
-		return fmt.Errorf("system is not initialized")
-	}
-	to, err := a.Select(service, strategy)
-	if err != nil {
-		return err
-	}
-	message := a.buildMessage(to, msgId, request)
-	if message == nil {
-		return fmt.Errorf("build message failed")
-	}
-
-	if n := a.system.GetNode(); n != nil {
-		return n.GetRemote().Send(message)
-	}
+	message := a.buildMessage(a.pid, to, msgId, request)
 	return a.system.Send(message)
 }
 
 func (a *baseActorContext) Request(to *iface.Pid, msgId uint16, request interface{}, reply interface{}) error {
-	if to == nil || request == nil || reply == nil {
-		return fmt.Errorf("invalid parameters")
-	}
-	if a.system == nil {
-		return fmt.Errorf("system is not initialized")
-	}
-
-	message := a.buildMessage(to, msgId, request)
-	if message == nil {
-		return fmt.Errorf("build message failed")
-	}
-
-	timeout := 5 * time.Second
-	var response *iface.RespondMessage
-	if n := a.system.GetNode(); n != nil {
-		response = n.GetRemote().Request(message, timeout)
-	} else {
-		response = a.system.Request(message, timeout)
-	}
-
-	if errMsg := response.GetError(); errMsg != "" {
-		return fmt.Errorf("request failed: %s", errMsg)
-	}
-
-	if data := response.GetData(); len(data) > 0 {
-		if err := a.system.GetSerializer().Unmarshal(data, reply); err != nil {
-			return fmt.Errorf("unmarshal reply failed: %w", err)
-		}
-	}
-	return nil
+	message := a.buildMessage(a.pid, to, msgId, request)
+	return a.system.Request(message, reply)
 }
 
-func (a *baseActorContext) buildMessage(to *iface.Pid, msgId uint16, request interface{}) *iface.Message {
-	if m, ok := request.(*iface.Message); ok {
-		return m
+func (a *baseActorContext) Response(session *iface.Session, request interface{}) error {
+	message := a.buildMessage(a.pid, session.GetAgent(), -1, request)
+	if session.GetAgent() == a.pid {
+		return a.InvokerMessage(message)
 	}
+	return a.system.Send(message)
+}
 
-	ser := a.system.GetSerializer()
-	requestData, err := ser.Marshal(request)
-	if err != nil {
-		return nil
+func (a *baseActorContext) ResponseCode(session *iface.Session, code int64) error {
+	session.Code = code
+	message := a.buildMessage(a.pid, session.GetAgent(), -1, []byte{})
+	if session.GetAgent() == a.pid {
+		return a.InvokerMessage(message)
 	}
+	return a.system.Send(message)
+}
+func (a *baseActorContext) Forward(toPid *iface.Pid) error {
+	return a.system.PushMessage(toPid, a.Message())
+}
 
-	return &iface.Message{
+func (a *baseActorContext) buildMessage(from, to *iface.Pid, msgId uint16, request interface{}) *iface.Message {
+	message := &iface.Message{
 		To:   to,
-		From: a.pid,
-		Id:   uint32(msgId),
-		Data: requestData,
+		From: from,
+		Id:   int64(msgId),
 	}
+	switch data := request.(type) {
+	case []byte:
+		message.Data = data
+	default:
+		ser := a.GetSerializer()
+		requestData, err := ser.Marshal(request)
+		if err != nil {
+			return nil
+		}
+		message.Data = requestData
+	}
+	return message
+}
+
+func (a *baseActorContext) RegisterName(name string, isGlobal bool) error {
+	return a.system.RegisterName(a.pid, a.process, name, isGlobal)
 }
 
 // RegisterTimer 注册定时器，时间到后通过 pushTask 通知 baseActorContext 然后执行回调
@@ -244,47 +204,4 @@ func (a *baseActorContext) CancelTimer(timerID int64) bool {
 // CancelAllTimers 取消所有定时器
 func (a *baseActorContext) CancelAllTimers() {
 	a.timerMgr.CancelAllTimers()
-}
-
-func (a *baseActorContext) RegisterName(name string, isGlobal bool) error {
-	if len(name) == 0 {
-		return fmt.Errorf("name cannot be empty")
-	}
-	if a.system == nil {
-		return fmt.Errorf("system is not initialized")
-	}
-
-	// 本地注册：更新 pid 的名称并在 system 中注册
-	oldName := a.pid.Name
-	a.pid.Name = name
-
-	// 如果之前有名称，先从 nameDict 中删除旧名称
-	if oldName != "" && oldName != name {
-		a.system.nameDict.Delete(oldName)
-	}
-
-	// 在本地 system 中注册新名称
-	a.system.nameDict.Set(name, a.process)
-
-	// 如果是全局注册，还需要在远程注册
-	if isGlobal {
-		if a.node == nil {
-			return fmt.Errorf("node is not initialized")
-		}
-		remote := a.node.GetRemote()
-		if remote == nil {
-			return fmt.Errorf("remote is not initialized")
-		}
-		if err := remote.RegistryName(name); err != nil {
-			// 如果远程注册失败，回滚本地注册
-			a.system.nameDict.Delete(name)
-			a.pid.Name = oldName
-			if oldName != "" {
-				a.system.nameDict.Set(oldName, a.process)
-			}
-			return fmt.Errorf("remote registry name failed: %w", err)
-		}
-	}
-
-	return nil
 }

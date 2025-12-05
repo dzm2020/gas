@@ -12,71 +12,109 @@ var ErrMessageHandlerNotFound = errors.New("actor message handler not found")
 
 type Router struct {
 	mu     sync.RWMutex
-	routes map[uint16]routerEntry
+	routes map[int64]routerEntry
 }
 
+type handlerType int
+
+const (
+	handlerTypeClient handlerType = iota // 客户端消息: (ctx, session, request)
+	handlerTypeSync                      // 内部同步消息: (ctx, request, response)
+	handlerTypeAsync                     // 内部异步消息: (ctx, request) error
+)
+
 type routerEntry struct {
-	msgType      reflect.Type
+	handlerType  handlerType
 	handler      reflect.Value
-	returnsError bool
-	isSync       bool         // true: 同步调用 (ctx, request, response) error, false: 异步调用 (ctx, request) error
-	responseType reflect.Type // 同步调用时的 response 类型
+	requestType  reflect.Type // 请求类型（客户端消息的第三个参数，内部消息的第二个参数）
+	responseType reflect.Type // 响应类型（仅同步消息使用）
+	returnsError bool         // 是否返回 error（仅异步消息使用）
 }
 
 func NewRouter() iface.IRouter {
 	return &Router{
-		routes: make(map[uint16]routerEntry),
+		routes: make(map[int64]routerEntry),
 	}
 }
 
 var (
 	typeOfActorContext = reflect.TypeOf((*iface.IContext)(nil)).Elem()
 	typeOfError        = reflect.TypeOf((*error)(nil)).Elem()
+	typeOfSession      = reflect.TypeOf((*iface.Session)(nil))
 )
 
-func (r *Router) Register(msgId uint16, handler interface{}) error {
+func (r *Router) Register(msgId int64, handler interface{}) error {
 	if handler == nil {
 		return fmt.Errorf("actor: handler is nil")
 	}
 
 	handlerValue := reflect.ValueOf(handler)
-	handlerType := handlerValue.Type()
+	handlerFuncType := handlerValue.Type()
 
-	if handlerType.Kind() != reflect.Func {
-		return fmt.Errorf("actor: handler must be a function, got %s", handlerType.Kind())
+	if handlerFuncType.Kind() != reflect.Func {
+		return fmt.Errorf("actor: handler must be a function, got %s", handlerFuncType.Kind())
 	}
 
-	numIn := handlerType.NumIn()
-	if numIn != 2 && numIn != 3 {
-		return fmt.Errorf("actor: handler must accept 2 parameters (ctx, request) for async or 3 parameters (ctx, request, response) for sync, got %d", numIn)
+	numIn := handlerFuncType.NumIn()
+	if numIn < 2 || numIn > 3 {
+		return fmt.Errorf("actor: handler must accept 2 or 3 parameters, got %d", numIn)
 	}
 
-	if handlerType.In(0) != typeOfActorContext {
+	// 第一个参数必须是 IContext
+	if handlerFuncType.In(0) != typeOfActorContext {
 		return fmt.Errorf("actor: handler first parameter must be actor.IContext")
 	}
 
-	requestType := handlerType.In(1)
-	if requestType.Kind() != reflect.Pointer {
-		return fmt.Errorf("actor: handler second parameter (request) must be pointer, got %s", requestType)
-	}
+	var entry routerEntry
+	entry.handler = handlerValue
 
-	isSync := numIn == 3
-	var responseType reflect.Type
-	if isSync {
-		responseType = handlerType.In(2)
-		if responseType.Kind() != reflect.Pointer {
-			return fmt.Errorf("actor: handler third parameter (response) must be pointer, got %s", responseType)
+	// 判断处理函数类型
+	if numIn == 3 {
+		secondParamType := handlerFuncType.In(1)
+		// 如果第二个参数是 Session，则是客户端消息: (ctx, session, request)
+		if secondParamType == typeOfSession {
+			entry.handlerType = handlerTypeClient
+			// 第三个参数是 request
+			requestType := handlerFuncType.In(2)
+			if requestType.Kind() != reflect.Pointer {
+				return fmt.Errorf("actor: client handler third parameter (request) must be pointer, got %s", requestType)
+			}
+			entry.requestType = requestType
+		} else {
+			// 内部同步消息: (ctx, request, response)
+			entry.handlerType = handlerTypeSync
+			// 第二个参数是 request
+			requestType := handlerFuncType.In(1)
+			if requestType.Kind() != reflect.Pointer {
+				return fmt.Errorf("actor: sync handler second parameter (request) must be pointer, got %s", requestType)
+			}
+			entry.requestType = requestType
+			// 第三个参数是 response
+			responseType := handlerFuncType.In(2)
+			if responseType.Kind() != reflect.Pointer {
+				return fmt.Errorf("actor: sync handler third parameter (response) must be pointer, got %s", responseType)
+			}
+			entry.responseType = responseType
 		}
-	}
+	} else if numIn == 2 {
+		// 内部异步消息: (ctx, request) error
+		entry.handlerType = handlerTypeAsync
+		// 第二个参数是 request
+		requestType := handlerFuncType.In(1)
+		if requestType.Kind() != reflect.Pointer {
+			return fmt.Errorf("actor: async handler second parameter (request) must be pointer, got %s", requestType)
+		}
+		entry.requestType = requestType
 
-	numOut := handlerType.NumOut()
-	if numOut > 1 {
-		return fmt.Errorf("actor: handler can return at most one value")
-	}
-
-	returnsError := numOut == 1 && handlerType.Out(0).Implements(typeOfError)
-	if numOut == 1 && !returnsError {
-		return fmt.Errorf("actor: handler return type must be error")
+		// 异步消息必须返回 error
+		numOut := handlerFuncType.NumOut()
+		if numOut != 1 {
+			return fmt.Errorf("actor: async handler must return exactly one value (error), got %d", numOut)
+		}
+		if !handlerFuncType.Out(0).Implements(typeOfError) {
+			return fmt.Errorf("actor: async handler return type must be error")
+		}
+		entry.returnsError = true
 	}
 
 	r.mu.Lock()
@@ -86,17 +124,11 @@ func (r *Router) Register(msgId uint16, handler interface{}) error {
 		return fmt.Errorf("actor: handler already registered for msgId=%d", msgId)
 	}
 
-	r.routes[msgId] = routerEntry{
-		msgType:      requestType,
-		handler:      handlerValue,
-		returnsError: returnsError,
-		isSync:       isSync,
-		responseType: responseType,
-	}
+	r.routes[msgId] = entry
 	return nil
 }
 
-func (r *Router) Handle(ctx iface.IContext, msgId uint16, data []byte) ([]byte, error) {
+func (r *Router) Handle(ctx iface.IContext, msgId int64, session *iface.Session, data []byte) ([]byte, error) {
 	r.mu.RLock()
 	entry, ok := r.routes[msgId]
 	r.mu.RUnlock()
@@ -105,18 +137,65 @@ func (r *Router) Handle(ctx iface.IContext, msgId uint16, data []byte) ([]byte, 
 		return nil, ErrMessageHandlerNotFound
 	}
 
-	requestValue := reflect.New(entry.msgType.Elem())
-	if len(data) > 0 {
-		if err := ctx.GetSerializer().Unmarshal(data, requestValue.Interface()); err != nil {
-			return nil, fmt.Errorf("actor: unmarshal message msgId:%d failed: %w", msgId, err)
+	var args []reflect.Value
+	args = append(args, reflect.ValueOf(ctx))
+
+	switch entry.handlerType {
+	case handlerTypeClient:
+		// 客户端消息: (ctx, session, request)
+		if session == nil {
+			return nil, fmt.Errorf("actor: session is nil for msgId:%d", msgId)
 		}
-	}
+		args = append(args, reflect.ValueOf(session))
 
-	args := []reflect.Value{reflect.ValueOf(ctx), requestValue}
+		// 第三个参数是 request，需要反序列化
+		requestValue, err := r.createRequestValue(entry.requestType, data, ctx)
+		if err != nil {
+			return nil, fmt.Errorf("actor: unmarshal request message msgId:%d failed: %w", msgId, err)
+		}
+		args = append(args, requestValue)
 
-	if entry.isSync {
+		// 客户端消息不返回响应数据
+		results := entry.handler.Call(args)
+		if len(results) > 0 && !results[0].IsNil() {
+			if err, ok := results[0].Interface().(error); ok {
+				return nil, err
+			}
+		}
+		return nil, nil
+
+	case handlerTypeSync:
+		// 内部同步消息: (ctx, request, response)
+		requestValue, err := r.createRequestValue(entry.requestType, data, ctx)
+		if err != nil {
+			return nil, fmt.Errorf("actor: unmarshal request message msgId:%d failed: %w", msgId, err)
+		}
+		args = append(args, requestValue)
+
 		responseValue := reflect.New(entry.responseType.Elem())
 		args = append(args, responseValue)
+
+		results := entry.handler.Call(args)
+		if len(results) > 0 && !results[0].IsNil() {
+			if err, ok := results[0].Interface().(error); ok {
+				return nil, err
+			}
+		}
+
+		// 序列化响应数据
+		responseData, err := ctx.GetSerializer().Marshal(responseValue.Interface())
+		if err != nil {
+			return nil, fmt.Errorf("actor: marshal response message msgId:%d failed: %w", msgId, err)
+		}
+		return responseData, nil
+
+	case handlerTypeAsync:
+		// 内部异步消息: (ctx, request) error
+		requestValue, err := r.createRequestValue(entry.requestType, data, ctx)
+		if err != nil {
+			return nil, fmt.Errorf("actor: unmarshal request message msgId:%d failed: %w", msgId, err)
+		}
+		args = append(args, requestValue)
 
 		results := entry.handler.Call(args)
 		if entry.returnsError && len(results) > 0 && !results[0].IsNil() {
@@ -125,26 +204,33 @@ func (r *Router) Handle(ctx iface.IContext, msgId uint16, data []byte) ([]byte, 
 			}
 			return nil, fmt.Errorf("actor: handler returned non-error value")
 		}
+		return nil, nil
 
-		responseData, err := ctx.GetSerializer().Marshal(responseValue.Interface())
-		if err != nil {
-			return nil, fmt.Errorf("actor: marshal response message msgId:%d failed: %w", msgId, err)
-		}
-		return responseData, nil
+	default:
+		return nil, fmt.Errorf("actor: unknown handler type for msgId:%d", msgId)
 	}
+}
 
-	results := entry.handler.Call(args)
-	if entry.returnsError && len(results) > 0 && !results[0].IsNil() {
-		if err, ok := results[0].Interface().(error); ok {
-			return nil, err
+// createRequestValue 创建请求值，支持 []byte 直接赋值或其他类型反序列化
+func (r *Router) createRequestValue(requestType reflect.Type, data []byte, ctx iface.IContext) (reflect.Value, error) {
+	requestValue := reflect.New(requestType.Elem())
+	elemType := requestType.Elem()
+
+	// 如果消息类型是 []byte，则不需要反序列化，直接使用原始数据
+	if elemType.Kind() == reflect.Slice && elemType.Elem().Kind() == reflect.Uint8 {
+		// 直接设置 []byte 值
+		requestValue.Elem().Set(reflect.ValueOf(data))
+	} else if len(data) > 0 {
+		// 其他类型需要反序列化
+		if err := ctx.GetSerializer().Unmarshal(data, requestValue.Interface()); err != nil {
+			return reflect.Value{}, err
 		}
-		return nil, fmt.Errorf("actor: handler returned non-error value")
 	}
-	return nil, nil
+	return requestValue, nil
 }
 
 // HasRoute 判断指定消息ID的路由是否存在
-func (r *Router) HasRoute(msgId uint16) bool {
+func (r *Router) HasRoute(msgId int64) bool {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 	_, exists := r.routes[msgId]

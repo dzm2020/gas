@@ -1,11 +1,3 @@
-/**
- * @Author: dingQingHui
- * @Description:
- * @File: protocol
- * @Version: 1.0.0
- * @Date: 2024/12/6 15:52
- */
-
 package protocol
 
 const HeadLen = 13

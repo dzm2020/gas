@@ -1,11 +1,30 @@
 package gate
 
 import (
-	"fmt"
 	"gas/internal/gate/protocol"
 	"gas/internal/iface"
 	"gas/pkg/network"
 )
+
+func handlerPush(ctx iface.IContext, session *iface.Session, data []byte) {
+	agent := ctx.Actor().(*Agent)
+
+	if agent.IConnection == nil {
+		//  todo 日志
+		return
+	}
+
+	agent.Push(session, data)
+}
+
+func handlerClose(ctx iface.IContext, session *iface.Session, data []byte) {
+	agent := ctx.Actor().(*Agent)
+	if agent.IConnection == nil {
+		//  todo 日志
+		return
+	}
+	_ = agent.IConnection.Close(nil)
+}
 
 type Factory func() iface.IActor
 
@@ -23,6 +42,12 @@ type Agent struct {
 
 func (agent *Agent) OnConnect(ctx iface.IContext, connection network.IConnection) error {
 	agent.IConnection = connection
+	router := ctx.GetRouter()
+	if router == nil {
+		return nil
+	}
+	_ = router.Register(-1, handlerPush)
+	_ = router.Register(-2, handlerClose)
 	return nil
 }
 
@@ -39,13 +64,12 @@ func (agent *Agent) OnStop(ctx iface.IContext) error {
 	return nil
 }
 
-func (agent *Agent) Send(msg *iface.Message) error {
-	if agent.IConnection == nil {
-		return fmt.Errorf("connection is nil")
-	}
+func (agent *Agent) Push(session *iface.Session, data []byte) {
 	// 创建响应消息（使用相同的 cmd 和 act）
-	cmd, act := protocol.ParseId(uint16(msg.GetId()))
-	responseMsg := protocol.New(cmd, act, msg.GetData())
-	responseMsg.Index = 0 // 可以根据需要设置 Index
-	return agent.IConnection.Send(responseMsg)
+	cmd, act := protocol.ParseId(uint16(session.GetMid()))
+	response := protocol.New(cmd, act, data)
+	response.Index = session.GetIndex() // 可以根据需要设置 Index
+	if err := agent.IConnection.Send(response); err != nil {
+		// todo 日志
+	}
 }

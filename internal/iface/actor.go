@@ -25,14 +25,19 @@ type IContext interface {
 	CancelTimer(timerID int64) bool
 	// CancelAllTimers 取消所有定时器
 	CancelAllTimers()
-	SendService(service string, msgId uint16, request interface{}, strategy RouteStrategy) error
 	Node() INode
 	RegisterName(name string, isGlobal bool) error
+	SetRouter(router IRouter)
+	GetRouter() IRouter
+	Message() IMessage
+	System() ISystem
+	Response(session *Session, request interface{}) error
+	ResponseCode(session *Session, code int64) error
 }
 
 type IActor interface {
 	OnInit(ctx IContext, params []interface{}) error
-	OnMessage(ctx IContext, msg interface{}) error
+	OnMessage(ctx IContext, msg *Message) error
 	OnStop(ctx IContext) error
 }
 
@@ -59,12 +64,13 @@ type ISystem interface {
 	PushTask(pid *Pid, f Task) error
 	PushTaskAndWait(pid *Pid, timeout time.Duration, task Task) error
 	PushMessage(pid *Pid, message interface{}) error
+	Select(name string, strategy RouteStrategy) (*Pid, error)
 }
 
 type IRouter interface {
-	Register(msgId uint16, handler interface{}) error
-	Handle(ctx IContext, msgId uint16, data []byte) ([]byte, error) // 返回 response 数据和错误，异步调用时 response 为 nil
-	HasRoute(msgId uint16) bool                                     // 判断指定消息ID的路由是否存在
+	Register(msgId int64, handler interface{}) error
+	Handle(ctx IContext, msgId int64, session *Session, data []byte) ([]byte, error) // 返回 response 数据和错误，异步调用时 response 为 nil
+	HasRoute(msgId int64) bool                                                       // 判断指定消息ID的路由是否存在
 }
 
 // NewErrorResponse 创建错误响应消息
@@ -85,6 +91,6 @@ func (a *Actor) OnInit(ctx IContext, params []interface{}) error {
 func (a *Actor) OnStop(ctx IContext) error {
 	return nil
 }
-func (a *Actor) OnMessage(ctx IContext, msg interface{}) error {
+func (a *Actor) OnMessage(ctx IContext, msg IMessage) error {
 	return nil
 }

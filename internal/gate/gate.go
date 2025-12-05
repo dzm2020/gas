@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"gas/internal/gate/codec"
+	"gas/internal/gate/protocol"
 	"gas/internal/iface"
 	"gas/pkg/glog"
 	"gas/pkg/network"
@@ -65,7 +66,26 @@ func (m *Gate) OnMessage(entity network.IConnection, msg interface{}) error {
 		return ErrAgentNoBindConnection
 	}
 	system := m.node.GetActorSystem()
-	return system.PushMessage(pid, msg)
+
+	//  将网关消息转为内容消息
+	protocolMsg, ok := msg.(*protocol.Message)
+	if !ok {
+		return errors.New("gate: invalid message type")
+	}
+
+	// 转换为 iface.Message
+	message := &iface.Message{
+		To:   pid,
+		Id:   int64(protocolMsg.ID()),
+		Data: protocolMsg.Data,
+	}
+	message.Session = &iface.Session{
+		UserId:   0,
+		Agent:    pid,
+		Index:    protocolMsg.Index,
+		EntityId: entity.ID(),
+	}
+	return system.Send(message)
 }
 
 func (m *Gate) OnClose(entity network.IConnection, wrong error) error {

@@ -7,12 +7,11 @@
 package iface
 
 import (
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
-
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 )
 
 const (
@@ -25,8 +24,8 @@ const (
 type Pid struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	NodeId        uint64                 `protobuf:"varint,1,opt,name=nodeId,proto3" json:"nodeId,omitempty"`
-	ServiceId     uint64                 `protobuf:"varint,2,opt,name=serviceId,proto3" json:"serviceId,omitempty"`
-	Name          string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	ServiceId     uint64                 `protobuf:"varint,3,opt,name=serviceId,proto3" json:"serviceId,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -68,13 +67,6 @@ func (x *Pid) GetNodeId() uint64 {
 	return 0
 }
 
-func (x *Pid) GetServiceId() uint64 {
-	if x != nil {
-		return x.ServiceId
-	}
-	return 0
-}
-
 func (x *Pid) GetName() string {
 	if x != nil {
 		return x.Name
@@ -82,12 +74,20 @@ func (x *Pid) GetName() string {
 	return ""
 }
 
+func (x *Pid) GetServiceId() uint64 {
+	if x != nil {
+		return x.ServiceId
+	}
+	return 0
+}
+
 type Message struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	To            *Pid                   `protobuf:"bytes,1,opt,name=to,proto3" json:"to,omitempty"`
 	From          *Pid                   `protobuf:"bytes,2,opt,name=from,proto3" json:"from,omitempty"`
-	Id            uint32                 `protobuf:"varint,3,opt,name=id,proto3" json:"id,omitempty"`
+	Id            int64                  `protobuf:"varint,3,opt,name=id,proto3" json:"id,omitempty"`
 	Data          []byte                 `protobuf:"bytes,4,opt,name=data,proto3" json:"data,omitempty"`
+	Session       *Session               `protobuf:"bytes,5,opt,name=session,proto3" json:"session,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -136,7 +136,7 @@ func (x *Message) GetFrom() *Pid {
 	return nil
 }
 
-func (x *Message) GetId() uint32 {
+func (x *Message) GetId() int64 {
 	if x != nil {
 		return x.Id
 	}
@@ -146,6 +146,13 @@ func (x *Message) GetId() uint32 {
 func (x *Message) GetData() []byte {
 	if x != nil {
 		return x.Data
+	}
+	return nil
+}
+
+func (x *Message) GetSession() *Session {
+	if x != nil {
+		return x.Session
 	}
 	return nil
 }
@@ -202,26 +209,119 @@ func (x *RespondMessage) GetError() string {
 	return ""
 }
 
+type Session struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        uint64                 `protobuf:"varint,1,opt,name=userId,proto3" json:"userId,omitempty"`
+	Agent         *Pid                   `protobuf:"bytes,2,opt,name=agent,proto3" json:"agent,omitempty"`
+	Index         uint32                 `protobuf:"varint,3,opt,name=index,proto3" json:"index,omitempty"`
+	EntityId      int64                  `protobuf:"varint,4,opt,name=entityId,proto3" json:"entityId,omitempty"`
+	Code          int64                  `protobuf:"varint,5,opt,name=code,proto3" json:"code,omitempty"`
+	Mid           int64                  `protobuf:"varint,6,opt,name=mid,proto3" json:"mid,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Session) Reset() {
+	*x = Session{}
+	mi := &file_actor_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Session) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Session) ProtoMessage() {}
+
+func (x *Session) ProtoReflect() protoreflect.Message {
+	mi := &file_actor_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Session.ProtoReflect.Descriptor instead.
+func (*Session) Descriptor() ([]byte, []int) {
+	return file_actor_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *Session) GetUserId() uint64 {
+	if x != nil {
+		return x.UserId
+	}
+	return 0
+}
+
+func (x *Session) GetAgent() *Pid {
+	if x != nil {
+		return x.Agent
+	}
+	return nil
+}
+
+func (x *Session) GetIndex() uint32 {
+	if x != nil {
+		return x.Index
+	}
+	return 0
+}
+
+func (x *Session) GetEntityId() int64 {
+	if x != nil {
+		return x.EntityId
+	}
+	return 0
+}
+
+func (x *Session) GetCode() int64 {
+	if x != nil {
+		return x.Code
+	}
+	return 0
+}
+
+func (x *Session) GetMid() int64 {
+	if x != nil {
+		return x.Mid
+	}
+	return 0
+}
+
 var File_actor_proto protoreflect.FileDescriptor
 
 const file_actor_proto_rawDesc = "" +
 	"\n" +
 	"\vactor.proto\x12\x05actor\"O\n" +
 	"\x03Pid\x12\x16\n" +
-	"\x06nodeId\x18\x01 \x01(\x04R\x06nodeId\x12\x1c\n" +
-	"\tserviceId\x18\x02 \x01(\x04R\tserviceId\x12\x12\n" +
-	"\x04name\x18\x03 \x01(\tR\x04name\"i\n" +
+	"\x06nodeId\x18\x01 \x01(\x04R\x06nodeId\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1c\n" +
+	"\tserviceId\x18\x03 \x01(\x04R\tserviceId\"\x93\x01\n" +
 	"\aMessage\x12\x1a\n" +
 	"\x02to\x18\x01 \x01(\v2\n" +
 	".actor.PidR\x02to\x12\x1e\n" +
 	"\x04from\x18\x02 \x01(\v2\n" +
 	".actor.PidR\x04from\x12\x0e\n" +
-	"\x02id\x18\x03 \x01(\rR\x02id\x12\x12\n" +
-	"\x04data\x18\x04 \x01(\fR\x04data\":\n" +
+	"\x02id\x18\x03 \x01(\x03R\x02id\x12\x12\n" +
+	"\x04data\x18\x04 \x01(\fR\x04data\x12(\n" +
+	"\asession\x18\x05 \x01(\v2\x0e.actor.SessionR\asession\":\n" +
 	"\x0eRespondMessage\x12\x12\n" +
 	"\x04data\x18\x01 \x01(\fR\x04data\x12\x14\n" +
-	"\x05error\x18\x02 \x01(\tR\x05errorB\n" +
-	"Z\b./;actorb\x06proto3"
+	"\x05error\x18\x02 \x01(\tR\x05error\"\x9b\x01\n" +
+	"\aSession\x12\x16\n" +
+	"\x06userId\x18\x01 \x01(\x04R\x06userId\x12 \n" +
+	"\x05agent\x18\x02 \x01(\v2\n" +
+	".actor.PidR\x05agent\x12\x14\n" +
+	"\x05index\x18\x03 \x01(\rR\x05index\x12\x1a\n" +
+	"\bentityId\x18\x04 \x01(\x03R\bentityId\x12\x12\n" +
+	"\x04code\x18\x05 \x01(\x03R\x04code\x12\x10\n" +
+	"\x03mid\x18\x06 \x01(\x03R\x03midB\n" +
+	"Z\b./;ifaceb\x06proto3"
 
 var (
 	file_actor_proto_rawDescOnce sync.Once
@@ -235,20 +335,23 @@ func file_actor_proto_rawDescGZIP() []byte {
 	return file_actor_proto_rawDescData
 }
 
-var file_actor_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_actor_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_actor_proto_goTypes = []any{
 	(*Pid)(nil),            // 0: actor.Pid
 	(*Message)(nil),        // 1: actor.Message
 	(*RespondMessage)(nil), // 2: actor.RespondMessage
+	(*Session)(nil),        // 3: actor.Session
 }
 var file_actor_proto_depIdxs = []int32{
 	0, // 0: actor.Message.to:type_name -> actor.Pid
 	0, // 1: actor.Message.from:type_name -> actor.Pid
-	2, // [2:2] is the sub-list for method output_type
-	2, // [2:2] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	3, // 2: actor.Message.session:type_name -> actor.Session
+	0, // 3: actor.Session.agent:type_name -> actor.Pid
+	4, // [4:4] is the sub-list for method output_type
+	4, // [4:4] is the sub-list for method input_type
+	4, // [4:4] is the sub-list for extension type_name
+	4, // [4:4] is the sub-list for extension extendee
+	0, // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_actor_proto_init() }
@@ -262,7 +365,7 @@ func file_actor_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_actor_proto_rawDesc), len(file_actor_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   3,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

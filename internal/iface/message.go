@@ -4,6 +4,10 @@ type TaskMessage struct {
 	Task Task
 }
 
+func (m *Message) Response(data []byte, err error) {
+	return
+}
+
 type SyncMessage struct {
 	*Message
 	response func(message *RespondMessage)
@@ -24,4 +28,12 @@ func (m *SyncMessage) Response(data []byte, err error) {
 
 func (m *SyncMessage) SetResponse(f func(*RespondMessage)) {
 	m.response = f
+}
+
+type IMessage interface {
+	GetId() uint32
+	GetData() []byte
+	GetFrom() *Pid
+	GetTo() *Pid
+	Response(data []byte, err error)
 }
