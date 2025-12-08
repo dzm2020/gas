@@ -7,12 +7,7 @@ import (
 )
 
 func handlerPush(ctx iface.IContext, session *iface.Session, data []byte) {
-	agent := ctx.Actor().(*Agent)
-
-	if agent.IConnection == nil {
-		//  todo 日志
-		return
-	}
+	agent := ctx.Actor().(IAgent)
 
 	agent.Push(session, data)
 }
@@ -32,6 +27,7 @@ type IAgent interface {
 	iface.IActor
 	OnConnect(ctx iface.IContext, connection network.IConnection) error
 	OnClose(ctx iface.IContext) error
+	Push(session *iface.Session, data []byte)
 }
 
 type Agent struct {

@@ -41,6 +41,7 @@ var (
 	typeOfActorContext = reflect.TypeOf((*iface.IContext)(nil)).Elem()
 	typeOfError        = reflect.TypeOf((*error)(nil)).Elem()
 	typeOfSession      = reflect.TypeOf((*iface.Session)(nil))
+	typeOfByteArray    = reflect.TypeOf(([]byte)(nil))
 )
 
 func (r *Router) Register(msgId int64, handler interface{}) error {
@@ -76,7 +77,7 @@ func (r *Router) Register(msgId int64, handler interface{}) error {
 			entry.handlerType = handlerTypeClient
 			// 第三个参数是 request
 			requestType := handlerFuncType.In(2)
-			if requestType.Kind() != reflect.Pointer {
+			if requestType.Kind() != reflect.Pointer && (requestType != typeOfByteArray) {
 				return fmt.Errorf("actor: client handler third parameter (request) must be pointer, got %s", requestType)
 			}
 			entry.requestType = requestType
@@ -213,15 +214,15 @@ func (r *Router) Handle(ctx iface.IContext, msgId int64, session *iface.Session,
 
 // createRequestValue 创建请求值，支持 []byte 直接赋值或其他类型反序列化
 func (r *Router) createRequestValue(requestType reflect.Type, data []byte, ctx iface.IContext) (reflect.Value, error) {
-	requestValue := reflect.New(requestType.Elem())
-	elemType := requestType.Elem()
-
 	// 如果消息类型是 []byte，则不需要反序列化，直接使用原始数据
-	if elemType.Kind() == reflect.Slice && elemType.Elem().Kind() == reflect.Uint8 {
-		// 直接设置 []byte 值
-		requestValue.Elem().Set(reflect.ValueOf(data))
-	} else if len(data) > 0 {
-		// 其他类型需要反序列化
+	if requestType == typeOfByteArray {
+		// 对于 []byte 类型，直接返回指向 data 的指针
+		return reflect.ValueOf(&data).Elem(), nil
+	}
+
+	// 其他类型需要反序列化
+	requestValue := reflect.New(requestType.Elem())
+	if len(data) > 0 {
 		if err := ctx.GetSerializer().Unmarshal(data, requestValue.Interface()); err != nil {
 			return reflect.Value{}, err
 		}

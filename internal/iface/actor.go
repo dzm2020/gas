@@ -29,10 +29,11 @@ type IContext interface {
 	RegisterName(name string, isGlobal bool) error
 	SetRouter(router IRouter)
 	GetRouter() IRouter
-	Message() IMessage
+	Message() *Message
 	System() ISystem
 	Response(session *Session, request interface{}) error
 	ResponseCode(session *Session, code int64) error
+	Forward(toPid *Pid) error
 }
 
 type IActor interface {
@@ -65,6 +66,7 @@ type ISystem interface {
 	PushTaskAndWait(pid *Pid, timeout time.Duration, task Task) error
 	PushMessage(pid *Pid, message interface{}) error
 	Select(name string, strategy RouteStrategy) (*Pid, error)
+	RegisterName(pid *Pid, process IProcess, name string, isGlobal bool) error
 }
 
 type IRouter interface {
@@ -91,6 +93,6 @@ func (a *Actor) OnInit(ctx IContext, params []interface{}) error {
 func (a *Actor) OnStop(ctx IContext) error {
 	return nil
 }
-func (a *Actor) OnMessage(ctx IContext, msg IMessage) error {
+func (a *Actor) OnMessage(ctx IContext, msg *Message) error {
 	return nil
 }

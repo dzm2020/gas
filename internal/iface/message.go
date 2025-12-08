@@ -31,7 +31,7 @@ func (m *SyncMessage) SetResponse(f func(*RespondMessage)) {
 }
 
 type IMessage interface {
-	GetId() uint32
+	GetId() int64
 	GetData() []byte
 	GetFrom() *Pid
 	GetTo() *Pid

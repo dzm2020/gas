@@ -68,6 +68,9 @@ func (a *baseActorContext) SetRouter(router iface.IRouter) {
 	a.router = router
 }
 func (a *baseActorContext) Message() *iface.Message {
+	if a.msg == nil {
+		return nil
+	}
 	return a.msg
 }
 func (a *baseActorContext) InvokerMessage(msg interface{}) error {
@@ -77,7 +80,7 @@ func (a *baseActorContext) InvokerMessage(msg interface{}) error {
 		return chain(a.middlerWares, m.Task)(a)
 	case *iface.Message:
 		a.msg = m
-		if a.router != nil && a.router.HasRoute(int64(m.GetId())) {
+		if a.router != nil && a.router.HasRoute(m.GetId()) {
 			data, err := a.execHandler(m)
 			m.Response(data, err)
 			return err
@@ -85,12 +88,12 @@ func (a *baseActorContext) InvokerMessage(msg interface{}) error {
 		return a.actor.OnMessage(a, m)
 	case *iface.SyncMessage:
 		a.msg = m.Message
-		if a.router != nil && a.router.HasRoute(int64(m.GetId())) {
+		if a.router != nil && a.router.HasRoute(m.GetId()) {
 			data, err := a.execHandler(m.Message)
 			m.Response(data, err)
 			return err
 		}
-		return a.actor.OnMessage(a, m)
+		return a.actor.OnMessage(a, m.Message)
 	default:
 		return errors.New("not implement")
 	}
@@ -121,23 +124,35 @@ func (a *baseActorContext) Exit() {
 		a.timerMgr.CancelAllTimers()
 	}
 	if a.system != nil {
-		a.system.unregisterProcess(a.pid)
+		if sys, ok := a.system.(*System); ok {
+			sys.unregisterProcess(a.pid)
+		}
 	}
 	_ = a.actor.OnStop(a)
 }
 
 func (a *baseActorContext) Send(to *iface.Pid, msgId uint16, request interface{}) error {
-	message := a.buildMessage(a.pid, to, msgId, request)
+	message := a.buildMessage(a.pid, to, int64(msgId), request)
 	return a.system.Send(message)
 }
 
 func (a *baseActorContext) Request(to *iface.Pid, msgId uint16, request interface{}, reply interface{}) error {
-	message := a.buildMessage(a.pid, to, msgId, request)
-	return a.system.Request(message, reply)
+	message := a.buildMessage(a.pid, to, int64(msgId), request)
+	response := a.system.Request(message, time.Second*3)
+	if errMsg := response.GetError(); errMsg != "" {
+		return fmt.Errorf("request failed: %s", errMsg)
+	}
+	if data := response.GetData(); len(data) > 0 {
+		if err := a.GetSerializer().Unmarshal(data, reply); err != nil {
+			return fmt.Errorf("unmarshal reply failed: %w", err)
+		}
+	}
+	return nil
 }
 
 func (a *baseActorContext) Response(session *iface.Session, request interface{}) error {
 	message := a.buildMessage(a.pid, session.GetAgent(), -1, request)
+	message.Session = session
 	if session.GetAgent() == a.pid {
 		return a.InvokerMessage(message)
 	}
@@ -147,20 +162,33 @@ func (a *baseActorContext) Response(session *iface.Session, request interface{})
 func (a *baseActorContext) ResponseCode(session *iface.Session, code int64) error {
 	session.Code = code
 	message := a.buildMessage(a.pid, session.GetAgent(), -1, []byte{})
+	message.Session = session
 	if session.GetAgent() == a.pid {
 		return a.InvokerMessage(message)
 	}
 	return a.system.Send(message)
 }
+
 func (a *baseActorContext) Forward(toPid *iface.Pid) error {
-	return a.system.PushMessage(toPid, a.Message())
+	a.msg.To = toPid
+	a.msg.From = a.pid
+	return a.system.Send(a.Message())
 }
 
-func (a *baseActorContext) buildMessage(from, to *iface.Pid, msgId uint16, request interface{}) *iface.Message {
+func (a *baseActorContext) Push(session *iface.Session, request interface{}) error {
+	message := a.buildMessage(a.pid, session.GetAgent(), -1, request)
+	message.Session = session
+	if session.GetAgent() == a.pid {
+		return a.InvokerMessage(message)
+	}
+	return a.system.Send(message)
+}
+
+func (a *baseActorContext) buildMessage(from, to *iface.Pid, msgId int64, request interface{}) *iface.Message {
 	message := &iface.Message{
 		To:   to,
 		From: from,
-		Id:   int64(msgId),
+		Id:   msgId,
 	}
 	switch data := request.(type) {
 	case []byte:

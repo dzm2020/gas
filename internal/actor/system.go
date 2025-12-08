@@ -149,9 +149,9 @@ func (s *System) Send(message *iface.Message) error {
 }
 
 // Request 发送消息到指定进程
-func (s *System) Request(message *iface.Message, reply interface{}) error {
+func (s *System) Request(message *iface.Message, timeout time.Duration) *iface.RespondMessage {
 	if s.shuttingDown.Load() {
-		return fmt.Errorf("system is shutting down")
+		return iface.NewErrorResponse("system is shutting down")
 	}
 
 	to := message.To
@@ -160,17 +160,9 @@ func (s *System) Request(message *iface.Message, reply interface{}) error {
 	if to.GetNodeId() == s.GetNode().GetId() {
 		response = s.localRequest(message)
 	} else {
-		response = s.GetNode().GetRemote().Request(message, time.Second*3)
+		response = s.GetNode().GetRemote().Request(message, timeout)
 	}
-	if errMsg := response.GetError(); errMsg != "" {
-		return fmt.Errorf("request failed: %s", errMsg)
-	}
-	if data := response.GetData(); len(data) > 0 {
-		if err := s.GetSerializer().Unmarshal(data, reply); err != nil {
-			return fmt.Errorf("unmarshal reply failed: %w", err)
-		}
-	}
-	return nil
+	return response
 }
 
 func (s *System) localRequest(message *iface.Message) *iface.RespondMessage {
