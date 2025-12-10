@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"gas/internal/iface"
-	glog2 "gas/pkg/glog"
+	"gas/pkg/glog"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -32,7 +32,7 @@ func (g *GlogComponent) Start(ctx context.Context, node iface.INode) error {
 	}
 
 	// 使用节点配置中的 glog 配置初始化
-	if err := glog2.InitFromConfig(&cfg.Glog); err != nil {
+	if err := glog.InitFromConfig(&cfg.Glog); err != nil {
 		return fmt.Errorf("init glog from config failed: %w", err)
 	}
 	self := g.node.Self()
@@ -51,10 +51,10 @@ func (g *GlogComponent) Start(ctx context.Context, node iface.INode) error {
 			return nil
 		}),
 	}
-	glog2.WithOptions(options...)
+	glog.WithOptions(options...)
 	return nil
 }
 func (g *GlogComponent) Stop(ctx context.Context) error {
-	glog2.Stop()
+	glog.Stop()
 	return nil
 }

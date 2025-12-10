@@ -69,23 +69,26 @@ func (m *Mailbox) process() {
 
 func (m *Mailbox) run() {
 	throughput := m.dispatch.Throughput()
-	var i int
+	var processed int
+
 	for {
 		if m.queue.Empty() {
 			return
 		}
-		if i > throughput {
-			i = 0
+
+		// 每处理一定数量的消息后让出 CPU
+		if processed >= throughput {
+			processed = 0
 			runtime.Gosched()
 			continue
 		}
-		i++
+
+		processed++
 		msg := m.queue.Pop()
-		if msg != nil {
-			_ = m.invokerMessage(msg)
-		} else {
+		if msg == nil {
 			return
 		}
+		_ = m.invokerMessage(msg)
 	}
 }
 

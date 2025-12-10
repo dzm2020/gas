@@ -1,16 +1,7 @@
-/**
- * @Author: dingQingHui
- * @Description:
- * @File: system
- * @Version: 1.0.0
- * @Date: 2023/12/7 14:54
- */
-
+// Package actor 提供 Actor 模型实现，包括进程管理、消息路由、定时器等核心功能
 package actor
 
 import (
-	"errors"
-	"fmt"
 	"gas/internal/iface"
 	"gas/pkg/lib"
 	"sync/atomic"
@@ -75,24 +66,17 @@ func (s *System) Spawn(actor iface.IActor, args ...interface{}) *iface.Pid {
 	if s.shuttingDown.Load() {
 		return nil
 	}
-
+	ctx := newActorContext()
 	pid := s.newPid()
 	mailBox := NewMailbox()
-	// 先创建 process，传入 nil context（稍后设置）
-	process := NewProcess(nil, mailBox)
-	// 创建 context 配置
-	cfg := &contextConfig{
-		pid:     pid,
-		actor:   actor,
-		system:  s,
-		process: process,
-	}
-	// 创建 context
-	context := newBaseActorContext(cfg)
-	// 设置 process 的 context
-	process.(*Process).setContext(context)
-	// 注册 mailbox 的 handlers
-	mailBox.RegisterHandlers(context, NewDefaultDispatcher(1024))
+	process := NewProcess(ctx, mailBox)
+
+	ctx.process = process
+	ctx.pid = pid
+	ctx.actor = actor
+	ctx.system = s
+
+	mailBox.RegisterHandlers(ctx, NewDefaultDispatcher(1024))
 
 	s.registerProcess(pid, process)
 
@@ -101,6 +85,18 @@ func (s *System) Spawn(actor iface.IActor, args ...interface{}) *iface.Pid {
 	})
 
 	return pid
+}
+
+// getProcessChecked 获取进程并检查系统状态
+func (s *System) getProcessChecked(pid *iface.Pid) (iface.IProcess, error) {
+	if err := s.checkShuttingDown(); err != nil {
+		return nil, err
+	}
+	process := s.GetProcess(pid)
+	if process == nil {
+		return nil, ErrProcessNotFound
+	}
+	return process, nil
 }
 
 // GetProcess 根据 Pid 获取进程
@@ -131,93 +127,105 @@ func (s *System) GetProcessByName(name string) iface.IProcess {
 	return process
 }
 
-// Send 发送消息到指定进程
-func (s *System) Send(message *iface.Message) error {
+// checkShuttingDown 检查系统是否正在关闭
+func (s *System) checkShuttingDown() error {
 	if s.shuttingDown.Load() {
-		return errors.New("system is shutting down")
+		return ErrSystemShuttingDown
 	}
-	to := message.To
-	if to.GetNodeId() == s.GetNode().GetId() {
-		process := s.GetProcess(message.GetTo())
-		if process == nil {
-			return errors.New("process not found")
-		}
-		return process.PushMessage(message)
-	} else {
-		return s.GetNode().GetRemote().Send(message)
-	}
+	return nil
 }
 
-// Request 发送消息到指定进程
-func (s *System) Request(message *iface.Message, timeout time.Duration) *iface.RespondMessage {
+// getRemote 获取远程通信接口，并进行空指针检测
+func (s *System) getRemote() (iface.IRemote, error) {
+	node := s.GetNode()
+	if node == nil {
+		return nil, ErrNodeIsNil
+	}
+	remote := node.GetRemote()
+	if remote == nil {
+		return nil, ErrRemoteIsNil
+	}
+	return remote, nil
+}
+
+// isLocalPid 判断进程 ID 是否为本地进程
+func (s *System) isLocalPid(pid *iface.Pid) bool {
+	if pid == nil {
+		return false
+	}
+	node := s.GetNode()
+	if node == nil {
+		return false
+	}
+	return pid.GetNodeId() == node.GetId()
+}
+
+// Send 发送消息到指定进程
+func (s *System) Send(message *iface.Message) error {
+	if err := s.checkShuttingDown(); err != nil {
+		return err
+	}
+
+	to := message.GetTo()
+	if s.isLocalPid(to) {
+		// 本地消息，直接发送到本地进程
+		process, err := s.getProcessChecked(to)
+		if err != nil {
+			return err
+		}
+		return process.Send(message)
+	}
+
+	// 远程消息，通过远程接口发送
+	remote, err := s.getRemote()
+	if err != nil {
+		return err
+	}
+	return remote.Send(message)
+}
+
+// Call 发送消息到指定进程
+func (s *System) Call(message *iface.Message, timeout time.Duration) *iface.Response {
 	if s.shuttingDown.Load() {
 		return iface.NewErrorResponse("system is shutting down")
 	}
 
-	to := message.To
-
-	var response *iface.RespondMessage
-	if to.GetNodeId() == s.GetNode().GetId() {
-		response = s.localRequest(message)
-	} else {
-		response = s.GetNode().GetRemote().Request(message, timeout)
-	}
-	return response
-}
-
-func (s *System) localRequest(message *iface.Message) *iface.RespondMessage {
-	waiter := newChanWaiter[*iface.RespondMessage](time.Second * 3)
-	msg := &iface.SyncMessage{Message: message}
-	msg.SetResponse(func(message *iface.RespondMessage) {
-		waiter.Done(message)
-	})
-
-	process := s.GetProcess(msg.GetTo())
-	if process == nil {
-		return iface.NewErrorResponse("process not found")
-	}
-	if err := process.PushMessage(msg); err != nil {
-		return iface.NewErrorResponse(err.Error())
+	if message == nil {
+		return iface.NewErrorResponse("message is nil")
 	}
 
-	res, err := waiter.Wait()
+	to := message.GetTo()
+	if s.isLocalPid(to) {
+		// 本地消息，直接发送到本地进程
+		process, err := s.getProcessChecked(to)
+		if err != nil {
+			return iface.NewErrorResponse(err.Error())
+		}
+		return process.Call(message, timeout)
+	}
+
+	// 远程消息，通过远程接口发送
+	remote, err := s.getRemote()
 	if err != nil {
 		return iface.NewErrorResponse(err.Error())
 	}
-	return res
+	return remote.Request(message, timeout)
 }
 
 func (s *System) PushTask(pid *iface.Pid, f iface.Task) error {
-	if s.shuttingDown.Load() {
-		return errors.New("system is shutting down")
-	}
-	process := s.GetProcess(pid)
-	if process == nil {
-		return errors.New("process not found")
+	process, err := s.getProcessChecked(pid)
+	if err != nil {
+		return err
 	}
 	return process.PushTask(f)
 }
 
 func (s *System) PushTaskAndWait(pid *iface.Pid, timeout time.Duration, task iface.Task) error {
-	if s.shuttingDown.Load() {
-		return errors.New("system is shutting down")
-	}
-	process := s.GetProcess(pid)
-	if process == nil {
-		return errors.New("process not found")
+	process, err := s.getProcessChecked(pid)
+	if err != nil {
+		return err
 	}
 	return process.PushTaskAndWait(timeout, task)
-}
-
-func (s *System) PushMessage(pid *iface.Pid, message interface{}) error {
-	if s.shuttingDown.Load() {
-		return errors.New("system is shutting down")
-	}
-	process := s.GetProcess(pid)
-	if process == nil {
-		return errors.New("process not found")
-	}
-	return process.PushMessage(message)
 }
 
 func (s *System) Select(name string, strategy iface.RouteStrategy) (*iface.Pid, error) {
@@ -225,21 +233,19 @@ func (s *System) Select(name string, strategy iface.RouteStrategy) (*iface.Pid, 
 	if process := s.GetProcessByName(name); process != nil {
 		return process.Context().ID(), nil
 	}
+
 	// 本地找不到通过remote查找
-	node := s.GetNode()
-	if node == nil {
-		return nil, errors.New("node is nil")
-	}
-	remote := node.GetRemote()
-	if remote == nil {
-		return nil, errors.New("remote is nil")
+	// 远程消息，通过远程接口发送
+	remote, err := s.getRemote()
+	if err != nil {
+		return nil, err
 	}
 	return remote.Select(name, strategy)
 }
 
 func (s *System) RegisterName(pid *iface.Pid, process iface.IProcess, name string, isGlobal bool) error {
 	if len(name) == 0 {
-		return fmt.Errorf("name cannot be empty")
+		return ErrNameCannotBeEmpty()
 	}
 
 	// 本地注册：更新 pid 的名称并在 system 中注册
@@ -257,11 +263,11 @@ func (s *System) RegisterName(pid *iface.Pid, process iface.IProcess, name strin
 	// 如果是全局注册，还需要在远程注册
 	if isGlobal {
 		if s.GetNode() == nil {
-			return fmt.Errorf("node is not initialized")
+			return ErrNodeNotInitialized()
 		}
 		remote := s.GetNode().GetRemote()
 		if remote == nil {
-			return fmt.Errorf("remote is not initialized")
+			return ErrRemoteNotInitialized()
 		}
 		if err := remote.RegistryName(name); err != nil {
 			// 如果远程注册失败，回滚本地注册
@@ -270,7 +276,7 @@ func (s *System) RegisterName(pid *iface.Pid, process iface.IProcess, name strin
 			if oldName != "" {
 				s.nameDict.Set(oldName, process)
 			}
-			return fmt.Errorf("remote registry name failed: %w", err)
+			return ErrRemoteRegistryNameFailed(err)
 		}
 	}
 	return nil
@@ -319,7 +325,7 @@ func (s *System) Shutdown(timeout time.Duration) error {
 	// 第一步：依次调用每个进程的 Exit()
 	// Exit() 会推送退出任务到队列，并等待最多1秒
 	for _, process := range processes {
-		if err := process.Exit(); err != nil {
+		if err := process.Shutdown(); err != nil {
 			continue
 		}
 	}

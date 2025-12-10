@@ -83,7 +83,7 @@ func (r *Remote) onRemoteHandler(data []byte, reply func([]byte) error) {
 
 	if reply != nil {
 		// Request 模式
-		response := r.node.GetActorSystem().Request(message, 5*time.Second)
+		response := r.node.GetActorSystem().Call(message, 5*time.Second)
 		responseData, err := r.serializer.Marshal(response)
 		if err != nil {
 			r.sendError(reply, fmt.Sprintf("marshal response failed: %v", err))
@@ -128,7 +128,7 @@ func (r *Remote) Send(message *iface.Message) error {
 }
 
 // Request 向远程节点发送请求并等待回复
-func (r *Remote) Request(message *iface.Message, timeout time.Duration) *iface.RespondMessage {
+func (r *Remote) Request(message *iface.Message, timeout time.Duration) *iface.Response {
 	toNodeId := message.To.GetNodeId()
 	data, err := r.serializer.Marshal(message)
 	if err != nil {
@@ -140,7 +140,7 @@ func (r *Remote) Request(message *iface.Message, timeout time.Duration) *iface.R
 		return iface.NewErrorResponse(fmt.Sprintf("request to remote game-node %d failed: %v", toNodeId, err))
 	}
 
-	response := &iface.RespondMessage{}
+	response := &iface.Response{}
 	if err = r.serializer.Unmarshal(responseData, response); err != nil {
 		return iface.NewErrorResponse(fmt.Sprintf("unmarshal response failed: %v", err))
 	}

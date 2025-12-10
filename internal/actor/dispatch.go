@@ -1,6 +1,4 @@
-// Package actor
-// @Description:
-
+// Package actor 提供 Actor 模型实现，包括进程管理、消息路由、定时器等核心功能
 package actor
 
 type IDispatcher interface {

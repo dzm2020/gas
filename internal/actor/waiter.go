@@ -1,9 +1,6 @@
 package actor
 
-import (
-	"errors"
-	"time"
-)
+import "time"
 
 func newChanWaiter[T any](timeout time.Duration) *chanWaiter[T] {
 	f := new(chanWaiter[T])
@@ -23,7 +20,7 @@ func (f *chanWaiter[T]) Wait() (T, error) {
 	case e := <-f.ch:
 		return e, nil
 	case <-f.after:
-		return t, errors.New("timeout")
+		return t, ErrWaiterTimeout
 	}
 }
 

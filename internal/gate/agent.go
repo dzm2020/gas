@@ -6,13 +6,12 @@ import (
 	"gas/pkg/network"
 )
 
-func handlerPush(ctx iface.IContext, session *iface.Session, data []byte) {
+func handlerPush(ctx iface.IContext, session iface.ISession, data []byte) {
 	agent := ctx.Actor().(IAgent)
-
 	agent.Push(session, data)
 }
 
-func handlerClose(ctx iface.IContext, session *iface.Session, data []byte) {
+func handlerClose(ctx iface.IContext, session iface.ISession, data []byte) {
 	agent := ctx.Actor().(*Agent)
 	if agent.IConnection == nil {
 		//  todo 日志
@@ -27,7 +26,7 @@ type IAgent interface {
 	iface.IActor
 	OnConnect(ctx iface.IContext, connection network.IConnection) error
 	OnClose(ctx iface.IContext) error
-	Push(session *iface.Session, data []byte)
+	Push(session iface.ISession, data []byte)
 }
 
 type Agent struct {
@@ -42,14 +41,14 @@ func (agent *Agent) OnConnect(ctx iface.IContext, connection network.IConnection
 	if router == nil {
 		return nil
 	}
-	_ = router.Register(-1, handlerPush)
-	_ = router.Register(-2, handlerClose)
+	_ = router.Register(iface.MsgIdPushMessageToClient, handlerPush)
+	_ = router.Register(iface.MsgIdCloseClientConnection, handlerClose)
 	return nil
 }
 
 func (agent *Agent) OnClose(ctx iface.IContext) error {
 	agent.IConnection = nil
-	ctx.Exit()
+	_ = ctx.Process().Shutdown()
 	return nil
 }
 
@@ -60,11 +59,12 @@ func (agent *Agent) OnStop(ctx iface.IContext) error {
 	return nil
 }
 
-func (agent *Agent) Push(session *iface.Session, data []byte) {
+func (agent *Agent) Push(session iface.ISession, data []byte) {
 	// 创建响应消息（使用相同的 cmd 和 act）
 	cmd, act := protocol.ParseId(uint16(session.GetMid()))
 	response := protocol.New(cmd, act, data)
 	response.Index = session.GetIndex() // 可以根据需要设置 Index
+	response.Error = uint16(session.GetCode())
 	if err := agent.IConnection.Send(response); err != nil {
 		// todo 日志
 	}

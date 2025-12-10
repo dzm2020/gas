@@ -162,7 +162,7 @@ func (m *Node) Send(message *iface.Message) error {
 }
 
 // Request 向指定的 actor 发送请求并等待回复
-func (m *Node) Request(message *iface.Message, timeout time.Duration) *iface.RespondMessage {
+func (m *Node) Request(message *iface.Message, timeout time.Duration) *iface.Response {
 	if err := m.validateMessage(message); err != nil {
 		return iface.NewErrorResponse(err.Error())
 	}
@@ -172,7 +172,7 @@ func (m *Node) Request(message *iface.Message, timeout time.Duration) *iface.Res
 		if m.actorSystem == nil {
 			return iface.NewErrorResponse("actor system not initialized")
 		}
-		return m.actorSystem.Request(message, timeout)
+		return m.actorSystem.Call(message, timeout)
 	}
 
 	// 远程调用

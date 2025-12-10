@@ -1,128 +1,165 @@
-// Package actor
-// @Description:
-
+// Package actor 提供 Actor 模型实现，包括进程管理、消息路由、定时器等核心功能
 package actor
 
 import (
-	"errors"
 	"fmt"
 	"gas/internal/iface"
+	"gas/pkg/glog"
 	"gas/pkg/lib"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 type IMessageInvoker interface {
 	InvokerMessage(message interface{}) error
 }
 
-// contextConfig context 配置
-type contextConfig struct {
-	pid         *iface.Pid
-	actor       iface.IActor
-	middlewares []iface.TaskMiddleware
-	router      iface.IRouter
-	system      iface.ISystem
-	process     iface.IProcess
-}
-
-func newBaseActorContext(cfg *contextConfig) *baseActorContext {
-	ctx := &baseActorContext{
-		pid:          cfg.pid,
-		actor:        cfg.actor,
-		middlerWares: cfg.middlewares,
-		router:       cfg.router,
-		system:       cfg.system,
-		process:      cfg.process,
-		timerMgr:     newTimerManager(),
-		node:         cfg.system.GetNode(),
-	}
+func newActorContext() *actorContext {
+	ctx := &actorContext{}
 	return ctx
 }
 
-type baseActorContext struct {
-	pid          *iface.Pid
-	name         string
-	actor        iface.IActor
-	middlerWares []iface.TaskMiddleware
-	msg          *iface.Message
-	router       iface.IRouter
-	system       iface.ISystem
-	process      iface.IProcess // 保存自己的 process 引用
-	timerMgr     *timerManager  // 定时器管理器
-	node         iface.INode
+type actorContext struct {
+	system  iface.ISystem
+	process iface.IProcess // 保存自己的 process 引用
+	pid     *iface.Pid
+	name    string
+	actor   iface.IActor
+	router  iface.IRouter
+	msg     *iface.Message
 }
 
-func (a *baseActorContext) ID() *iface.Pid {
+func (a *actorContext) ID() *iface.Pid {
 	return a.pid
 }
-func (a *baseActorContext) Node() iface.INode {
-	return a.node
-}
-func (a *baseActorContext) GetRouter() iface.IRouter {
+
+func (a *actorContext) GetRouter() iface.IRouter {
 	return a.router
 }
-func (a *baseActorContext) System() iface.ISystem {
+func (a *actorContext) System() iface.ISystem {
 	return a.system
 }
-func (a *baseActorContext) SetRouter(router iface.IRouter) {
+func (a *actorContext) SetRouter(router iface.IRouter) {
 	a.router = router
 }
-func (a *baseActorContext) Message() *iface.Message {
-	if a.msg == nil {
-		return nil
-	}
-	return a.msg
+func (a *actorContext) Process() iface.IProcess {
+	return a.process
 }
-func (a *baseActorContext) InvokerMessage(msg interface{}) error {
-
-	switch m := msg.(type) {
-	case *iface.TaskMessage:
-		return chain(a.middlerWares, m.Task)(a)
-	case *iface.Message:
-		a.msg = m
-		if a.router != nil && a.router.HasRoute(m.GetId()) {
-			data, err := a.execHandler(m)
-			m.Response(data, err)
-			return err
-		}
-		return a.actor.OnMessage(a, m)
-	case *iface.SyncMessage:
-		a.msg = m.Message
-		if a.router != nil && a.router.HasRoute(m.GetId()) {
-			data, err := a.execHandler(m.Message)
-			m.Response(data, err)
-			return err
-		}
-		return a.actor.OnMessage(a, m.Message)
-	default:
-		return errors.New("not implement")
-	}
-}
-
-func (a *baseActorContext) execHandler(msg *iface.Message) ([]byte, error) {
-	if msg == nil {
-		return nil, fmt.Errorf("msg is nil")
-	}
-	session := msg.GetSession()
-	return a.router.Handle(a, msg.GetId(), session, msg.GetData())
-}
-
-func (a *baseActorContext) Actor() iface.IActor {
+func (a *actorContext) Actor() iface.IActor {
 	return a.actor
 }
 
-func (a *baseActorContext) GetSerializer() lib.ISerializer {
+func (a *actorContext) GetSerializer() lib.ISerializer {
 	if a.system != nil {
 		return a.system.GetSerializer()
 	}
 	return lib.Json // 默认序列化器
 }
 
-func (a *baseActorContext) Exit() {
-	// 取消所有定时器
-	if a.timerMgr != nil {
-		a.timerMgr.CancelAllTimers()
+func (a *actorContext) Message() *iface.Message {
+	if a.msg == nil {
+		return nil
 	}
+	return a.msg
+}
+func (a *actorContext) InvokerMessage(msg interface{}) error {
+	if err := a.invokerMessage(msg); err != nil {
+		glog.Error("InvokerMessage", zap.Any("msg", msg), zap.Error(err))
+		return err
+	}
+	return nil
+}
+
+func (a *actorContext) invokerMessage(msg interface{}) error {
+	switch m := msg.(type) {
+	case *iface.TaskMessage:
+		return m.Task(a)
+	case *iface.Message:
+		return a.handleMessage(m)
+	case *iface.SyncMessage:
+		return a.handleSyncMessage(m)
+	default:
+		return ErrUnsupportedMessageType(fmt.Sprintf("%T", msg))
+	}
+}
+
+// handleMessage 处理普通消息
+func (a *actorContext) handleMessage(m *iface.Message) error {
+	a.msg = m
+	if a.router != nil && a.router.HasRoute(m.GetId()) {
+		_, err := a.execHandler(m)
+		return err
+	}
+	return a.actor.OnMessage(a, m)
+}
+
+// handleSyncMessage 处理同步消息
+func (a *actorContext) handleSyncMessage(m *iface.SyncMessage) error {
+	a.msg = m.Message
+	if a.router != nil && a.router.HasRoute(m.GetId()) {
+		data, err := a.execHandler(m.Message)
+		m.Response(data, err)
+		return err
+	}
+	return a.actor.OnMessage(a, m.Message)
+}
+
+func (a *actorContext) execHandler(msg *iface.Message) ([]byte, error) {
+	if msg == nil {
+		return nil, ErrMsgIsNil()
+	}
+	session := msg.GetSession()
+	wrapSession := iface.NewSession(a, session)
+	return a.router.Handle(a, msg.GetId(), wrapSession, msg.GetData())
+}
+
+func (a *actorContext) Send(to *iface.Pid, msgId uint16, request interface{}) error {
+	message, err := iface.BuildMessage(a.GetSerializer(), a.pid, to, int64(msgId), request)
+	if err != nil {
+		return err
+	}
+	return a.system.Send(message)
+}
+
+func (a *actorContext) Call(to *iface.Pid, msgId uint16, request interface{}, reply interface{}) error {
+	message, err := iface.BuildMessage(a.GetSerializer(), a.pid, to, int64(msgId), request)
+	if err != nil {
+		return err
+	}
+	response := a.system.Call(message, time.Second*3)
+	if errMsg := response.GetError(); errMsg != "" {
+		return ErrRequestFailed(errMsg)
+	}
+	if reply != nil {
+		if data := response.GetData(); len(data) > 0 {
+			if err := a.GetSerializer().Unmarshal(data, reply); err != nil {
+				return ErrUnmarshalReplyFailed(err)
+			}
+		}
+	}
+	return nil
+}
+
+func (a *actorContext) RegisterName(name string, isGlobal bool) error {
+	return a.system.RegisterName(a.pid, a.process, name, isGlobal)
+}
+
+// AfterFunc 注册一次性定时器
+func (a *actorContext) AfterFunc(duration time.Duration, callback iface.Task) *lib.Timer {
+	return lib.AfterFunc(duration, func() {
+		_ = a.process.PushTask(callback)
+	})
+}
+
+// TickFunc 注册周期性定时器，每隔指定时间间隔执行一次回调
+func (a *actorContext) TickFunc(interval time.Duration, callback iface.Task) *lib.Timer {
+	return lib.TickFunc(interval, func() {
+		_ = a.process.PushTask(callback)
+	})
+}
+
+func (a *actorContext) exit() {
 	if a.system != nil {
 		if sys, ok := a.system.(*System); ok {
 			sys.unregisterProcess(a.pid)
@@ -131,105 +168,6 @@ func (a *baseActorContext) Exit() {
 	_ = a.actor.OnStop(a)
 }
 
-func (a *baseActorContext) Send(to *iface.Pid, msgId uint16, request interface{}) error {
-	message := a.buildMessage(a.pid, to, int64(msgId), request)
-	return a.system.Send(message)
-}
-
-func (a *baseActorContext) Request(to *iface.Pid, msgId uint16, request interface{}, reply interface{}) error {
-	message := a.buildMessage(a.pid, to, int64(msgId), request)
-	response := a.system.Request(message, time.Second*3)
-	if errMsg := response.GetError(); errMsg != "" {
-		return fmt.Errorf("request failed: %s", errMsg)
-	}
-	if data := response.GetData(); len(data) > 0 {
-		if err := a.GetSerializer().Unmarshal(data, reply); err != nil {
-			return fmt.Errorf("unmarshal reply failed: %w", err)
-		}
-	}
-	return nil
-}
-
-func (a *baseActorContext) Response(session *iface.Session, request interface{}) error {
-	message := a.buildMessage(a.pid, session.GetAgent(), -1, request)
-	message.Session = session
-	if session.GetAgent() == a.pid {
-		return a.InvokerMessage(message)
-	}
-	return a.system.Send(message)
-}
-
-func (a *baseActorContext) ResponseCode(session *iface.Session, code int64) error {
-	session.Code = code
-	message := a.buildMessage(a.pid, session.GetAgent(), -1, []byte{})
-	message.Session = session
-	if session.GetAgent() == a.pid {
-		return a.InvokerMessage(message)
-	}
-	return a.system.Send(message)
-}
-
-func (a *baseActorContext) Forward(toPid *iface.Pid) error {
-	a.msg.To = toPid
-	a.msg.From = a.pid
-	return a.system.Send(a.Message())
-}
-
-func (a *baseActorContext) Push(session *iface.Session, request interface{}) error {
-	message := a.buildMessage(a.pid, session.GetAgent(), -1, request)
-	message.Session = session
-	if session.GetAgent() == a.pid {
-		return a.InvokerMessage(message)
-	}
-	return a.system.Send(message)
-}
-
-func (a *baseActorContext) buildMessage(from, to *iface.Pid, msgId int64, request interface{}) *iface.Message {
-	message := &iface.Message{
-		To:   to,
-		From: from,
-		Id:   msgId,
-	}
-	switch data := request.(type) {
-	case []byte:
-		message.Data = data
-	default:
-		ser := a.GetSerializer()
-		requestData, err := ser.Marshal(request)
-		if err != nil {
-			return nil
-		}
-		message.Data = requestData
-	}
-	return message
-}
-
-func (a *baseActorContext) RegisterName(name string, isGlobal bool) error {
-	return a.system.RegisterName(a.pid, a.process, name, isGlobal)
-}
-
-// RegisterTimer 注册定时器，时间到后通过 pushTask 通知 baseActorContext 然后执行回调
-// 这是 IContext 接口要求的方法，内部调用 AfterFunc
-func (a *baseActorContext) RegisterTimer(duration time.Duration, callback iface.Task) (int64, error) {
-	return a.timerMgr.AfterFunc(a.process, duration, callback)
-}
-
-// AfterFunc 注册一次性定时器
-func (a *baseActorContext) AfterFunc(duration time.Duration, callback iface.Task) (int64, error) {
-	return a.timerMgr.AfterFunc(a.process, duration, callback)
-}
-
-// TickFunc 注册周期性定时器，每隔指定时间间隔执行一次回调
-func (a *baseActorContext) TickFunc(interval time.Duration, callback iface.Task) (int64, error) {
-	return a.timerMgr.TickFunc(a.process, interval, callback)
-}
-
-// CancelTimer 取消定时器
-func (a *baseActorContext) CancelTimer(timerID int64) bool {
-	return a.timerMgr.CancelTimer(timerID)
-}
-
-// CancelAllTimers 取消所有定时器
-func (a *baseActorContext) CancelAllTimers() {
-	a.timerMgr.CancelAllTimers()
+func (a *actorContext) Shutdown() error {
+	return a.process.Shutdown()
 }

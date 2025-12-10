@@ -157,7 +157,7 @@ func (x *Message) GetSession() *Session {
 	return nil
 }
 
-type RespondMessage struct {
+type Response struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Data          []byte                 `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
 	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
@@ -165,20 +165,20 @@ type RespondMessage struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *RespondMessage) Reset() {
-	*x = RespondMessage{}
+func (x *Response) Reset() {
+	*x = Response{}
 	mi := &file_actor_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *RespondMessage) String() string {
+func (x *Response) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*RespondMessage) ProtoMessage() {}
+func (*Response) ProtoMessage() {}
 
-func (x *RespondMessage) ProtoReflect() protoreflect.Message {
+func (x *Response) ProtoReflect() protoreflect.Message {
 	mi := &file_actor_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -190,19 +190,19 @@ func (x *RespondMessage) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use RespondMessage.ProtoReflect.Descriptor instead.
-func (*RespondMessage) Descriptor() ([]byte, []int) {
+// Deprecated: Use Response.ProtoReflect.Descriptor instead.
+func (*Response) Descriptor() ([]byte, []int) {
 	return file_actor_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *RespondMessage) GetData() []byte {
+func (x *Response) GetData() []byte {
 	if x != nil {
 		return x.Data
 	}
 	return nil
 }
 
-func (x *RespondMessage) GetError() string {
+func (x *Response) GetError() string {
 	if x != nil {
 		return x.Error
 	}
@@ -309,8 +309,8 @@ const file_actor_proto_rawDesc = "" +
 	".actor.PidR\x04from\x12\x0e\n" +
 	"\x02id\x18\x03 \x01(\x03R\x02id\x12\x12\n" +
 	"\x04data\x18\x04 \x01(\fR\x04data\x12(\n" +
-	"\asession\x18\x05 \x01(\v2\x0e.actor.SessionR\asession\":\n" +
-	"\x0eRespondMessage\x12\x12\n" +
+	"\asession\x18\x05 \x01(\v2\x0e.actor.SessionR\asession\"4\n" +
+	"\bResponse\x12\x12\n" +
 	"\x04data\x18\x01 \x01(\fR\x04data\x12\x14\n" +
 	"\x05error\x18\x02 \x01(\tR\x05error\"\x9b\x01\n" +
 	"\aSession\x12\x16\n" +
@@ -337,10 +337,10 @@ func file_actor_proto_rawDescGZIP() []byte {
 
 var file_actor_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_actor_proto_goTypes = []any{
-	(*Pid)(nil),            // 0: actor.Pid
-	(*Message)(nil),        // 1: actor.Message
-	(*RespondMessage)(nil), // 2: actor.RespondMessage
-	(*Session)(nil),        // 3: actor.Session
+	(*Pid)(nil),      // 0: actor.Pid
+	(*Message)(nil),  // 1: actor.Message
+	(*Response)(nil), // 2: actor.Response
+	(*Session)(nil),  // 3: actor.Session
 }
 var file_actor_proto_depIdxs = []int32{
 	0, // 0: actor.Message.to:type_name -> actor.Pid
