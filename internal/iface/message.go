@@ -40,30 +40,12 @@ func BuildMessage(ser lib.ISerializer, from, to *Pid, msgId int64, request inter
 		From: from,
 		Id:   msgId,
 	}
-	data, err := marshal(ser, request)
+	data, err := Marshal(ser, request)
 	if err != nil {
 		return nil, err
 	}
 	message.Data = data
 	return message, nil
-}
-
-func marshal(serializer lib.ISerializer, request interface{}) ([]byte, error) {
-	// 处理 nil 情况
-	if request == nil {
-		return []byte{}, nil
-	}
-
-	switch t := request.(type) {
-	case []byte:
-		return t, nil
-	default:
-		data, err := serializer.Marshal(request)
-		if err != nil {
-			return nil, err
-		}
-		return data, nil
-	}
 }
 
 func (m *Message) Response(data []byte, err error) {
@@ -134,4 +116,39 @@ func NewErrorResponse(errMsg string) *Response {
 	return &Response{
 		Error: errMsg,
 	}
+}
+
+func Marshal(serializer lib.ISerializer, request interface{}) ([]byte, error) {
+	// 处理 nil 情况
+	if request == nil {
+		return []byte{}, nil
+	}
+
+	switch t := request.(type) {
+	case []byte:
+		return t, nil
+	default:
+		data, err := serializer.Marshal(request)
+		if err != nil {
+			return nil, err
+		}
+		return data, nil
+	}
+}
+
+func Unmarshal(serializer lib.ISerializer, data []byte, reply interface{}) error {
+	if data == nil {
+		return nil
+	}
+	switch reply.(type) {
+	case []byte:
+	case struct{}:
+	default:
+		if reply != nil {
+			if err := serializer.Unmarshal(data, reply); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

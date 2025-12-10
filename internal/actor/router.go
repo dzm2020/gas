@@ -200,7 +200,7 @@ func (r *Router) handleSyncMessage(ctx iface.IContext, msgId int64, data []byte,
 		return nil, err
 	}
 
-	responseData, err := ctx.GetSerializer().Marshal(responseValue.Interface())
+	responseData, err := iface.Marshal(ctx.GetSerializer(), responseValue.Interface())
 	if err != nil {
 		return nil, ErrMarshalResponse(msgId, err)
 	}
@@ -246,13 +246,10 @@ func (r *Router) createRequestValue(requestType reflect.Type, data []byte, ctx i
 	if requestType == typeOfByteArray {
 		return reflect.ValueOf(data), nil
 	}
-
 	// 其他类型需要反序列化
 	requestValue := reflect.New(requestType.Elem())
-	if len(data) > 0 {
-		if err := ctx.GetSerializer().Unmarshal(data, requestValue.Interface()); err != nil {
-			return reflect.Value{}, ErrUnmarshalFailed(err)
-		}
+	if err := iface.Unmarshal(ctx.GetSerializer(), data, requestValue.Interface()); err != nil {
+		return reflect.Value{}, ErrUnmarshalFailed(err)
 	}
 	return requestValue, nil
 }

@@ -155,6 +155,22 @@ func (r *Remote) RegistryName(name string) error {
 	return r.discovery.Add(info)
 }
 
+func (r *Remote) UnregisterName(name string) error {
+	info := r.node.Self()
+	if !slices.Contains(info.GetTags(), name) {
+		return nil
+	}
+	// 从 Tags 中移除名字
+	newTags := make([]string, 0, len(info.GetTags()))
+	for _, tag := range info.GetTags() {
+		if tag != name {
+			newTags = append(newTags, tag)
+		}
+	}
+	info.Tags = newTags
+	return r.discovery.Add(info)
+}
+
 func (r *Remote) Select(service string, strategy iface.RouteStrategy) (*iface.Pid, error) {
 	if strategy == nil {
 		strategy = RouteRandom

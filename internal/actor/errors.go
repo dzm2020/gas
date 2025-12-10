@@ -133,6 +133,18 @@ func ErrRemoteRegistryNameFailed(err error) error {
 	return fmt.Errorf("remote registry name failed: %w", err)
 }
 
+func ErrNameAlreadyRegistered(name string) error {
+	return fmt.Errorf("name '%s' is already registered", name)
+}
+
+func ErrProcessAlreadyHasName(processId uint64) error {
+	return fmt.Errorf("process %d already has a registered name", processId)
+}
+
+func ErrNameChangeNotAllowed() error {
+	return fmt.Errorf("name change is not allowed")
+}
+
 // 上下文相关错误构造函数
 func ErrUnsupportedMessageType(msgType string) error {
 	return fmt.Errorf("unsupported message type: %s", msgType)

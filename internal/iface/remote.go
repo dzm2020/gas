@@ -12,4 +12,5 @@ type IRemote interface {
 	Request(message *Message, timeout time.Duration) *Response
 	Select(service string, strategy RouteStrategy) (*Pid, error)
 	RegistryName(name string) error
+	UnregisterName(name string) error
 }

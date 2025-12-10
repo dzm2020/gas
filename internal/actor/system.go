@@ -2,6 +2,7 @@
 package actor
 
 import (
+	"fmt"
 	"gas/internal/iface"
 	"gas/pkg/lib"
 	"sync/atomic"
@@ -13,8 +14,8 @@ import (
 // System Actor 系统，管理所有进程和消息传递
 type System struct {
 	uniqId       atomic.Uint64
-	nameDict     *maputil.ConcurrentMap[string, iface.IProcess]
 	processDict  *maputil.ConcurrentMap[uint64, iface.IProcess]
+	nameManager  *NameManager // 名字管理器
 	serializer   lib.ISerializer
 	node         iface.INode
 	shuttingDown atomic.Bool
@@ -22,17 +23,19 @@ type System struct {
 
 // NewSystem 创建新的 Actor 系统
 func NewSystem() *System {
-	return &System{
+	sys := &System{
 		uniqId:      atomic.Uint64{},
-		nameDict:    maputil.NewConcurrentMap[string, iface.IProcess](10),
 		processDict: maputil.NewConcurrentMap[uint64, iface.IProcess](10),
+		nameManager: NewNameManager(),
 		serializer:  lib.Json,
 	}
+	return sys
 }
 
 // SetNode 设置节点实例
 func (s *System) SetNode(n iface.INode) {
 	s.node = n
+	s.nameManager.SetNode(n)
 }
 
 // GetNode 获取节点实例
@@ -105,8 +108,7 @@ func (s *System) GetProcess(pid *iface.Pid) iface.IProcess {
 		return nil
 	}
 	if name := pid.GetName(); name != "" {
-		p, _ := s.nameDict.Get(name)
-		return p
+		return s.nameManager.GetProcess(name)
 	}
 	if id := pid.GetServiceId(); id > 0 {
 		p, _ := s.processDict.Get(id)
@@ -123,8 +125,7 @@ func (s *System) GetProcessById(id uint64) iface.IProcess {
 
 // GetProcessByName 根据名称获取进程
 func (s *System) GetProcessByName(name string) iface.IProcess {
-	process, _ := s.nameDict.Get(name)
-	return process
+	return s.nameManager.GetProcess(name)
 }
 
 // checkShuttingDown 检查系统是否正在关闭
@@ -165,7 +166,9 @@ func (s *System) Send(message *iface.Message) error {
 	if err := s.checkShuttingDown(); err != nil {
 		return err
 	}
-
+	if message == nil {
+		return fmt.Errorf("message is nil")
+	}
 	to := message.GetTo()
 	if s.isLocalPid(to) {
 		// 本地消息，直接发送到本地进程
@@ -244,58 +247,19 @@ func (s *System) Select(name string, strategy iface.RouteStrategy) (*iface.Pid, 
 }
 
 func (s *System) RegisterName(pid *iface.Pid, process iface.IProcess, name string, isGlobal bool) error {
-	if len(name) == 0 {
-		return ErrNameCannotBeEmpty()
-	}
-
-	// 本地注册：更新 pid 的名称并在 system 中注册
-	oldName := pid.Name
-	pid.Name = name
-
-	// 如果之前有名称，先从 nameDict 中删除旧名称
-	if oldName != "" && oldName != name {
-		s.nameDict.Delete(oldName)
-	}
-
-	// 在本地 system 中注册新名称
-	s.nameDict.Set(name, process)
-
-	// 如果是全局注册，还需要在远程注册
-	if isGlobal {
-		if s.GetNode() == nil {
-			return ErrNodeNotInitialized()
-		}
-		remote := s.GetNode().GetRemote()
-		if remote == nil {
-			return ErrRemoteNotInitialized()
-		}
-		if err := remote.RegistryName(name); err != nil {
-			// 如果远程注册失败，回滚本地注册
-			s.nameDict.Delete(name)
-			pid.Name = oldName
-			if oldName != "" {
-				s.nameDict.Set(oldName, process)
-			}
-			return ErrRemoteRegistryNameFailed(err)
-		}
-	}
-	return nil
+	return s.nameManager.Register(pid, process, name, isGlobal)
 }
 
 // registerProcess 注册进程
 func (s *System) registerProcess(pid *iface.Pid, process iface.IProcess) {
 	s.processDict.Set(pid.GetServiceId(), process)
-	if pid.GetName() != "" {
-		s.nameDict.Set(pid.GetName(), process)
-	}
+	s.nameManager.Set(pid.GetName(), process)
 }
 
 // unregisterProcess 注销进程
 func (s *System) unregisterProcess(pid *iface.Pid) {
 	s.processDict.Delete(pid.GetServiceId())
-	if pid.GetName() != "" {
-		s.nameDict.Delete(pid.GetName())
-	}
+	s.nameManager.Unregister(pid)
 }
 
 // GetAllProcesses 获取所有进程

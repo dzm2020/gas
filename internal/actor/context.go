@@ -2,6 +2,7 @@
 package actor
 
 import (
+	"errors"
 	"fmt"
 	"gas/internal/iface"
 	"gas/pkg/glog"
@@ -128,17 +129,10 @@ func (a *actorContext) Call(to *iface.Pid, msgId uint16, request interface{}, re
 		return err
 	}
 	response := a.system.Call(message, time.Second*3)
-	if errMsg := response.GetError(); errMsg != "" {
-		return ErrRequestFailed(errMsg)
+	if response.Error != "" {
+		return errors.New(response.Error)
 	}
-	if reply != nil {
-		if data := response.GetData(); len(data) > 0 {
-			if err := a.GetSerializer().Unmarshal(data, reply); err != nil {
-				return ErrUnmarshalReplyFailed(err)
-			}
-		}
-	}
-	return nil
+	return iface.Unmarshal(a.GetSerializer(), response.GetData(), reply)
 }
 
 func (a *actorContext) RegisterName(name string, isGlobal bool) error {
