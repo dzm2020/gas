@@ -22,7 +22,7 @@ func newActorContext() *actorContext {
 }
 
 type actorContext struct {
-	system  iface.ISystem
+	system  *System
 	process iface.IProcess // 保存自己的 process 引用
 	pid     *iface.Pid
 	name    string
@@ -103,7 +103,10 @@ func (a *actorContext) handleSyncMessage(m *iface.SyncMessage) error {
 		m.Response(data, err)
 		return err
 	}
-	return a.actor.OnMessage(a, m.Message)
+	// 如果没有路由，调用 actor.OnMessage
+	err := a.actor.OnMessage(a, m.Message)
+	m.Response(nil, err)
+	return err
 }
 
 func (a *actorContext) execHandler(msg *iface.Message) ([]byte, error) {
@@ -116,18 +119,26 @@ func (a *actorContext) execHandler(msg *iface.Message) ([]byte, error) {
 }
 
 func (a *actorContext) Send(to *iface.Pid, msgId uint16, request interface{}) error {
-	message, err := iface.BuildMessage(a.GetSerializer(), a.pid, to, int64(msgId), request)
+	message := iface.NewMessage(a.pid, to, int64(msgId))
+
+	data, err := iface.Marshal(a.GetSerializer(), request)
 	if err != nil {
 		return err
 	}
+	message.Data = data
+
 	return a.system.Send(message)
 }
 
 func (a *actorContext) Call(to *iface.Pid, msgId uint16, request interface{}, reply interface{}) error {
-	message, err := iface.BuildMessage(a.GetSerializer(), a.pid, to, int64(msgId), request)
+	message := iface.NewMessage(a.pid, to, int64(msgId))
+
+	data, err := iface.Marshal(a.GetSerializer(), request)
 	if err != nil {
 		return err
 	}
+	message.Data = data
+
 	response := a.system.Call(message, time.Second*3)
 	if response.Error != "" {
 		return errors.New(response.Error)
@@ -154,11 +165,7 @@ func (a *actorContext) TickFunc(interval time.Duration, callback iface.Task) *li
 }
 
 func (a *actorContext) exit() {
-	if a.system != nil {
-		if sys, ok := a.system.(*System); ok {
-			sys.unregisterProcess(a.pid)
-		}
-	}
+	a.system.Remove(a.pid)
 	_ = a.actor.OnStop(a)
 }
 

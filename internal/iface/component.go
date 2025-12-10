@@ -148,6 +148,9 @@ func (m *Manager) stopComponents(ctx context.Context, components []Component, is
 	// 逆序停止
 	for i := len(components) - 1; i >= 0; i-- {
 		component := components[i]
+		if component == nil {
+			continue
+		}
 		glog.Infof("component: %s component '%s'", stopType, component.Name())
 
 		if err := component.Stop(ctx); err != nil {

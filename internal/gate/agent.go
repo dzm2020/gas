@@ -3,6 +3,7 @@ package gate
 import (
 	"gas/internal/gate/protocol"
 	"gas/internal/iface"
+	"gas/pkg/glog"
 	"gas/pkg/network"
 )
 
@@ -36,13 +37,15 @@ type Agent struct {
 }
 
 func (agent *Agent) OnConnect(ctx iface.IContext, connection network.IConnection) error {
+
 	agent.IConnection = connection
+
 	router := ctx.GetRouter()
 	if router == nil {
 		return nil
 	}
-	_ = router.Register(iface.MsgIdPushMessageToClient, handlerPush)
-	_ = router.Register(iface.MsgIdCloseClientConnection, handlerClose)
+	router.Register(iface.MsgIdPushMessageToClient, handlerPush)
+	router.Register(iface.MsgIdCloseClientConnection, handlerClose)
 	return nil
 }
 
@@ -60,12 +63,11 @@ func (agent *Agent) OnStop(ctx iface.IContext) error {
 }
 
 func (agent *Agent) Push(session iface.ISession, data []byte) {
-	// 创建响应消息（使用相同的 cmd 和 act）
 	cmd, act := protocol.ParseId(uint16(session.GetMid()))
 	response := protocol.New(cmd, act, data)
 	response.Index = session.GetIndex() // 可以根据需要设置 Index
 	response.Error = uint16(session.GetCode())
 	if err := agent.IConnection.Send(response); err != nil {
-		// todo 日志
+		glog.Errorf("send response error:%v", err)
 	}
 }

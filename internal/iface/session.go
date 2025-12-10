@@ -53,7 +53,7 @@ func (a *WrapSession) Forward(toPid *Pid) error {
 	}
 	msg.To = toPid
 	msg.From = a.ctx.ID()
-	return a.send(msg)
+	return a.ctx.System().Send(msg)
 }
 
 func (a *WrapSession) Push(request interface{}) error {
@@ -82,5 +82,11 @@ func (a *WrapSession) Close() error {
 }
 
 func (a *WrapSession) buildMessage(msgId int64, request interface{}) (*Message, error) {
-	return BuildMessage(a.ctx.GetSerializer(), a.ctx.ID(), a.GetAgent(), msgId, request)
+	message := NewMessage(a.ctx.ID(), a.GetAgent(), msgId)
+	data, err := Marshal(a.ctx.GetSerializer(), request)
+	if err != nil {
+		return nil, err
+	}
+	message.Data = data
+	return message, nil
 }

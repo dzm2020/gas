@@ -87,6 +87,9 @@ func (s *UDPServer) readLoop(ctx context.Context) {
 
 // copyUDPAddr 复制 UDPAddr（避免并发问题）
 func copyUDPAddr(addr *net.UDPAddr) *net.UDPAddr {
+	if addr == nil {
+		return nil
+	}
 	ip := make(net.IP, len(addr.IP))
 	copy(ip, addr.IP)
 	return &net.UDPAddr{IP: ip, Port: addr.Port, Zone: addr.Zone}

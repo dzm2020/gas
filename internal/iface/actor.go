@@ -202,8 +202,8 @@ type IRouter interface {
 	//   - 客户端消息: func(ctx IContext, session ISession, request *RequestType) error
 	//   - 同步消息: func(ctx IContext, request *RequestType, response *ResponseType) error
 	//   - 异步消息: func(ctx IContext, request *RequestType) error
-	// 返回: 注册错误
-	Register(msgId int64, handler interface{}) error
+	// 注意: 如果注册失败，错误会通过日志输出
+	Register(msgId int64, handler interface{})
 
 	// Handle 处理消息
 	// ctx: Actor 上下文

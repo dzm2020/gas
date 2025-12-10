@@ -2,8 +2,11 @@ package actor
 
 import (
 	"gas/internal/iface"
+	"gas/pkg/glog"
 	"reflect"
 	"sync"
+
+	"go.uber.org/zap"
 )
 
 type Router struct {
@@ -36,46 +39,59 @@ func NewRouter() iface.IRouter {
 var (
 	typeOfActorContext = reflect.TypeOf((*iface.IContext)(nil)).Elem()
 	typeOfError        = reflect.TypeOf((*error)(nil)).Elem()
-	typeOfSession      = reflect.TypeOf((iface.ISession)(nil))
+	typeOfSession      = reflect.TypeOf((*iface.ISession)(nil)).Elem()
 	typeOfByteArray    = reflect.TypeOf(([]byte)(nil))
 )
 
-func (r *Router) Register(msgId int64, handler interface{}) error {
+func (r *Router) Register(msgId int64, handler interface{}) {
 	if handler == nil {
-		return ErrHandlerIsNil()
+		glog.Error("路由注册失败: 处理器为空", zap.Int64("msgId", msgId))
+		return
 	}
 
 	handlerValue := reflect.ValueOf(handler)
 	handlerFuncType := handlerValue.Type()
 
 	if handlerFuncType.Kind() != reflect.Func {
-		return ErrHandlerMustBeFunction(handlerFuncType.Kind().String())
+		glog.Error("路由注册失败: 处理器必须是函数类型",
+			zap.Int64("msgId", msgId),
+			zap.String("实际类型", handlerFuncType.Kind().String()))
+		return
 	}
 
 	numIn := handlerFuncType.NumIn()
 	if numIn < 2 || numIn > 3 {
-		return ErrHandlerParameterCount(numIn)
+		glog.Error("路由注册失败: 处理器必须接受 2 或 3 个参数",
+			zap.Int64("msgId", msgId),
+			zap.Int("实际参数数量", numIn))
+		return
 	}
 
 	// 第一个参数必须是 IContext
 	if handlerFuncType.In(0) != typeOfActorContext {
-		return ErrHandlerFirstParameterMustBeContext()
+		glog.Error("路由注册失败: 处理器的第一个参数必须是 actor.IContext",
+			zap.Int64("msgId", msgId))
+		return
 	}
 
 	entry, err := r.parseHandler(handlerValue, handlerFuncType, numIn)
 	if err != nil {
-		return err
+		glog.Error("路由注册失败: 解析处理器签名失败",
+			zap.Int64("msgId", msgId),
+			zap.Error(err))
+		return
 	}
 
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	if _, exists := r.routes[msgId]; exists {
-		return ErrHandlerAlreadyRegistered(msgId)
+		glog.Error("路由注册失败: 该消息ID的处理器已注册",
+			zap.Int64("msgId", msgId))
+		return
 	}
 
 	r.routes[msgId] = entry
-	return nil
 }
 
 // parseHandler 解析处理器函数签名

@@ -25,5 +25,9 @@ func (f *chanWaiter[T]) Wait() (T, error) {
 }
 
 func (f *chanWaiter[T]) Done(reply T) {
-	f.ch <- reply
+	// 使用 select 实现非阻塞发送，避免多次调用 Done 时阻塞
+	select {
+	case f.ch <- reply:
+	default:
+	}
 }

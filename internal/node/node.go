@@ -143,61 +143,6 @@ func (m *Node) StarUp(comps ...iface.Component) error {
 	return m.shutdown(context.Background())
 }
 
-// Send 发送消息到指定的 actor
-func (m *Node) Send(message *iface.Message) error {
-	if err := m.validateMessage(message); err != nil {
-		return err
-	}
-
-	toNodeId := message.GetTo().GetNodeId()
-	if m.isLocalNode(toNodeId) {
-		if m.actorSystem == nil {
-			return fmt.Errorf("actor system not initialized")
-		}
-		return m.actorSystem.Send(message)
-	}
-
-	// 远程发送
-	return m.remote.Send(message)
-}
-
-// Request 向指定的 actor 发送请求并等待回复
-func (m *Node) Request(message *iface.Message, timeout time.Duration) *iface.Response {
-	if err := m.validateMessage(message); err != nil {
-		return iface.NewErrorResponse(err.Error())
-	}
-
-	toNodeId := message.GetTo().GetNodeId()
-	if m.isLocalNode(toNodeId) {
-		if m.actorSystem == nil {
-			return iface.NewErrorResponse("actor system not initialized")
-		}
-		return m.actorSystem.Call(message, timeout)
-	}
-
-	// 远程调用
-	return m.remote.Request(message, timeout)
-}
-
-// validateMessage 验证消息有效性
-func (m *Node) validateMessage(message *iface.Message) error {
-	if message == nil {
-		return fmt.Errorf("message is nil")
-	}
-	if message.GetTo() == nil {
-		return fmt.Errorf("target pid is nil")
-	}
-	if m.Self().GetID() == 0 {
-		return fmt.Errorf("self game-node not registered")
-	}
-	return nil
-}
-
-// isLocalNode 判断是否为本地节点
-func (m *Node) isLocalNode(nodeId uint64) bool {
-	return nodeId == 0 || nodeId == m.Self().GetID()
-}
-
 func (m *Node) SetPanicHook(panicHook func(entry zapcore.Entry)) {
 	m.panicHook = panicHook
 }

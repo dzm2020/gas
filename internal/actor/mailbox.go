@@ -63,8 +63,11 @@ func (m *Mailbox) schedule() error {
 }
 
 func (m *Mailbox) process() {
+	defer func() {
+		// 确保无论是否发生 panic，状态都能被重置
+		m.dispatchStat.CompareAndSwap(running, idle)
+	}()
 	m.run()
-	m.dispatchStat.CompareAndSwap(running, idle)
 }
 
 func (m *Mailbox) run() {

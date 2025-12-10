@@ -7,15 +7,12 @@ import (
 	"gas/pkg/lib"
 	"sync/atomic"
 	"time"
-
-	"github.com/duke-git/lancet/v2/maputil"
 )
 
 // System Actor 系统，管理所有进程和消息传递
 type System struct {
+	*Manager     // 名字管理器
 	uniqId       atomic.Uint64
-	processDict  *maputil.ConcurrentMap[uint64, iface.IProcess]
-	nameManager  *NameManager // 名字管理器
 	serializer   lib.ISerializer
 	node         iface.INode
 	shuttingDown atomic.Bool
@@ -24,10 +21,9 @@ type System struct {
 // NewSystem 创建新的 Actor 系统
 func NewSystem() *System {
 	sys := &System{
-		uniqId:      atomic.Uint64{},
-		processDict: maputil.NewConcurrentMap[uint64, iface.IProcess](10),
-		nameManager: NewNameManager(),
-		serializer:  lib.Json,
+		uniqId:     atomic.Uint64{},
+		Manager:    NewNameManager(),
+		serializer: lib.Json,
 	}
 	return sys
 }
@@ -35,7 +31,7 @@ func NewSystem() *System {
 // SetNode 设置节点实例
 func (s *System) SetNode(n iface.INode) {
 	s.node = n
-	s.nameManager.SetNode(n)
+	s.Manager.SetNode(n)
 }
 
 // GetNode 获取节点实例
@@ -66,27 +62,19 @@ func (s *System) newPid() *iface.Pid {
 
 // Spawn 创建新的 actor 进程
 func (s *System) Spawn(actor iface.IActor, args ...interface{}) *iface.Pid {
-	if s.shuttingDown.Load() {
-		return nil
-	}
 	ctx := newActorContext()
 	pid := s.newPid()
 	mailBox := NewMailbox()
 	process := NewProcess(ctx, mailBox)
-
 	ctx.process = process
 	ctx.pid = pid
 	ctx.actor = actor
 	ctx.system = s
-
 	mailBox.RegisterHandlers(ctx, NewDefaultDispatcher(1024))
-
-	s.registerProcess(pid, process)
-
+	s.Add(pid, process)
 	_ = process.PushTask(func(ctx iface.IContext) error {
 		return ctx.Actor().OnInit(ctx, args)
 	})
-
 	return pid
 }
 
@@ -100,32 +88,6 @@ func (s *System) getProcessChecked(pid *iface.Pid) (iface.IProcess, error) {
 		return nil, ErrProcessNotFound
 	}
 	return process, nil
-}
-
-// GetProcess 根据 Pid 获取进程
-func (s *System) GetProcess(pid *iface.Pid) iface.IProcess {
-	if pid == nil {
-		return nil
-	}
-	if name := pid.GetName(); name != "" {
-		return s.nameManager.GetProcess(name)
-	}
-	if id := pid.GetServiceId(); id > 0 {
-		p, _ := s.processDict.Get(id)
-		return p
-	}
-	return nil
-}
-
-// GetProcessById 根据 ID 获取进程
-func (s *System) GetProcessById(id uint64) iface.IProcess {
-	process, _ := s.processDict.Get(id)
-	return process
-}
-
-// GetProcessByName 根据名称获取进程
-func (s *System) GetProcessByName(name string) iface.IProcess {
-	return s.nameManager.GetProcess(name)
 }
 
 // checkShuttingDown 检查系统是否正在关闭
@@ -232,13 +194,9 @@ func (s *System) PushTaskAndWait(pid *iface.Pid, timeout time.Duration, task ifa
 }
 
 func (s *System) Select(name string, strategy iface.RouteStrategy) (*iface.Pid, error) {
-	// 查找本地名字
 	if process := s.GetProcessByName(name); process != nil {
 		return process.Context().ID(), nil
 	}
-
-	// 本地找不到通过remote查找
-	// 远程消息，通过远程接口发送
 	remote, err := s.getRemote()
 	if err != nil {
 		return nil, err
@@ -246,48 +204,14 @@ func (s *System) Select(name string, strategy iface.RouteStrategy) (*iface.Pid, 
 	return remote.Select(name, strategy)
 }
 
-func (s *System) RegisterName(pid *iface.Pid, process iface.IProcess, name string, isGlobal bool) error {
-	return s.nameManager.Register(pid, process, name, isGlobal)
-}
-
-// registerProcess 注册进程
-func (s *System) registerProcess(pid *iface.Pid, process iface.IProcess) {
-	s.processDict.Set(pid.GetServiceId(), process)
-	s.nameManager.Set(pid.GetName(), process)
-}
-
-// unregisterProcess 注销进程
-func (s *System) unregisterProcess(pid *iface.Pid) {
-	s.processDict.Delete(pid.GetServiceId())
-	s.nameManager.Unregister(pid)
-}
-
-// GetAllProcesses 获取所有进程
-func (s *System) GetAllProcesses() []iface.IProcess {
-	var processes []iface.IProcess
-	s.processDict.Range(func(_ uint64, value iface.IProcess) bool {
-		processes = append(processes, value)
-		return true
-	})
-	return processes
-}
-
 // Shutdown 优雅关闭 Actor 系统
-// timeout: 最大等待时间，如果为 0 则使用默认值 10 秒
 func (s *System) Shutdown(timeout time.Duration) error {
 	// 标记为关闭状态，拒绝新的消息和进程创建
 	if !s.shuttingDown.CompareAndSwap(false, true) {
 		return nil // 已经在关闭中
 	}
 
-	if timeout == 0 {
-		timeout = 10 * time.Second
-	}
-	// 获取所有进程的快照
 	processes := s.GetAllProcesses()
-
-	// 第一步：依次调用每个进程的 Exit()
-	// Exit() 会推送退出任务到队列，并等待最多1秒
 	for _, process := range processes {
 		if err := process.Shutdown(); err != nil {
 			continue

@@ -34,18 +34,13 @@ func (m *TaskMessage) Validate() error {
 	return nil
 }
 
-func BuildMessage(ser lib.ISerializer, from, to *Pid, msgId int64, request interface{}) (*Message, error) {
+func NewMessage(from, to *Pid, msgId int64) *Message {
 	message := &Message{
 		To:   to,
 		From: from,
 		Id:   msgId,
 	}
-	data, err := Marshal(ser, request)
-	if err != nil {
-		return nil, err
-	}
-	message.Data = data
-	return message, nil
+	return message
 }
 
 func (m *Message) Response(data []byte, err error) {
@@ -118,37 +113,47 @@ func NewErrorResponse(errMsg string) *Response {
 	}
 }
 
+// Marshal 将请求对象序列化为字节数组
+// serializer: 序列化器
+// request: 要序列化的请求对象，可以是任意类型或 []byte
+// 返回: 序列化后的字节数组和错误
 func Marshal(serializer lib.ISerializer, request interface{}) ([]byte, error) {
 	// 处理 nil 情况
 	if request == nil {
 		return []byte{}, nil
 	}
 
-	switch t := request.(type) {
-	case []byte:
-		return t, nil
-	default:
-		data, err := serializer.Marshal(request)
-		if err != nil {
-			return nil, err
-		}
+	// 如果已经是 []byte 类型，直接返回
+	if data, ok := request.([]byte); ok {
 		return data, nil
 	}
+
+	// 使用序列化器序列化
+	return serializer.Marshal(request)
 }
 
+// Unmarshal 将字节数组反序列化为目标对象
+// serializer: 序列化器
+// data: 要反序列化的字节数组
+// reply: 目标对象指针，用于接收反序列化后的数据
+// 返回: 反序列化错误
 func Unmarshal(serializer lib.ISerializer, data []byte, reply interface{}) error {
-	if data == nil {
+	// 如果数据为空，直接返回
+	if len(data) == 0 {
 		return nil
 	}
-	switch reply.(type) {
-	case []byte:
-	case struct{}:
-	default:
-		if reply != nil {
-			if err := serializer.Unmarshal(data, reply); err != nil {
-				return err
-			}
-		}
+
+	// 如果目标对象为空，直接返回
+	if reply == nil {
+		return nil
 	}
-	return nil
+
+	// 如果目标对象是指向 []byte 的指针，直接将数据赋值
+	if ptr, ok := reply.(*[]byte); ok {
+		*ptr = data
+		return nil
+	}
+
+	// 使用序列化器反序列化
+	return serializer.Unmarshal(data, reply)
 }
