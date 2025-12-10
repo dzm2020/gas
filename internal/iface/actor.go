@@ -47,12 +47,6 @@ type IContext interface {
 	// 返回: 定时器
 	AfterFunc(duration time.Duration, callback Task) *lib.Timer
 
-	// TickFunc 注册周期性定时器，每隔指定时间间隔执行一次回调
-	// interval: 执行间隔时间
-	// callback: 每次执行的回调函数
-	// 返回: 定时器
-	TickFunc(interval time.Duration, callback Task) *lib.Timer
-
 	// RegisterName 注册进程名称
 	// name: 进程名称
 	// isGlobal: 是否全局注册（跨节点可见）

@@ -157,13 +157,6 @@ func (a *actorContext) AfterFunc(duration time.Duration, callback iface.Task) *l
 	})
 }
 
-// TickFunc 注册周期性定时器，每隔指定时间间隔执行一次回调
-func (a *actorContext) TickFunc(interval time.Duration, callback iface.Task) *lib.Timer {
-	return lib.TickFunc(interval, func() {
-		_ = a.process.PushTask(callback)
-	})
-}
-
 func (a *actorContext) exit() {
 	a.system.Remove(a.pid)
 	_ = a.actor.OnStop(a)
