@@ -1,8 +1,10 @@
 package nats
 
 import (
+	"encoding/json"
 	"fmt"
 	"gas/pkg/lib/glog"
+	"gas/pkg/messageQue"
 	"gas/pkg/messageQue/iface"
 	"strings"
 	"sync"
@@ -11,6 +13,20 @@ import (
 	"github.com/nats-io/nats.go"
 	"go.uber.org/zap"
 )
+
+func init() {
+	// 注册默认的 nats 提供者
+	_ = messageQue.Register("nats", func(configData json.RawMessage) (iface.IMessageQue, error) {
+		natsCfg := defaultConfig()
+		// 如果是从 Options 字段传入的 JSON 数据，尝试解析
+		if len(configData) > 0 {
+			if err := json.Unmarshal(configData, natsCfg); err != nil {
+				return nil, fmt.Errorf("failed to parse nats config: %w", err)
+			}
+		}
+		return New(natsCfg.Servers, natsCfg)
+	})
+}
 
 // New 创建 NATS 集群通信实例
 // 如果 cfg 为 nil，将使用默认配置
@@ -33,18 +49,6 @@ func New(servers []string, cfg *Config) (*Client, error) {
 	glog.Info("NATS连接成功", zap.Strings("servers", servers))
 	return &Client{
 		conn:          client,
-		subscriptions: make(map[iface.ISubscription]struct{}),
-	}, nil
-}
-
-// NewWithNatsOptions 使用原生 nats.Option 创建 NATS 集群通信实例（向后兼容）
-func NewWithNatsOptions(servers []string, natsOpts ...nats.Option) (*Client, error) {
-	conn, err := nats.Connect(strings.Join(servers, ","), natsOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return &Client{
-		conn:          conn,
 		subscriptions: make(map[iface.ISubscription]struct{}),
 	}, nil
 }
