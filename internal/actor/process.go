@@ -1,6 +1,7 @@
 package actor
 
 import (
+	"gas/internal/errs"
 	"gas/internal/iface"
 	"sync/atomic"
 	"time"
@@ -32,7 +33,7 @@ func (p *Process) Context() iface.IContext {
 // checkShutdown 检查进程是否正在退出
 func (p *Process) checkShutdown() error {
 	if p.shutdown.Load() {
-		return ErrProcessExiting
+		return errs.ErrProcessExiting
 	}
 	return nil
 }
@@ -40,12 +41,12 @@ func (p *Process) checkShutdown() error {
 // validateMessage 验证消息是否合法
 func (p *Process) validateMessage(message interface{}) error {
 	if message == nil {
-		return ErrMessageIsNil
+		return errs.ErrMessageIsNil
 	}
 	// 使用 IMessageValidator 接口验证消息
 	if validator, ok := message.(iface.IMessageValidator); ok {
 		if err := validator.Validate(); err != nil {
-			return ErrInvalidMessage(err)
+			return errs.ErrInvalidMessage(err)
 		}
 	}
 	return nil
@@ -76,7 +77,7 @@ func (p *Process) PushTask(task iface.Task) error {
 // PushTaskAndWait 推送任务并等待执行完成（同步执行）
 func (p *Process) PushTaskAndWait(timeout time.Duration, task iface.Task) error {
 	if task == nil {
-		return ErrTaskIsNil
+		return errs.ErrTaskIsNil
 	}
 	if err := p.checkShutdown(); err != nil {
 		return err
@@ -89,7 +90,7 @@ func (p *Process) PushTaskAndWait(timeout time.Duration, task iface.Task) error 
 // 用于确保退出任务等关键任务能够执行
 func (p *Process) pushTaskAndWait(timeout time.Duration, task iface.Task) error {
 	if task == nil {
-		return ErrTaskIsNil
+		return errs.ErrTaskIsNil
 	}
 
 	waiter := newChanWaiter[error](timeout)

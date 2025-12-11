@@ -1,4 +1,4 @@
-package node
+package component
 
 import (
 	"context"
@@ -11,24 +11,44 @@ import (
 	"go.uber.org/zap"
 )
 
+type BaseComponent struct {
+}
+
+func (*BaseComponent) Start(ctx context.Context) errs {
+	return nil
+}
+func (*BaseComponent) Stop(ctx context.Context) errs {
+	return nil
+}
+
+// Component 组件接口，所有需要管理生命周期的组件都应实现此接口
+type Component interface {
+	// Start 启动组件
+	Start(ctx context.Context, node iface.INode) errs
+	// Stop 停止组件，ctx 用于控制超时
+	Stop(ctx context.Context) errs
+	// Name 返回组件名称，用于日志和错误报告
+	Name() string
+}
+
 // Manager 生命周期管理器
 type Manager struct {
-	components []iface.IComponent
+	components []Component
 	mu         sync.RWMutex
 	started    bool
 	stopped    bool
 	stopOnce   sync.Once
 }
 
-// NewComponentsMgr 创建新的生命周期管理器
-func NewComponentsMgr() *Manager {
+// New 创建新的生命周期管理器
+func New() *Manager {
 	return &Manager{
-		components: make([]iface.IComponent, 0),
+		components: make([]Component, 0),
 	}
 }
 
 // Register 注册组件，按注册顺序启动，按逆序停止
-func (m *Manager) Register(component iface.IComponent) error {
+func (m *Manager) Register(component Component) errs {
 	if component == nil {
 		return errs.ErrComponentCannotBeNil()
 	}
@@ -57,7 +77,7 @@ func (m *Manager) Register(component iface.IComponent) error {
 
 // Start 启动所有已注册的组件
 // 按注册顺序依次启动，如果某个组件启动失败，会停止已启动的组件
-func (m *Manager) Start(ctx context.Context, node iface.INode) error {
+func (m *Manager) Start(ctx context.Context, node iface.INode) errs {
 	m.mu.Lock()
 	if m.started {
 		m.mu.Unlock()
@@ -71,7 +91,7 @@ func (m *Manager) Start(ctx context.Context, node iface.INode) error {
 
 	glog.Info("组件: 正在启动组件", zap.Int("count", len(m.components)))
 
-	var started []iface.IComponent
+	var started []Component
 	for i, component := range m.components {
 		glog.Info("组件: 正在启动组件", zap.String("component", component.Name()), zap.Int("current", i+1), zap.Int("total", len(m.components)))
 
@@ -96,8 +116,8 @@ func (m *Manager) Start(ctx context.Context, node iface.INode) error {
 
 // Stop 停止所有已注册的组件
 // 按注册顺序的逆序依次停止，确保依赖关系正确
-func (m *Manager) Stop(ctx context.Context) error {
-	var err error
+func (m *Manager) Stop(ctx context.Context) errs {
+	var err errs
 	m.stopOnce.Do(func() {
 		m.mu.Lock()
 		if !m.started {
@@ -109,7 +129,7 @@ func (m *Manager) Stop(ctx context.Context) error {
 			return
 		}
 		m.stopped = true
-		components := make([]iface.IComponent, len(m.components))
+		components := make([]Component, len(m.components))
 		copy(components, m.components)
 		m.mu.Unlock()
 
@@ -121,8 +141,8 @@ func (m *Manager) Stop(ctx context.Context) error {
 }
 
 // stopComponents 停止组件列表（逆序）
-func (m *Manager) stopComponents(ctx context.Context, components []iface.IComponent, isRollback bool) error {
-	var lastErr error
+func (m *Manager) stopComponents(ctx context.Context, components []Component, isRollback bool) errs {
+	var lastErr errs
 	stopType := "正在停止"
 	if isRollback {
 		stopType = "正在回滚"
@@ -153,7 +173,7 @@ func (m *Manager) stopComponents(ctx context.Context, components []iface.ICompon
 }
 
 // StopWithTimeout 使用超时停止所有组件
-func (m *Manager) StopWithTimeout(timeout time.Duration) error {
+func (m *Manager) StopWithTimeout(timeout time.Duration) errs {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 

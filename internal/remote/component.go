@@ -2,7 +2,7 @@ package remote
 
 import (
 	"context"
-	"fmt"
+	"gas/internal/errs"
 	"gas/internal/iface"
 	discoveryFactory "gas/pkg/discovery"
 	messageQueFactory "gas/pkg/messageQue"
@@ -31,13 +31,13 @@ func (r *Component) Start(ctx context.Context, node iface.INode) error {
 	// 创建服务发现实例
 	discoveryInstance, err := discoveryFactory.NewFromConfig(config.Cluster.Discovery)
 	if err != nil {
-		return fmt.Errorf("create discovery failed: %w", err)
+		return errs.ErrCreateDiscoveryFailed(err)
 	}
 
 	// 创建远程通信管理器
 	messageQueue, err := messageQueFactory.NewFromConfig(config.Cluster.MessageQueue)
 	if err != nil {
-		return fmt.Errorf("create message queue failed: %w", err)
+		return errs.ErrCreateMessageQueueFailed(err)
 	}
 
 	r.remote = &Remote{

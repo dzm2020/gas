@@ -1,7 +1,7 @@
 package iface
 
 import (
-	"errors"
+	"gas/internal/errs"
 	"gas/pkg/lib"
 )
 
@@ -26,10 +26,10 @@ type TaskMessage struct {
 // Validate 验证任务消息是否合法
 func (m *TaskMessage) Validate() error {
 	if m == nil {
-		return errors.New("task message is nil")
+		return errs.ErrTaskMessageIsNil
 	}
 	if m.Task == nil {
-		return errors.New("task is nil")
+		return errs.ErrTaskIsNilInMsg
 	}
 	return nil
 }
@@ -50,15 +50,15 @@ func (m *Message) Response(data []byte, err error) {
 // Validate 验证消息内容是否合法
 func (m *Message) Validate() error {
 	if m == nil {
-		return errors.New("message is nil")
+		return errs.ErrMessageIsNilInMsg
 	}
 	// 验证目标进程
 	if m.GetTo() == nil {
-		return errors.New("message target (To) is nil")
+		return errs.ErrMessageTargetIsNil
 	}
 	// 验证目标进程 ID 是否有效
 	if m.GetTo().GetServiceId() == 0 && m.GetTo().GetName() == "" {
-		return errors.New("message target (To) is invalid: both serviceId and name are empty")
+		return errs.ErrMessageTargetInvalid
 	}
 	return nil
 }
@@ -71,10 +71,10 @@ type SyncMessage struct {
 // Validate 验证同步消息是否合法
 func (m *SyncMessage) Validate() error {
 	if m == nil {
-		return errors.New("sync message is nil")
+		return errs.ErrSyncMessageIsNil
 	}
 	if m.Message == nil {
-		return errors.New("sync message inner message is nil")
+		return errs.ErrSyncMessageInnerIsNil
 	}
 	// 验证内部消息
 	if err := m.Message.Validate(); err != nil {
@@ -82,7 +82,7 @@ func (m *SyncMessage) Validate() error {
 	}
 	// 同步消息必须设置响应回调
 	if m.response == nil {
-		return errors.New("sync message response callback is nil")
+		return errs.ErrSyncMessageResponseCallbackIsNil
 	}
 	return nil
 }

@@ -1,6 +1,7 @@
 package actor
 
 import (
+	"gas/internal/errs"
 	"gas/internal/iface"
 	"gas/pkg/lib/glog"
 	"reflect"
@@ -23,11 +24,11 @@ const (
 )
 
 type routerEntry struct {
-	handlerType  handlerType
-	handler      reflect.Value
-	requestType  reflect.Type // 请求类型（可能是[]byte或指针类型）
-	responseType reflect.Type // 响应类型（仅同步消息使用，指针类型）
-	isByteRequest bool        // request是否为[]byte类型
+	handlerType   handlerType
+	handler       reflect.Value
+	requestType   reflect.Type // 请求类型（可能是[]byte或指针类型）
+	responseType  reflect.Type // 响应类型（仅同步消息使用，指针类型）
+	isByteRequest bool         // request是否为[]byte类型
 }
 
 func NewRouter() iface.IRouter {
@@ -105,7 +106,7 @@ func (r *Router) parseHandler(handlerValue reflect.Value, handlerFuncType reflec
 	case 3:
 		return r.parseThreeParamHandler(handlerFuncType, entry)
 	default:
-		return entry, ErrUnsupportedParameterCount(numIn)
+		return entry, errs.ErrUnsupportedParameterCount(numIn)
 	}
 }
 
@@ -123,16 +124,16 @@ func (r *Router) parseTwoParamHandler(handlerFuncType reflect.Type, entry router
 		entry.isByteRequest = false
 		entry.requestType = requestType
 	} else {
-		return entry, ErrAsyncHandlerSecondParameter(requestType.String())
+		return entry, errs.ErrAsyncHandlerSecondParameter(requestType.String())
 	}
 
 	// 检查返回值：必须返回error
 	numOut := handlerFuncType.NumOut()
 	if numOut != 1 {
-		return entry, ErrHandlerReturnCount(numOut)
+		return entry, errs.ErrHandlerReturnCount(numOut)
 	}
 	if !handlerFuncType.Out(0).Implements(typeOfError) {
-		return entry, ErrHandlerReturnType()
+		return entry, errs.ErrHandlerReturnType()
 	}
 
 	return entry, nil
@@ -154,7 +155,7 @@ func (r *Router) parseThreeParamHandler(handlerFuncType reflect.Type, entry rout
 			entry.isByteRequest = false
 			entry.requestType = requestType
 		} else {
-			return entry, ErrClientHandlerThirdParameter(requestType.String())
+			return entry, errs.ErrClientHandlerThirdParameter(requestType.String())
 		}
 	} else {
 		// 同步消息: (ctx, request, response) error
@@ -168,13 +169,13 @@ func (r *Router) parseThreeParamHandler(handlerFuncType reflect.Type, entry rout
 			entry.isByteRequest = false
 			entry.requestType = requestType
 		} else {
-			return entry, ErrSyncHandlerSecondParameter(requestType.String())
+			return entry, errs.ErrSyncHandlerSecondParameter(requestType.String())
 		}
 
 		responseType := handlerFuncType.In(2)
 		// response必须是指针类型
 		if responseType.Kind() != reflect.Pointer {
-			return entry, ErrSyncHandlerThirdParameter(responseType.String())
+			return entry, errs.ErrSyncHandlerThirdParameter(responseType.String())
 		}
 		entry.responseType = responseType
 	}
@@ -182,10 +183,10 @@ func (r *Router) parseThreeParamHandler(handlerFuncType reflect.Type, entry rout
 	// 检查返回值：必须返回error
 	numOut := handlerFuncType.NumOut()
 	if numOut != 1 {
-		return entry, ErrHandlerReturnCount(numOut)
+		return entry, errs.ErrHandlerReturnCount(numOut)
 	}
 	if !handlerFuncType.Out(0).Implements(typeOfError) {
-		return entry, ErrHandlerReturnType()
+		return entry, errs.ErrHandlerReturnType()
 	}
 
 	return entry, nil
@@ -197,7 +198,7 @@ func (r *Router) Handle(ctx iface.IContext, msgId int64, session iface.ISession,
 	r.mu.RUnlock()
 
 	if !ok {
-		return nil, ErrMessageHandlerNotFound
+		return nil, errs.ErrMessageHandlerNotFound
 	}
 
 	args := []reflect.Value{reflect.ValueOf(ctx)}
@@ -210,7 +211,7 @@ func (r *Router) Handle(ctx iface.IContext, msgId int64, session iface.ISession,
 	case handlerTypeAsync:
 		return r.handleAsyncMessage(ctx, msgId, data, entry, args)
 	default:
-		return nil, ErrUnknownHandlerType(msgId)
+		return nil, errs.ErrUnknownHandlerType(msgId)
 	}
 }
 
@@ -218,13 +219,13 @@ func (r *Router) Handle(ctx iface.IContext, msgId int64, session iface.ISession,
 // 签名: (ctx iface.IContext, session iface.ISession, request) error
 func (r *Router) handleClientMessage(ctx iface.IContext, msgId int64, session iface.ISession, data []byte, entry routerEntry, args []reflect.Value) ([]byte, error) {
 	if session == nil {
-		return nil, ErrSessionIsNil(msgId)
+		return nil, errs.ErrSessionIsNil(msgId)
 	}
 	args = append(args, reflect.ValueOf(session))
 
 	requestValue, err := r.createRequestValue(entry.requestType, entry.isByteRequest, data, ctx)
 	if err != nil {
-		return nil, ErrUnmarshalRequest(msgId, err)
+		return nil, errs.ErrUnmarshalRequest(msgId, err)
 	}
 	args = append(args, requestValue)
 
@@ -236,7 +237,7 @@ func (r *Router) handleClientMessage(ctx iface.IContext, msgId int64, session if
 func (r *Router) handleSyncMessage(ctx iface.IContext, msgId int64, data []byte, entry routerEntry, args []reflect.Value) ([]byte, error) {
 	requestValue, err := r.createRequestValue(entry.requestType, entry.isByteRequest, data, ctx)
 	if err != nil {
-		return nil, ErrUnmarshalRequest(msgId, err)
+		return nil, errs.ErrUnmarshalRequest(msgId, err)
 	}
 	args = append(args, requestValue)
 
@@ -249,7 +250,7 @@ func (r *Router) handleSyncMessage(ctx iface.IContext, msgId int64, data []byte,
 
 	responseData, err := iface.Marshal(ctx.GetSerializer(), responseValue.Interface())
 	if err != nil {
-		return nil, ErrMarshalResponse(msgId, err)
+		return nil, errs.ErrMarshalResponse(msgId, err)
 	}
 	return responseData, nil
 }
@@ -259,7 +260,7 @@ func (r *Router) handleSyncMessage(ctx iface.IContext, msgId int64, data []byte,
 func (r *Router) handleAsyncMessage(ctx iface.IContext, msgId int64, data []byte, entry routerEntry, args []reflect.Value) ([]byte, error) {
 	requestValue, err := r.createRequestValue(entry.requestType, entry.isByteRequest, data, ctx)
 	if err != nil {
-		return nil, ErrUnmarshalRequest(msgId, err)
+		return nil, errs.ErrUnmarshalRequest(msgId, err)
 	}
 	args = append(args, requestValue)
 
@@ -297,7 +298,7 @@ func (r *Router) createRequestValue(requestType reflect.Type, isByteRequest bool
 	// 其他类型（指针类型）需要反序列化
 	requestValue := reflect.New(requestType.Elem())
 	if err := iface.Unmarshal(ctx.GetSerializer(), data, requestValue.Interface()); err != nil {
-		return reflect.Value{}, ErrUnmarshalFailed(err)
+		return reflect.Value{}, errs.ErrUnmarshalFailed(err)
 	}
 	return requestValue, nil
 }

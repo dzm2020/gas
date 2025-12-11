@@ -4,6 +4,7 @@ package actor
 import (
 	"errors"
 	"fmt"
+	"gas/internal/errs"
 	"gas/internal/iface"
 	"gas/pkg/lib"
 	"gas/pkg/lib/glog"
@@ -81,7 +82,7 @@ func (a *actorContext) invokerMessage(msg interface{}) error {
 	case *iface.SyncMessage:
 		return a.handleSyncMessage(m)
 	default:
-		return ErrUnsupportedMessageType(fmt.Sprintf("%T", msg))
+		return errs.ErrUnsupportedMessageType(fmt.Sprintf("%T", msg))
 	}
 }
 
@@ -111,7 +112,7 @@ func (a *actorContext) handleSyncMessage(m *iface.SyncMessage) error {
 
 func (a *actorContext) execHandler(msg *iface.Message) ([]byte, error) {
 	if msg == nil {
-		return nil, ErrMsgIsNil()
+		return nil, errs.ErrMsgIsNil()
 	}
 	session := msg.GetSession()
 	wrapSession := iface.NewSession(a, session)

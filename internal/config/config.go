@@ -2,7 +2,7 @@ package config
 
 import (
 	"encoding/json"
-	"fmt"
+	"gas/internal/errs"
 	discoveryConfig "gas/pkg/discovery"
 	consulConfig "gas/pkg/discovery/provider/consul"
 	"gas/pkg/lib"
@@ -41,11 +41,11 @@ type Config struct {
 func Load(profileFilePath string) (*Config, error) {
 	data, err := os.ReadFile(profileFilePath)
 	if err != nil {
-		return nil, fmt.Errorf("read config file failed: %w", err)
+		return nil, errs.ErrReadConfigFileFailed(err)
 	}
 	var config = Default()
 	if err = lib.Json.Unmarshal(data, config); err != nil {
-		return nil, fmt.Errorf("unmarshal config failed: %w", err)
+		return nil, errs.ErrUnmarshalConfigFailed(err)
 	}
 	return config, nil
 }

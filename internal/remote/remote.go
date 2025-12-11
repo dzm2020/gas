@@ -2,6 +2,7 @@ package remote
 
 import (
 	"fmt"
+	"gas/internal/errs"
 	"gas/internal/iface"
 	discovery "gas/pkg/discovery/iface"
 	"gas/pkg/lib"
@@ -58,7 +59,7 @@ func (r *Remote) subscribe(nodeId uint64) error {
 	nodeSubject := fmt.Sprintf("%s%d", r.nodeSubjectPrefix, nodeId)
 	_, err := r.messageQue.Subscribe(nodeSubject, handler)
 	if err != nil {
-		return fmt.Errorf("subscribe to game-node %d failed: %w", nodeId, err)
+		return errs.ErrSubscribeToNodeFailed(nodeId, err)
 	}
 
 	return nil
@@ -117,11 +118,11 @@ func (r *Remote) Send(message *iface.Message) error {
 	toNodeId := message.To.GetNodeId()
 	data, err := r.serializer.Marshal(message)
 	if err != nil {
-		return fmt.Errorf("marshal message failed: %w", err)
+		return errs.ErrMarshalMessageFailed(err)
 	}
 	subject := fmt.Sprintf("%s%d", r.nodeSubjectPrefix, toNodeId)
 	if err := r.messageQue.Publish(subject, data); err != nil {
-		return fmt.Errorf("publish to remote game-node %d failed: %w", toNodeId, err)
+		return errs.ErrPublishToRemoteNodeFailed(toNodeId, err)
 	}
 	return nil
 }
@@ -177,7 +178,7 @@ func (r *Remote) Select(service string, strategy iface.RouteStrategy) (*iface.Pi
 	// 通过服务发现获取节点列表
 	nodes := r.discovery.GetAll()
 	if len(nodes) == 0 {
-		return nil, fmt.Errorf("no nodes found for service: %s", service)
+		return nil, errs.ErrNoNodesFoundForService(service)
 	}
 
 	var _nodes []*discovery.Node
@@ -191,7 +192,7 @@ func (r *Remote) Select(service string, strategy iface.RouteStrategy) (*iface.Pi
 	// 使用路由策略选择节点
 	selectedNode := strategy(_nodes)
 	if selectedNode == nil {
-		return nil, fmt.Errorf("route strategy returned nil node for service: %s", service)
+		return nil, errs.ErrRouteStrategyReturnedNilNode(service)
 	}
 
 	// 设置消息的目标节点ID
@@ -206,7 +207,7 @@ func (r *Remote) Broadcast(service string, message *iface.Message) error {
 	// 通过服务发现获取节点列表
 	nodes := r.discovery.GetService(service)
 	if len(nodes) == 0 {
-		return fmt.Errorf("no nodes found for service: %s", service)
+		return errs.ErrNoNodesFoundForService(service)
 	}
 
 	var lastErr error

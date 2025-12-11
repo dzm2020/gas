@@ -1,9 +1,11 @@
-package actor
+package errs
 
 import (
 	"errors"
 	"fmt"
 )
+
+// ========== Actor 相关错误 ==========
 
 // 路由相关错误
 var (
@@ -48,6 +50,7 @@ var (
 )
 
 // 路由注册相关错误构造函数
+
 func ErrHandlerIsNil() error {
 	return fmt.Errorf("actor: handler is nil")
 }
@@ -117,6 +120,7 @@ func ErrUnmarshalFailed(err error) error {
 }
 
 // 系统相关错误构造函数
+
 func ErrNameCannotBeEmpty() error {
 	return fmt.Errorf("name cannot be empty")
 }
@@ -146,6 +150,7 @@ func ErrNameChangeNotAllowed() error {
 }
 
 // 上下文相关错误构造函数
+
 func ErrUnsupportedMessageType(msgType string) error {
 	return fmt.Errorf("unsupported message type: %s", msgType)
 }
@@ -164,4 +169,122 @@ func ErrUnmarshalReplyFailed(err error) error {
 
 func ErrInvalidMessage(err error) error {
 	return fmt.Errorf("invalid message: %w", err)
+}
+
+// ========== Gate 相关错误 ==========
+
+var (
+	ErrAgentFactoryNil       = errors.New("gate: agent factory is nil")
+	ErrAgentNoBindConnection = errors.New("no bind connection")
+	ErrInvalidMessageType    = errors.New("gate: invalid message type")
+)
+
+// ========== Component 相关错误 ==========
+
+func ErrComponentCannotBeNil() error {
+	return fmt.Errorf("component cannot be nil")
+}
+
+func ErrComponentNameCannotBeEmpty() error {
+	return fmt.Errorf("component name cannot be empty")
+}
+
+func ErrCannotRegisterComponentAfterStarted() error {
+	return fmt.Errorf("cannot register component after manager has started")
+}
+
+func ErrComponentAlreadyRegistered(name string) error {
+	return fmt.Errorf("component with name '%s' already registered", name)
+}
+
+func ErrManagerAlreadyStarted() error {
+	return fmt.Errorf("manager has already been started")
+}
+
+func ErrManagerStoppedCannotRestart() error {
+	return fmt.Errorf("manager has been stopped and cannot be restarted")
+}
+
+func ErrFailedToStartComponent(name string, err error) error {
+	return fmt.Errorf("failed to start component '%s': %w", name, err)
+}
+
+// ========== Config 相关错误 ==========
+
+func ErrReadConfigFileFailed(err error) error {
+	return fmt.Errorf("read config file failed: %w", err)
+}
+
+func ErrUnmarshalConfigFailed(err error) error {
+	return fmt.Errorf("unmarshal config failed: %w", err)
+}
+
+// ========== Remote 相关错误 ==========
+
+func ErrSubscribeToNodeFailed(nodeId uint64, err error) error {
+	return fmt.Errorf("subscribe to game-node %d failed: %w", nodeId, err)
+}
+
+func ErrMarshalMessageFailed(err error) error {
+	return fmt.Errorf("marshal message failed: %w", err)
+}
+
+func ErrPublishToRemoteNodeFailed(toNodeId uint64, err error) error {
+	return fmt.Errorf("publish to remote game-node %d failed: %w", toNodeId, err)
+}
+
+func ErrNoNodesFoundForService(service string) error {
+	return fmt.Errorf("no nodes found for service: %s", service)
+}
+
+func ErrRouteStrategyReturnedNilNode(service string) error {
+	return fmt.Errorf("route strategy returned nil node for service: %s", service)
+}
+
+func ErrCreateDiscoveryFailed(err error) error {
+	return fmt.Errorf("create discovery failed: %w", err)
+}
+
+func ErrCreateMessageQueueFailed(err error) error {
+	return fmt.Errorf("create message queue failed: %w", err)
+}
+
+// ========== Node 相关错误 ==========
+
+func ErrRegisterComponentFailed(name string, err error) error {
+	return fmt.Errorf("注册组件失败 name:%v err:%v", name, err)
+}
+
+func ErrStartComponentFailed(err error) error {
+	return fmt.Errorf("启动组件失败 err:%w", err)
+}
+
+// ========== Codec 相关错误 ==========
+
+func ErrInvalidCodecMessageType() error {
+	return fmt.Errorf("invalid message type")
+}
+
+// ========== Message 相关错误 ==========
+var (
+	ErrTaskMessageIsNil                 = errors.New("task message is nil")
+	ErrTaskIsNilInMsg                   = errors.New("task is nil")
+	ErrMessageIsNilInMsg                = errors.New("message is nil")
+	ErrMessageTargetIsNil               = errors.New("message target (To) is nil")
+	ErrMessageTargetInvalid             = errors.New("message target (To) is invalid: both serviceId and name are empty")
+	ErrSyncMessageIsNil                 = errors.New("sync message is nil")
+	ErrSyncMessageInnerIsNil            = errors.New("sync message inner message is nil")
+	ErrSyncMessageResponseCallbackIsNil = errors.New("sync message response callback is nil")
+)
+
+// ========== Session 相关错误 ==========
+
+var (
+	ErrNoMessageToForwardInSession = errors.New("no message to forward")
+)
+
+// ========== System 相关错误 ==========
+
+func ErrMessageIsNilInSystem() error {
+	return fmt.Errorf("message is nil")
 }

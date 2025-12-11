@@ -2,9 +2,9 @@ package node
 
 import (
 	"context"
-	"fmt"
 	"gas/internal/actor"
 	"gas/internal/config"
+	"gas/internal/errs"
 	"gas/internal/iface"
 	"gas/internal/remote"
 	"gas/pkg/lib"
@@ -118,14 +118,14 @@ func (m *Node) StarUp(comps ...iface.IComponent) error {
 
 	for _, com := range components {
 		if err := m.componentManager.Register(com); err != nil {
-			return fmt.Errorf("注册组件失败 name:%v err:%v", com.Name(), err)
+			return errs.ErrRegisterComponentFailed(com.Name(), err)
 		}
 	}
 
 	// 启动所有组件
 	ctx := context.Background()
 	if err := m.componentManager.Start(ctx, m); err != nil {
-		return fmt.Errorf("启动组件失败 err:%w", err)
+		return errs.ErrStartComponentFailed(err)
 	}
 
 	glog.Info("节点启动完成")
@@ -151,10 +151,10 @@ func (m *Node) shutdown(ctx context.Context) error {
 
 	glog.Info("节点开始停止运行")
 
-	// 停止所有组件（按逆序停止：subscription -> messageQue -> discovery -> actor）
+	// 停止所有组件(按逆序停止)
 	if m.componentManager != nil {
 		if err := m.componentManager.Stop(ctx); err != nil {
-			glog.Errorf("game-node: stop components failed: %v", err)
+			return err
 		}
 	}
 

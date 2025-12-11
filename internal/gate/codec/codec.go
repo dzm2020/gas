@@ -2,7 +2,7 @@ package codec
 
 import (
 	"encoding/binary"
-	"fmt"
+	errd "gas/internal/errs"
 	"gas/internal/gate/protocol"
 )
 
@@ -16,7 +16,7 @@ type Codec struct {
 func (*Codec) Encode(message interface{}) ([]byte, error) {
 	msg, ok := message.(*protocol.Message)
 	if !ok {
-		return nil, fmt.Errorf("invalid message type")
+		return nil, errd.ErrInvalidCodecMessageType()
 	}
 	msg.Len = uint32(len(msg.Data))
 	buf := make([]byte, protocol.HeadLen+len(msg.Data))

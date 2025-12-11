@@ -1,6 +1,7 @@
 package actor
 
 import (
+	"gas/internal/errs"
 	"gas/internal/iface"
 
 	"github.com/duke-git/lancet/v2/maputil"
@@ -39,23 +40,23 @@ func (m *Manager) Add(pid *iface.Pid, process iface.IProcess) {
 
 func (m *Manager) RegisterName(pid *iface.Pid, process iface.IProcess, name string, isGlobal bool) error {
 	if len(name) == 0 {
-		return ErrNameCannotBeEmpty()
+		return errs.ErrNameCannotBeEmpty()
 	}
 
 	// 检查1: 如果进程已经有名字
 	if pid.Name != "" {
-		return ErrNameChangeNotAllowed()
+		return errs.ErrNameChangeNotAllowed()
 	}
 
 	// 检查2: 名字是否已被其他进程注册
 	if m.HasName(name) {
-		return ErrNameAlreadyRegistered(name)
+		return errs.ErrNameAlreadyRegistered(name)
 	}
 
 	// 如果是全局注册，还需要在远程注册
 	if isGlobal {
 		if err := m.registerGlobalName(name); err != nil {
-			return ErrRemoteRegistryNameFailed(err)
+			return errs.ErrRemoteRegistryNameFailed(err)
 		}
 		// 记录全局注册的名字
 		m.globalNames.Set(name, true)
@@ -73,11 +74,11 @@ func (m *Manager) RegisterName(pid *iface.Pid, process iface.IProcess, name stri
 // registerGlobalName 在远程注册全局名字
 func (m *Manager) registerGlobalName(name string) error {
 	if m.node == nil {
-		return ErrNodeNotInitialized()
+		return errs.ErrNodeNotInitialized()
 	}
 	remote := m.node.GetRemote()
 	if remote == nil {
-		return ErrRemoteNotInitialized()
+		return errs.ErrRemoteNotInitialized()
 	}
 	return remote.RegistryName(name)
 }

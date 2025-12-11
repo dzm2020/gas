@@ -2,7 +2,7 @@
 package actor
 
 import (
-	"fmt"
+	"gas/internal/errs"
 	"gas/internal/iface"
 	"gas/pkg/lib"
 	"sync/atomic"
@@ -85,7 +85,7 @@ func (s *System) getProcessChecked(pid *iface.Pid) (iface.IProcess, error) {
 	}
 	process := s.GetProcess(pid)
 	if process == nil {
-		return nil, ErrProcessNotFound
+		return nil, errs.ErrProcessNotFound
 	}
 	return process, nil
 }
@@ -93,7 +93,7 @@ func (s *System) getProcessChecked(pid *iface.Pid) (iface.IProcess, error) {
 // checkShuttingDown 检查系统是否正在关闭
 func (s *System) checkShuttingDown() error {
 	if s.shuttingDown.Load() {
-		return ErrSystemShuttingDown
+		return errs.ErrSystemShuttingDown
 	}
 	return nil
 }
@@ -102,11 +102,11 @@ func (s *System) checkShuttingDown() error {
 func (s *System) getRemote() (iface.IRemote, error) {
 	node := s.GetNode()
 	if node == nil {
-		return nil, ErrNodeIsNil
+		return nil, errs.ErrNodeIsNil
 	}
 	remote := node.GetRemote()
 	if remote == nil {
-		return nil, ErrRemoteIsNil
+		return nil, errs.ErrRemoteIsNil
 	}
 	return remote, nil
 }
@@ -129,7 +129,7 @@ func (s *System) Send(message *iface.Message) error {
 		return err
 	}
 	if message == nil {
-		return fmt.Errorf("message is nil")
+		return errs.ErrMessageIsNilInSystem()
 	}
 	to := message.GetTo()
 	if s.isLocalPid(to) {

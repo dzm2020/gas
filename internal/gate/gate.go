@@ -2,16 +2,11 @@ package gate
 
 import (
 	"context"
-	"errors"
+	"gas/internal/errs"
 	"gas/internal/gate/codec"
 	"gas/internal/gate/protocol"
 	"gas/internal/iface"
 	"gas/pkg/network"
-)
-
-var (
-	ErrAgentFactoryNil       = errors.New("gate: agent factory is nil")
-	ErrAgentNoBindConnection = errors.New("no bind connection")
 )
 
 type Gate struct {
@@ -42,7 +37,7 @@ func (m *Gate) Start(ctx context.Context, node iface.INode) error {
 func (m *Gate) OnConnect(entity network.IConnection) (err error) {
 	factory := m.Factory
 	if factory == nil {
-		return ErrAgentFactoryNil
+		return errs.ErrAgentFactoryNil
 	}
 
 	system := m.node.GetActorSystem()
@@ -61,14 +56,14 @@ func (m *Gate) OnConnect(entity network.IConnection) (err error) {
 func (m *Gate) OnMessage(entity network.IConnection, msg interface{}) error {
 	pid, _ := entity.Context().(*iface.Pid)
 	if pid == nil {
-		return ErrAgentNoBindConnection
+		return errs.ErrAgentNoBindConnection
 	}
 	system := m.node.GetActorSystem()
 
 	//  将网关消息转为内容消息
 	protocolMsg, ok := msg.(*protocol.Message)
 	if !ok {
-		return errors.New("gate: invalid message type")
+		return errs.ErrInvalidMessageType
 	}
 
 	// 转换为 iface.Message
@@ -89,7 +84,7 @@ func (m *Gate) OnMessage(entity network.IConnection, msg interface{}) error {
 func (m *Gate) OnClose(entity network.IConnection, wrong error) error {
 	pid, _ := entity.Context().(*iface.Pid)
 	if pid == nil {
-		return ErrAgentNoBindConnection
+		return errs.ErrAgentNoBindConnection
 	}
 
 	system := m.node.GetActorSystem()

@@ -1,6 +1,6 @@
 package iface
 
-import "errors"
+import "gas/internal/errs"
 
 const (
 	MsgIdPushMessageToClient   = -1
@@ -49,7 +49,7 @@ func (a *WrapSession) ResponseCode(code int64) error {
 func (a *WrapSession) Forward(toPid *Pid) error {
 	msg := a.ctx.Message()
 	if msg == nil {
-		return errors.New("no message to forward")
+		return errs.ErrNoMessageToForwardInSession
 	}
 	msg.To = toPid
 	msg.From = a.ctx.ID()
