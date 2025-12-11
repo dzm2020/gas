@@ -2,10 +2,9 @@ package network
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"gas/pkg/glog"
 	"gas/pkg/lib"
+	"gas/pkg/lib/glog"
 	"net"
 	"sync/atomic"
 
@@ -32,14 +31,16 @@ func NewTCPServer(proto, addr string, option ...Option) *TCPServer {
 
 func (s *TCPServer) Start() error {
 	if !s.running.CompareAndSwap(false, true) {
-		return errors.New("tcp server already running")
+		return ErrTCPServerAlreadyRunning
 	}
 	var err error
 	if s.listener, err = net.Listen(s.proto, s.addr); err != nil {
+		glog.Error("TCP服务器监听失败", zap.String("proto", s.proto),
+			zap.String("addr", s.addr), zap.Error(err))
 		return err
 	}
 
-	glog.Info("tcp server listening start", zap.String("proto", s.proto), zap.String("addr", s.addr))
+	glog.Info("TCP服务器启动监听", zap.String("proto", s.proto), zap.String("addr", s.addr))
 
 	lib.Go(func(ctx context.Context) {
 		s.acceptLoop(ctx)
@@ -48,7 +49,7 @@ func (s *TCPServer) Start() error {
 }
 
 func (s *TCPServer) acceptLoop(ctx context.Context) {
-	defer glog.Info("tcp server listening end", zap.String("proto", s.proto), zap.String("addr", s.addr))
+	defer glog.Info("TCP服务器退出监听", zap.String("proto", s.proto), zap.String("addr", s.addr))
 
 	for {
 		select {
@@ -68,6 +69,7 @@ func (s *TCPServer) accept() bool {
 	}
 	conn, err := s.listener.Accept()
 	if err != nil {
+		glog.Error("TCP服务器ACCEPT失败", zap.String("proto", s.proto), zap.String("addr", s.addr), zap.Error(err))
 		return false
 	}
 	_ = newTCPConnection(conn, Accept, s.options)
@@ -80,11 +82,12 @@ func (s *TCPServer) Addr() string {
 
 func (s *TCPServer) Stop() error {
 	if !s.running.CompareAndSwap(true, false) {
-		return errors.New("tcp server not running")
+		return ErrTCPServerNotRunning
 	}
 
 	if s.listener != nil {
 		_ = s.listener.Close()
 	}
+	glog.Info("TCP服务器关闭", zap.String("proto", s.proto), zap.String("addr", s.addr))
 	return nil
 }

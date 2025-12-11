@@ -11,7 +11,7 @@ const Topic = "topic1"
 
 func TestMessageQue(t *testing.T) {
 
-	client, err := nats.New([]string{"127.0.0.1:4222"})
+	client, err := nats.New([]string{"127.0.0.1:4222"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

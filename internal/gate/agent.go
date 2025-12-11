@@ -3,7 +3,7 @@ package gate
 import (
 	"gas/internal/gate/protocol"
 	"gas/internal/iface"
-	"gas/pkg/glog"
+	"gas/pkg/lib/glog"
 	"gas/pkg/network"
 )
 

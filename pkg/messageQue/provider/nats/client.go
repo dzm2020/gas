@@ -2,27 +2,35 @@ package nats
 
 import (
 	"fmt"
+	"gas/pkg/lib/glog"
 	"gas/pkg/messageQue/iface"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/nats-io/nats.go"
+	"go.uber.org/zap"
 )
 
 // New 创建 NATS 集群通信实例
-func New(servers []string, opts ...Option) (*Client, error) {
-	options := loadOptions(opts...)
-	natsOpts := buildNatsOptions(options)
+// 如果 cfg 为 nil，将使用默认配置
+// 配置会自动解析并合并默认值
+func New(servers []string, cfg *Config) (*Client, error) {
+	if cfg == nil {
+		cfg = defaultConfig()
+	}
+	natsOpts := buildNatsOptions(cfg)
 	// 连接 NATS 集群
 	client, err := nats.Connect(strings.Join(servers, ","), natsOpts...)
 	if err != nil {
+		glog.Error("NATS连接失败", zap.Strings("servers", servers), zap.Error(err))
 		return nil, err
 	}
 	if client.Status() != nats.CONNECTED {
+		glog.Error("NATS连接失败", zap.Strings("servers", servers), zap.Error(err))
 		return nil, fmt.Errorf("nats connect failed: %s", client.Status().String())
 	}
-
+	glog.Info("NATS连接成功", zap.Strings("servers", servers))
 	return &Client{
 		conn:          client,
 		subscriptions: make(map[iface.ISubscription]struct{}),
@@ -67,6 +75,7 @@ func (n *Client) Subscribe(subject string, handler iface.MsgHandler) (iface.ISub
 		handler(m.Data, replyFunc)
 	})
 	if err != nil {
+		glog.Error("NATS订阅主题失败", zap.String("subject", subject), zap.Error(err))
 		return nil, err
 	}
 	subscription := &Subscription{sub: sub}
@@ -75,6 +84,7 @@ func (n *Client) Subscribe(subject string, handler iface.MsgHandler) (iface.ISub
 	n.subscriptions[subscription] = struct{}{}
 	n.mu.Unlock()
 
+	glog.Info("NATS订阅主题成功", zap.String("subject", subject))
 	return subscription, nil
 }
 
@@ -82,8 +92,10 @@ func (n *Client) Subscribe(subject string, handler iface.MsgHandler) (iface.ISub
 func (n *Client) Request(subject string, data []byte, timeout time.Duration) ([]byte, error) {
 	reply, err := n.conn.Request(subject, data, timeout)
 	if err != nil {
+		glog.Error("NATS发送消息失败", zap.String("subject", subject), zap.Error(err))
 		return nil, err
 	}
+	glog.Debug("NATS发送消息", zap.String("subject", subject), zap.Error(err))
 	return reply.Data, nil
 }
 
@@ -107,6 +119,8 @@ func (n *Client) Close() error {
 	}
 
 	n.conn.Close()
+
+	glog.Info("NAT客户端关闭")
 	return nil
 }
 
@@ -118,6 +132,7 @@ type Subscription struct {
 
 // Unsubscribe 实现 Subscription 接口
 func (n *Subscription) Unsubscribe() error {
+	glog.Info("NAT取消订阅", zap.String("subject", n.sub.Subject))
 	n.c.removeSub(n)
 	return n.sub.Unsubscribe()
 }

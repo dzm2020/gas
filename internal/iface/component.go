@@ -3,7 +3,7 @@ package iface
 import (
 	"context"
 	"fmt"
-	"gas/pkg/glog"
+	"gas/pkg/lib/glog"
 	"sync"
 	"time"
 )

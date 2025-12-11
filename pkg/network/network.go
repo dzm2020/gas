@@ -1,7 +1,6 @@
 package network
 
 import (
-	"fmt"
 	"gas/pkg/lib"
 	"net"
 	"sync/atomic"
@@ -74,7 +73,7 @@ const (
 	defaultSendChanBuf = 1024
 	// 默认TCP读缓冲区大小
 	defaultTCPReadBuf = 4096
-	// UDP默认超时时间（无数据时自动关闭虚拟连接）
+	// 默认超时时间（无数据时自动关闭虚拟连接）
 	defaultKeepAlive = 5 * time.Second
 )
 
@@ -117,6 +116,6 @@ func NewServer(protoAddr string, option ...Option) (IServer, error) {
 	case "udp", "udp4", "udp6":
 		return NewUDPServer(proto, addr, option...), nil
 	default:
-		return nil, fmt.Errorf("proto: %s is not support", proto)
+		return nil, ErrUnsupportedProtocol(proto)
 	}
 }

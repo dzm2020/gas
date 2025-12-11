@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"gas/internal/iface"
-	"gas/pkg/glog"
+	"gas/pkg/lib/glog"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"

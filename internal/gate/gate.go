@@ -6,7 +6,7 @@ import (
 	"gas/internal/gate/codec"
 	"gas/internal/gate/protocol"
 	"gas/internal/iface"
-	"gas/pkg/glog"
+	"gas/pkg/lib/glog"
 	"gas/pkg/network"
 )
 

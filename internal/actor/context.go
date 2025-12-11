@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"gas/internal/iface"
-	"gas/pkg/glog"
 	"gas/pkg/lib"
+	"gas/pkg/lib/glog"
 	"time"
 
 	"go.uber.org/zap"

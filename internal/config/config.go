@@ -3,8 +3,8 @@ package config
 import (
 	"fmt"
 	discoveryConfig "gas/pkg/discovery"
-	"gas/pkg/glog"
 	"gas/pkg/lib"
+	"gas/pkg/lib/glog"
 	messageQueConfig "gas/pkg/messageQue"
 	"os"
 )

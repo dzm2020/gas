@@ -2,9 +2,8 @@ package network
 
 import (
 	"context"
-	"errors"
-	"gas/pkg/glog"
 	"gas/pkg/lib"
+	"gas/pkg/lib/glog"
 	"net"
 	"time"
 
@@ -37,7 +36,10 @@ func newTCPConnection(conn net.Conn, typ ConnectionType, options *Options) *TCPC
 	lib.Go(func(ctx context.Context) {
 		tcpConn.writeLoop(ctx)
 	})
-	glog.Infof("tcp connection open %v local:%v remote:%v typ:%v", tcpConn.ID(), tcpConn.LocalAddr(), tcpConn.RemoteAddr(), tcpConn.Type())
+
+	glog.Info("创建TCP连接", zap.Int64("connectionId", tcpConn.ID()),
+		zap.String("localAddr", tcpConn.LocalAddr().String()),
+		zap.String("remoteAddr", tcpConn.RemoteAddr().String()))
 	return tcpConn
 }
 
@@ -52,13 +54,14 @@ func (c *TCPConnection) Send(msg interface{}) error {
 	// 编码消息
 	data, err := c.codec.Encode(msg)
 	if err != nil {
+		glog.Error("TCP发送消息编码失败", zap.Int64("connectionId", c.ID()), zap.Error(err))
 		return err
 	}
 	select {
 	case c.sendChan <- data:
 	default:
-		glog.Error("tcp connection send chan full", zap.Int64("conn_id", c.ID()))
-		return errors.New("tcp send queue full")
+		glog.Error("TCP发送消息失败channel已满", zap.Int64("connectionId", c.ID()))
+		return ErrTCPSendQueueFull
 	}
 	return nil
 }
@@ -70,7 +73,7 @@ func (c *TCPConnection) readLoop(ctx context.Context) {
 	}()
 
 	if err = c.handler.OnConnect(c); err != nil {
-		glog.Error("tcp connection OnConnect error", zap.Int64("conn_id", c.ID()), zap.Error(err))
+		glog.Error("TCP连接回调错误", zap.Int64("connectionId", c.ID()), zap.Error(err))
 		return
 	}
 
@@ -91,13 +94,15 @@ func (c *TCPConnection) readLoop(ctx context.Context) {
 func (c *TCPConnection) read() error {
 	n, readErr := c.conn.Read(c.tmpBuf)
 	if readErr != nil {
+		glog.Error("TCP读取消息失败", zap.Int64("connectionId", c.ID()), zap.Error(readErr))
 		return readErr
 	}
 	if n == 0 {
-		return errors.New("tcp read zero bytes")
+		return ErrTCPReadZeroBytes
 	}
 
 	if _, readErr = c.buffer.Write(c.tmpBuf[:n]); readErr != nil {
+		glog.Error("TCP读取消息失败", zap.Int64("connectionId", c.ID()), zap.Error(readErr))
 		return readErr
 	}
 
@@ -109,6 +114,7 @@ func (c *TCPConnection) read() error {
 		}
 		_ = c.buffer.Skip(pn)
 		if err != nil {
+			glog.Error("TCP处理消息失败", zap.Int64("connectionId", c.ID()), zap.Error(err))
 			return err
 		}
 	}
@@ -136,14 +142,15 @@ func (c *TCPConnection) writeLoop(ctx context.Context) {
 			if !ok {
 				return // 通道已关闭
 			}
-			//  todo 循环读取chan内容写入到buffer中 再写入到连接
 			_, err = c.conn.Write(data)
 			if err != nil {
+				glog.Error("TCP写入消息失败", zap.Int64("connectionId", c.ID()), zap.Error(err))
 				return
 			}
 		case <-timeoutChan:
 			if c.isTimeout() {
-				err = errors.New("tcp connection keepAlive")
+				err = ErrTCPConnectionKeepAlive
+				glog.Error("TCP心跳超时", zap.Int64("connectionId", c.ID()), zap.Error(err))
 				return
 			}
 		}
@@ -152,7 +159,7 @@ func (c *TCPConnection) writeLoop(ctx context.Context) {
 
 func (c *TCPConnection) Close(err error) error {
 	if !c.closeBase() {
-		return errors.New("tcp connection already closed")
+		return ErrTCPConnectionClosed
 	}
 
 	lib.Go(func(ctx context.Context) {
@@ -160,6 +167,6 @@ func (c *TCPConnection) Close(err error) error {
 		_ = c.baseConnection.Close(c, err)
 	})
 
-	glog.Info("tcp connection close", zap.Int64("conn_id", c.ID()), zap.Error(err))
+	glog.Info("TCP连接断开", zap.Int64("connectionId", c.ID()), zap.Error(err))
 	return nil
 }

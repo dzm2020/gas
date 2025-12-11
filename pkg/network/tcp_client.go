@@ -1,7 +1,6 @@
 package network
 
 import (
-	"errors"
 	"net"
 	"sync/atomic"
 	"time"
@@ -31,7 +30,7 @@ func NewTCPClient(addr string, timeout time.Duration, option ...Option) *TCPClie
 // Connect 连接到服务器
 func (c *TCPClient) Connect() error {
 	if c.connected.Load() {
-		return errors.New("tcp client already connected")
+		return ErrTCPClientAlreadyConnected
 	}
 
 	conn, err := net.DialTimeout("tcp", c.addr, c.timeout)
@@ -48,7 +47,7 @@ func (c *TCPClient) Connect() error {
 // Disconnect 断开连接
 func (c *TCPClient) Disconnect() error {
 	if !c.connected.Load() {
-		return errors.New("tcp client not connected")
+		return ErrTCPClientNotConnected
 	}
 
 	if c.TCPConnection != nil {
@@ -62,7 +61,7 @@ func (c *TCPClient) Disconnect() error {
 // Send 发送消息（直接使用嵌入的TCPConnection的方法）
 func (c *TCPClient) Send(msg interface{}) error {
 	if !c.connected.Load() || c.TCPConnection == nil {
-		return errors.New("tcp client not connected")
+		return ErrTCPClientNotConnected
 	}
 	return c.TCPConnection.Send(msg)
 }

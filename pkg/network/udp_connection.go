@@ -2,10 +2,8 @@ package network
 
 import (
 	"context"
-	"errors"
-	"fmt"
-	"gas/pkg/glog"
 	"gas/pkg/lib"
+	"gas/pkg/lib/glog"
 	"net"
 
 	"go.uber.org/zap"
@@ -30,7 +28,9 @@ func newUDPConnection(conn *net.UDPConn, typ ConnectionType, remoteAddr *net.UDP
 		writeChan:      make(chan []byte, 100),
 	}
 
-	glog.Infof("udp connection open %v local:%v remote:%v typ:%v", udpConn.ID(), udpConn.LocalAddr(), udpConn.RemoteAddr(), udpConn.Type())
+	glog.Info("创建UDP连接", zap.Int64("connectionId", udpConn.ID()),
+		zap.String("localAddr", udpConn.LocalAddr().String()),
+		zap.String("remoteAddr", udpConn.RemoteAddr().String()))
 
 	AddConnection(udpConn)
 	lib.Go(func(ctx context.Context) {
@@ -48,11 +48,11 @@ func (c *UDPConnection) Send(msg interface{}) error {
 	}
 	data, err := c.codec.Encode(msg)
 	if err != nil {
-		glog.Error("udp encode data error", zap.Int64("conn_id", c.ID()), zap.Error(err), zap.Any("data", msg))
+		glog.Error("UDP消息encode失败", zap.Int64("connectionId", c.ID()), zap.Error(err))
 		return err
 	}
 	if _, err = c.conn.WriteToUDP(data, c.remoteAddr); err != nil {
-		glog.Error("udp write data error", zap.Int64("conn_id", c.ID()), zap.Error(err), zap.Any("data", msg))
+		glog.Error("UDP发送消息", zap.Int64("connectionId", c.ID()), zap.Error(err))
 		return err
 	}
 	return nil
@@ -65,7 +65,7 @@ func (c *UDPConnection) writeLoop(ctx context.Context) {
 	}()
 
 	if err = c.handler.OnConnect(c); err != nil {
-		glog.Error("udp connection OnConnect error", zap.Int64("conn_id", c.ID()), zap.Error(err))
+		glog.Error("UDP连接回调错误", zap.Int64("connectionId", c.ID()), zap.Error(err))
 		return
 	}
 
@@ -77,7 +77,7 @@ func (c *UDPConnection) writeLoop(ctx context.Context) {
 			return
 		case <-c.timeoutTicker.C:
 			if c.isTimeout() {
-				err = fmt.Errorf("keepAlive")
+				err = ErrUDPConnectionKeepAlive
 				return
 			}
 		case data := <-c.writeChan:
@@ -93,20 +93,19 @@ func (c *UDPConnection) input(data []byte) {
 	select {
 	case c.writeChan <- data:
 	default:
-		glog.Warn("udp connection read channel full, closing connection", zap.Int64("conn_id", c.ID()))
-		_ = c.Close(errors.New("read channel full"))
+		glog.Error("UDP读取chan已满", zap.Int64("connectionId", c.ID()))
 	}
 }
 
 func (c *UDPConnection) Close(err error) error {
 	if !c.closeBase() {
-		return errors.New("udp connection already closed")
+		return ErrUDPConnectionClosed
 	}
 
 	lib.Go(func(context.Context) {
 		c.server.removeConnection(c.remoteAddr.String())
 		_ = c.baseConnection.Close(c, err)
 	})
-	glog.Info("udp connection close", zap.Int64("conn_id", c.ID()), zap.Error(err))
+	glog.Info("UDP连接断开", zap.Int64("connectionId", c.ID()), zap.Error(err))
 	return nil
 }

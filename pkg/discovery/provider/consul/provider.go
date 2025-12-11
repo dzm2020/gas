@@ -2,7 +2,7 @@ package consul
 
 import (
 	"gas/pkg/discovery/iface"
-	"gas/pkg/glog"
+	"gas/pkg/lib/glog"
 	"sync"
 
 	"github.com/duke-git/lancet/v2/convertor"

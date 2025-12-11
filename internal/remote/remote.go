@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"gas/internal/iface"
 	discovery "gas/pkg/discovery/iface"
-	"gas/pkg/glog"
 	"gas/pkg/lib"
+	"gas/pkg/lib/glog"
 	messageQue "gas/pkg/messageQue/iface"
 	"time"
 

@@ -2,7 +2,7 @@ package actor
 
 import (
 	"gas/internal/iface"
-	"gas/pkg/glog"
+	"gas/pkg/lib/glog"
 	"reflect"
 	"sync"
 

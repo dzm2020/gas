@@ -1,7 +1,6 @@
 package network
 
 import (
-	"errors"
 	"sync/atomic"
 	"time"
 )
@@ -70,7 +69,7 @@ func (b *baseConnection) closeChanSignal() chan struct{} {
 // checkClosed 检查连接是否已关闭，如果已关闭返回错误
 func (b *baseConnection) checkClosed() error {
 	if b.closed.Load() {
-		return errors.New(" connection closed")
+		return ErrConnectionClosed
 	}
 	return nil
 }

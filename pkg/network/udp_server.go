@@ -2,10 +2,9 @@ package network
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"gas/pkg/glog"
 	"gas/pkg/lib"
+	"gas/pkg/lib/glog"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -41,15 +40,16 @@ func NewUDPServer(proto, addr string, option ...Option) *UDPServer {
 
 func (s *UDPServer) Start() error {
 	if !s.running.CompareAndSwap(false, true) {
-		return errors.New("udp server already running")
+		return ErrUDPServerAlreadyRunning
 	}
 	if err := s.listen(); err != nil {
+		glog.Info("UDP服务器监听错误", zap.String("proto", s.proto), zap.String("addr", s.addr), zap.Error(err))
 		return err
 	}
 	lib.Go(func(ctx context.Context) {
 		s.readLoop(ctx)
 	})
-	glog.Info("udp server listen", zap.String("proto", s.proto), zap.String("addr", s.addr))
+	glog.Info("UDP服务器监听", zap.String("proto", s.proto), zap.String("addr", s.addr))
 	return nil
 
 }
@@ -74,7 +74,8 @@ func (s *UDPServer) readLoop(ctx context.Context) {
 		default:
 			n, remoteAddr, w := s.conn.ReadFromUDP(readBuf)
 			if w != nil {
-				glog.Error("udp read err", zap.Error(w))
+				glog.Error("UDP读取数据包错误", zap.String("proto", s.proto),
+					zap.String("addr", s.addr), zap.Error(w))
 				return
 			}
 			if n == 0 {
@@ -132,7 +133,7 @@ func (s *UDPServer) Addr() string {
 
 func (s *UDPServer) Stop() error {
 	if !s.running.CompareAndSwap(true, false) {
-		return errors.New("udp server not running")
+		return ErrUDPServerNotRunning
 	}
 
 	close(s.closeChan)
