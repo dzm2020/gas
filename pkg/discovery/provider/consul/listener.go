@@ -4,11 +4,8 @@ import (
 	"context"
 	"gas/pkg/discovery/iface"
 	"gas/pkg/lib"
-	"gas/pkg/lib/glog"
 	"reflect"
 	"sync"
-
-	"go.uber.org/zap"
 )
 
 // serviceListenerManager 服务变化监听器管理器
@@ -78,11 +75,6 @@ func (m *serviceListenerManager) Notify(topology *iface.Topology) {
 	for _, listener := range listeners {
 		if listener != nil {
 			lib.Go(func(ctx context.Context) {
-				defer func() {
-					if rec := recover(); rec != nil {
-						glog.Error("consul watcher listener panic", zap.Any("error", rec))
-					}
-				}()
 				listener(topology)
 			})
 		}

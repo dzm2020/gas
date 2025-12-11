@@ -12,10 +12,10 @@ import (
 	"go.uber.org/zap"
 )
 
-func newConsulWatcher(client *api.Client, service string, opts *Options, stopCh <-chan struct{}) *consulWatcher {
+func newConsulWatcher(client *api.Client, service string, config *Config, stopCh <-chan struct{}) *consulWatcher {
 	return &consulWatcher{
 		client:                 client,
-		opts:                   opts,
+		config:                 config,
 		stopCh:                 stopCh,
 		waitIndex:              0,
 		list:                   iface.NewNodeList(nil),
@@ -27,7 +27,7 @@ func newConsulWatcher(client *api.Client, service string, opts *Options, stopCh 
 type consulWatcher struct {
 	*serviceListenerManager
 	client    *api.Client
-	opts      *Options
+	config    *Config
 	stopCh    <-chan struct{}
 	waitIndex uint64
 	list      *iface.NodeList
@@ -62,12 +62,12 @@ func (w *consulWatcher) loop(ctx context.Context, service string) {
 func (w *consulWatcher) fetch(ctx context.Context, service string, listener func(*iface.Topology)) error {
 	options := &api.QueryOptions{
 		WaitIndex: w.waitIndex,
-		WaitTime:  w.opts.WatchWaitTime,
+		WaitTime:  w.config.WatchWaitTime,
 	}
 	options.WithContext(ctx)
 	services, meta, err := w.client.Health().Service(service, "", true, options)
 	if err != nil {
-		glog.Error("consul watcher: failed to fetch service", zap.String("service", service), zap.Error(err))
+		glog.Error("Consul获取服务失败", zap.String("service", service), zap.Error(err))
 		return err
 	}
 
@@ -89,7 +89,7 @@ func (w *consulWatcher) fetch(ctx context.Context, service string, listener func
 	list := iface.NewNodeList(nodeDict)
 	topology := list.UpdateTopology(w.list)
 	if len(topology.Left) > 0 || len(topology.Joined) > 0 {
-		glog.Debug("consul watcher: service topology changed",
+		glog.Debug("Consul服务拓扑变化",
 			zap.String("service", service),
 			zap.Int("joined", len(topology.Joined)),
 			zap.Int("alive", len(topology.Alive)),
@@ -97,7 +97,7 @@ func (w *consulWatcher) fetch(ctx context.Context, service string, listener func
 			zap.Int("total", len(nodeDict)))
 
 	} else {
-		glog.Debug("consul watcher: service topology unchanged",
+		glog.Debug("Consul服务拓扑未变化",
 			zap.String("service", service),
 			zap.Int("total", len(nodeDict)))
 	}

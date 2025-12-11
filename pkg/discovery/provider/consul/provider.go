@@ -1,6 +1,9 @@
 package consul
 
 import (
+	"encoding/json"
+	"fmt"
+	"gas/pkg/discovery"
 	"gas/pkg/discovery/iface"
 	"gas/pkg/lib/glog"
 	"sync"
@@ -10,34 +13,40 @@ import (
 	"go.uber.org/zap"
 )
 
+func init() {
+	_ = discovery.Register("consul", func(configData json.RawMessage) (iface.IDiscovery, error) {
+		consulCfg := defaultConfig()
+		if len(configData) > 0 {
+			if err := json.Unmarshal(configData, consulCfg); err != nil {
+				return nil, fmt.Errorf("failed to parse consul config: %w", err)
+			}
+		}
+		return New(consulCfg)
+	})
+}
+
 var _ iface.IDiscovery = (*Provider)(nil)
 
-func New(options ...Option) (*Provider, error) {
-	opts := loadOptions(options...)
-
-	client, err := newConsulClient(opts.Address)
+func New(config *Config) (*Provider, error) {
+	client, err := newConsulClient(config.Address)
 	if err != nil {
-		glog.Error("consul provider: failed to create consul client", zap.String("address", opts.Address), zap.Error(err))
 		return nil, err
 	}
-
 	stopCh := make(chan struct{})
 	provider := &Provider{
 		client:          client,
-		opts:            opts,
+		config:          config,
 		stopCh:          stopCh,
 		nodes:           make(map[uint64]*iface.Node),
-		consulRegistrar: newConsulRegistrar(client, opts, stopCh),
+		consulRegistrar: newConsulRegistrar(client, config, stopCh),
 	}
-	provider.serviceWatcher = newServiceWatcher(client, opts, stopCh, provider.onNodeChange)
-
-	glog.Info("consul provider: created successfully", zap.String("address", opts.Address))
+	provider.serviceWatcher = newServiceWatcher(client, config, stopCh, provider.onNodeChange)
 	return provider, nil
 }
 
 type Provider struct {
 	client *api.Client
-	opts   *Options
+	config *Config
 
 	stopOnce sync.Once
 	stopCh   chan struct{}
@@ -56,21 +65,21 @@ func newConsulClient(addr string) (*api.Client, error) {
 	cfg.Address = addr
 	client, err := api.NewClient(cfg)
 	if err != nil {
-		glog.Error("consul provider: failed to create consul client", zap.String("address", addr), zap.Error(err))
+		glog.Error("Consul创建客户端失败", zap.String("address", addr), zap.Error(err))
 		return nil, err
 	}
 	if _, err = client.Status().Leader(); err != nil {
-		glog.Error("consul provider: failed to connect to consul leader", zap.String("address", addr), zap.Error(err))
+		glog.Error("Consul连接Leader失败", zap.String("address", addr), zap.Error(err))
 		return nil, err
 	}
-	glog.Debug("consul provider: connected to consul", zap.String("address", addr))
+	glog.Info("Consul连接成功", zap.String("address", addr))
 	return client, nil
 }
 
 func (c *Provider) Subscribe(service string, listener iface.ServiceChangeListener) error {
 	watcher := c.serviceWatcher.GetOrCreateWatcher(service)
 	watcher.Add(listener)
-	glog.Info("consul provider: subscribed to service", zap.String("service", service))
+	glog.Info("Consul订阅服务", zap.String("service", service))
 	return nil
 }
 
@@ -80,6 +89,7 @@ func (c *Provider) Unsubscribe(service string, listener iface.ServiceChangeListe
 		return
 	}
 	_ = watcher.Remove(listener)
+	glog.Info("Consul取消服务订阅", zap.String("service", service))
 }
 
 // onNodeChange 节点变化回调，更新节点存储

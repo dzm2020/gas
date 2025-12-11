@@ -15,7 +15,7 @@ import (
 
 type consulRegistrar struct {
 	client   *api.Client
-	opts     *Options
+	config   *Config
 	stopCh   <-chan struct{}
 	status   string
 	wg       sync.WaitGroup
@@ -23,10 +23,10 @@ type consulRegistrar struct {
 	healthCh map[uint64]chan string
 }
 
-func newConsulRegistrar(client *api.Client, opts *Options, stopCh <-chan struct{}) *consulRegistrar {
+func newConsulRegistrar(client *api.Client, config *Config, stopCh <-chan struct{}) *consulRegistrar {
 	return &consulRegistrar{
 		client:   client,
-		opts:     opts,
+		config:   config,
 		stopCh:   stopCh,
 		healthCh: make(map[uint64]chan string),
 	}
@@ -34,8 +34,8 @@ func newConsulRegistrar(client *api.Client, opts *Options, stopCh <-chan struct{
 
 func (r *consulRegistrar) Add(node *iface.Node) error {
 	check := &api.AgentServiceCheck{
-		TTL:                            r.opts.HealthTTL.String(),
-		DeregisterCriticalServiceAfter: r.opts.DeregisterInterval.String(),
+		TTL:                            r.config.HealthTTL.String(),
+		DeregisterCriticalServiceAfter: r.config.DeregisterInterval.String(),
 	}
 	registration := &api.AgentServiceRegistration{
 		ID:      convertor.ToString(node.GetID()),
@@ -47,23 +47,21 @@ func (r *consulRegistrar) Add(node *iface.Node) error {
 		Check:   check,
 	}
 	if err := r.client.Agent().ServiceRegister(registration); err != nil {
-		glog.Error("consul registrar: failed to register node",
-			zap.Uint64("nodeId", node.GetID()),
-			zap.String("name", node.GetName()),
-			zap.Error(err))
+		glog.Error("Consul注册节点失败", zap.Uint64("nodeId", node.GetID()),
+			zap.String("name", node.GetName()), zap.Error(err))
 		return err
 	}
 
 	ch := make(chan string, 1)
 	if !r.setHealthChan(node.GetID(), ch) {
-		glog.Debug("consul registrar: node already registered", zap.Uint64("nodeId", node.GetID()))
-		return nil // service already registered
+		glog.Debug("Consul节点已注册", zap.Uint64("nodeId", node.GetID()))
+		return nil
 	}
 
 	lib.Go(func(ctx context.Context) {
 		r.healthCheck(ctx, node.GetID(), ch)
 	})
-	glog.Info("consul registrar: node registered successfully",
+	glog.Info("Consul节点注册成功",
 		zap.Uint64("nodeId", node.GetID()),
 		zap.String("name", node.GetName()))
 	return nil
@@ -77,7 +75,7 @@ func (r *consulRegistrar) UpdateStatus(nodeID uint64, status string) {
 	select {
 	case ch <- status:
 	default:
-		glog.Warn("consul registrar: failed to update node status, channel full", zap.Uint64("nodeId", nodeID))
+		glog.Warn("Consul更新节点状态失败，通道已满", zap.Uint64("nodeId", nodeID))
 	}
 }
 
@@ -87,16 +85,16 @@ func (r *consulRegistrar) Remove(nodeID uint64) error {
 	}
 	r.deleteHealthChan(nodeID)
 	if err := r.client.Agent().ServiceDeregister(convertor.ToString(nodeID)); err != nil {
-		glog.Error("consul registrar: failed to remove node", zap.Uint64("nodeId", nodeID), zap.Error(err))
+		glog.Error("Consul移除节点失败", zap.Uint64("nodeId", nodeID), zap.Error(err))
 		return err
 	}
-	glog.Info("consul registrar: node removed successfully", zap.Uint64("nodeId", nodeID))
+	glog.Info("Consul节点移除成功", zap.Uint64("nodeId", nodeID))
 	return nil
 }
 
 func (r *consulRegistrar) healthCheck(ctx context.Context, nodeID uint64, ch <-chan string) {
 
-	interval := r.opts.HealthTTL / 2
+	interval := r.config.HealthTTL / 2
 	if interval <= 0 {
 		interval = time.Second
 	}
@@ -122,12 +120,12 @@ func (r *consulRegistrar) healthCheck(ctx context.Context, nodeID uint64, ch <-c
 			}
 			r.status = status
 			if err := r.updateTTL(nodeID, status); err != nil {
-				glog.Error("consul registrar: failed to update TTL", zap.Uint64("nodeId", nodeID), zap.Error(err))
+				glog.Error("Consul更新TTL失败", zap.Uint64("nodeId", nodeID), zap.Error(err))
 				return
 			}
 		case <-ticker.C:
 			if err := r.updateTTL(nodeID, r.status); err != nil {
-				glog.Error("consul registrar: failed to update TTL on tick", zap.Uint64("nodeId", nodeID), zap.Error(err))
+				glog.Error("Consul定时更新TTL失败", zap.Uint64("nodeId", nodeID), zap.Error(err))
 				return
 			}
 		}

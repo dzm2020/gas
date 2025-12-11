@@ -15,7 +15,7 @@ import (
 // serviceWatcher 服务列表监听器，负责监听 Consul 服务列表变化并管理 watchers
 type serviceWatcher struct {
 	client    *api.Client
-	opts      *Options
+	config    *Config
 	stopCh    <-chan struct{}
 	waitIndex uint64
 
@@ -30,13 +30,13 @@ type serviceWatcher struct {
 // newServiceWatcher 创建服务列表监听器
 func newServiceWatcher(
 	client *api.Client,
-	opts *Options,
+	config *Config,
 	stopCh <-chan struct{},
 	onNodeChange iface.ServiceChangeListener,
 ) *serviceWatcher {
 	s := &serviceWatcher{
 		client:       client,
-		opts:         opts,
+		config:       config,
 		stopCh:       stopCh,
 		waitIndex:    0,
 		watchers:     make(map[string]*consulWatcher),
@@ -63,7 +63,7 @@ func (sw *serviceWatcher) watch(ctx context.Context) {
 			return
 		default:
 			if err := sw.fetch(ctx); err != nil {
-				glog.Error("consul serviceWatcher fetch services failed", zap.Error(err))
+				glog.Error("Consul获取服务列表失败", zap.Error(err))
 				select {
 				case <-time.After(time.Second):
 				case <-sw.stopCh:
@@ -78,7 +78,7 @@ func (sw *serviceWatcher) watch(ctx context.Context) {
 func (sw *serviceWatcher) fetch(ctx context.Context) error {
 	options := &api.QueryOptions{
 		WaitIndex: sw.waitIndex,
-		WaitTime:  sw.opts.WatchWaitTime,
+		WaitTime:  sw.config.WatchWaitTime,
 	}
 	options = options.WithContext(ctx)
 	services, meta, err := sw.client.Catalog().Services(options)
@@ -96,13 +96,12 @@ func (sw *serviceWatcher) fetch(ctx context.Context) error {
 			continue
 		}
 		if _, exists := sw.watchers[name]; !exists {
-			watcher := newConsulWatcher(sw.client, name, sw.opts, sw.stopCh)
+			watcher := newConsulWatcher(sw.client, name, sw.config, sw.stopCh)
 			sw.watchers[name] = watcher
 			if sw.onNodeChange != nil {
 				watcher.Add(sw.onNodeChange)
 			}
 			watcher.start()
-			glog.Info("consul serviceWatcher: created watcher for new service", zap.String("service", name))
 		}
 	}
 	return nil
@@ -121,12 +120,10 @@ func (sw *serviceWatcher) GetOrCreateWatcher(service string) *consulWatcher {
 	defer sw.watchersMu.Unlock()
 
 	if watcher, exists := sw.watchers[service]; exists {
-		glog.Debug("consul serviceWatcher: using existing watcher", zap.String("service", service))
 		return watcher
 	}
 
-	glog.Debug("consul serviceWatcher: creating new watcher", zap.String("service", service))
-	watcher := newConsulWatcher(sw.client, service, sw.opts, sw.stopCh)
+	watcher := newConsulWatcher(sw.client, service, sw.config, sw.stopCh)
 	sw.watchers[service] = watcher
 	if sw.onNodeChange != nil {
 		watcher.Add(sw.onNodeChange)
