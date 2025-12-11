@@ -20,4 +20,4 @@ type ISubscription interface {
 }
 
 // MsgHandler 消息处理函数类型
-type MsgHandler func(data []byte, reply func([]byte) error)
+type MsgHandler func(request []byte, response func([]byte) error)
