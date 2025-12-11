@@ -1,11 +1,3 @@
-/**
- * @Author: dingQingHui
- * @Description:
- * @File: uid
- * @Version: 1.0.0
- * @Date: 2024/12/16 14:02
- */
-
 package lib
 
 import (

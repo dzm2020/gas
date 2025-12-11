@@ -1,51 +1,34 @@
-package iface
+package node
 
 import (
 	"context"
 	"fmt"
+	"gas/internal/iface"
 	"gas/pkg/lib/glog"
 	"sync"
 	"time"
+
+	"go.uber.org/zap"
 )
-
-type BaseComponent struct {
-}
-
-func (*BaseComponent) Start(ctx context.Context) error {
-	return nil
-}
-func (*BaseComponent) Stop(ctx context.Context) error {
-	return nil
-}
-
-// Component 组件接口，所有需要管理生命周期的组件都应实现此接口
-type Component interface {
-	// Start 启动组件
-	Start(ctx context.Context, node INode) error
-	// Stop 停止组件，ctx 用于控制超时
-	Stop(ctx context.Context) error
-	// Name 返回组件名称，用于日志和错误报告
-	Name() string
-}
 
 // Manager 生命周期管理器
 type Manager struct {
-	components []Component
+	components []iface.IComponent
 	mu         sync.RWMutex
 	started    bool
 	stopped    bool
 	stopOnce   sync.Once
 }
 
-// New 创建新的生命周期管理器
-func New() *Manager {
+// NewComponentsMgr 创建新的生命周期管理器
+func NewComponentsMgr() *Manager {
 	return &Manager{
-		components: make([]Component, 0),
+		components: make([]iface.IComponent, 0),
 	}
 }
 
 // Register 注册组件，按注册顺序启动，按逆序停止
-func (m *Manager) Register(component Component) error {
+func (m *Manager) Register(component iface.IComponent) error {
 	if component == nil {
 		return fmt.Errorf("component cannot be nil")
 	}
@@ -68,13 +51,13 @@ func (m *Manager) Register(component Component) error {
 	}
 
 	m.components = append(m.components, component)
-	glog.Debugf("component: registered component '%s'", component.Name())
+	glog.Debug("组件: 已注册组件", zap.String("component", component.Name()))
 	return nil
 }
 
 // Start 启动所有已注册的组件
 // 按注册顺序依次启动，如果某个组件启动失败，会停止已启动的组件
-func (m *Manager) Start(ctx context.Context, node INode) error {
+func (m *Manager) Start(ctx context.Context, node iface.INode) error {
 	m.mu.Lock()
 	if m.started {
 		m.mu.Unlock()
@@ -86,28 +69,28 @@ func (m *Manager) Start(ctx context.Context, node INode) error {
 	}
 	m.mu.Unlock()
 
-	glog.Infof("component: starting %d components", len(m.components))
+	glog.Info("组件: 正在启动组件", zap.Int("count", len(m.components)))
 
-	var started []Component
+	var started []iface.IComponent
 	for i, component := range m.components {
-		glog.Infof("component: starting component '%s' (%d/%d)", component.Name(), i+1, len(m.components))
+		glog.Info("组件: 正在启动组件", zap.String("component", component.Name()), zap.Int("current", i+1), zap.Int("total", len(m.components)))
 
 		if err := component.Start(ctx, node); err != nil {
-			glog.Errorf("component: failed to start component '%s': %v", component.Name(), err)
+			glog.Error("组件: 启动组件失败", zap.String("component", component.Name()), zap.Error(err))
 			// 停止已启动的组件（逆序）
 			m.stopComponents(ctx, started, true)
 			return fmt.Errorf("failed to start component '%s': %w", component.Name(), err)
 		}
 
 		started = append(started, component)
-		glog.Infof("component: component '%s' started successfully", component.Name())
+		glog.Info("组件: 组件启动成功", zap.String("component", component.Name()))
 	}
 
 	m.mu.Lock()
 	m.started = true
 	m.mu.Unlock()
 
-	glog.Infof("component: all %d components started successfully", len(m.components))
+	glog.Info("组件: 所有组件启动成功", zap.Int("count", len(m.components)))
 	return nil
 }
 
@@ -126,11 +109,11 @@ func (m *Manager) Stop(ctx context.Context) error {
 			return
 		}
 		m.stopped = true
-		components := make([]Component, len(m.components))
+		components := make([]iface.IComponent, len(m.components))
 		copy(components, m.components)
 		m.mu.Unlock()
 
-		glog.Infof("component: stopping %d components", len(components))
+		glog.Info("组件: 正在停止组件", zap.Int("count", len(components)))
 		err = m.stopComponents(ctx, components, false)
 	})
 
@@ -138,11 +121,11 @@ func (m *Manager) Stop(ctx context.Context) error {
 }
 
 // stopComponents 停止组件列表（逆序）
-func (m *Manager) stopComponents(ctx context.Context, components []Component, isRollback bool) error {
+func (m *Manager) stopComponents(ctx context.Context, components []iface.IComponent, isRollback bool) error {
 	var lastErr error
-	stopType := "stopping"
+	stopType := "正在停止"
 	if isRollback {
-		stopType = "rolling back"
+		stopType = "正在回滚"
 	}
 
 	// 逆序停止
@@ -151,19 +134,19 @@ func (m *Manager) stopComponents(ctx context.Context, components []Component, is
 		if component == nil {
 			continue
 		}
-		glog.Infof("component: %s component '%s'", stopType, component.Name())
+		glog.Info("组件: 停止组件", zap.String("action", stopType), zap.String("component", component.Name()))
 
 		if err := component.Stop(ctx); err != nil {
-			glog.Errorf("component: failed to stop component '%s': %v", component.Name(), err)
+			glog.Error("组件: 停止组件失败", zap.String("component", component.Name()), zap.Error(err))
 			lastErr = err
 			// 继续停止其他组件，不因单个组件失败而中断
 		} else {
-			glog.Infof("component: component '%s' stopped successfully", component.Name())
+			glog.Info("组件: 组件停止成功", zap.String("component", component.Name()))
 		}
 	}
 
 	if !isRollback {
-		glog.Infof("component: all components stopped")
+		glog.Info("组件: 所有组件已停止")
 	}
 
 	return lastErr

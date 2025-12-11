@@ -17,42 +17,51 @@ import (
 
 	discovery "gas/pkg/discovery/iface"
 
+	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
 // New 创建节点实例
-func New(profileFilePath string) *Node {
+func New(path string) *Node {
 	node := &Node{
-		profileFilePath: profileFilePath,
-		serializer:      lib.Json,
+		serializer:       lib.Json,
+		componentManager: NewComponentsMgr(),
+	}
+	c, err := config.Load(path)
+	if err != nil {
+		panic(err)
+	}
+	node.config = c
+	return node
+}
+
+func NewWithConfig(config *config.Config) *Node {
+	node := &Node{
+		config:           config,
+		serializer:       lib.Json,
+		componentManager: NewComponentsMgr(),
 	}
 	return node
 }
 
 type Node struct {
-	profileFilePath string
-
-	node *discovery.Node
+	*discovery.Node
 
 	config *config.Config
 
 	actorSystem iface.ISystem
 	remote      iface.IRemote
 	// 组件管理器
-	componentManager *iface.Manager
+	componentManager *Manager
 
 	serializer lib.ISerializer
 
 	panicHook func(entry zapcore.Entry)
 }
 
-func (m *Node) GetId() uint64 {
-	if m.node == nil {
-		return 0
-	}
-	return m.node.Id
+func (m *Node) Info() *discovery.Node {
+	return m.Node
 }
-
 func (m *Node) SetActorSystem(system iface.ISystem) {
 	m.actorSystem = system
 }
@@ -81,59 +90,45 @@ func (m *Node) GetConfig() *config.Config {
 	return m.config
 }
 
-// Self 获取当前节点信息
-func (m *Node) Self() *discovery.Node {
-	return m.node
-}
-
-func (m *Node) StarUp(comps ...iface.Component) error {
-	// 读取配置文件
-	c, err := config.Load(m.profileFilePath)
-	if err != nil {
-		return fmt.Errorf("load config failed: %w", err)
-	}
-
-	m.config = c
-
+func (m *Node) StarUp(comps ...iface.IComponent) error {
+	defer lib.PrintCoreDump()
 	// 创建节点信息
-	m.node = &discovery.Node{
-		Id:      c.Node.Id,
-		Name:    c.Node.Name,
-		Address: c.Node.Address,
-		Port:    c.Node.Port,
-		Tags:    c.Node.Tags,
-		Meta:    c.Node.Meta,
+	m.Node = &discovery.Node{
+		Id:      m.config.Node.Id,
+		Name:    m.config.Node.Name,
+		Address: m.config.Node.Address,
+		Port:    m.config.Node.Port,
+		Tags:    m.config.Node.Tags,
+		Meta:    m.config.Node.Meta,
 	}
-
-	m.componentManager = iface.New()
 
 	// 注册组件（注意顺序：glog 应该最先初始化，因为其他组件可能会使用日志）
-	components := []iface.Component{
-		NewGlogComponent(),
+	components := []iface.IComponent{
+		NewLogComponent(),
 		actor.NewComponent(),
 		remote.NewComponent(),
 	}
 
 	lib.SetPanicHandler(func(err interface{}) {
-		glog.Panicf("panic handler: %v stack:%v", err, string(debug.Stack()))
+		glog.Panic("panic", zap.Any("err", err), zap.String("stack", string(debug.Stack())))
 	})
 
 	//  注册外部传入的
 	components = append(components, comps...)
 
 	for _, com := range components {
-		if err = m.componentManager.Register(com); err != nil {
-			return fmt.Errorf("register %s component failed: %w", com.Name(), err)
+		if err := m.componentManager.Register(com); err != nil {
+			return fmt.Errorf("注册组件失败 name:%v err:%v", com.Name(), err)
 		}
 	}
 
 	// 启动所有组件
 	ctx := context.Background()
-	if err = m.componentManager.Start(ctx, m); err != nil {
-		return fmt.Errorf("start components failed: %w", err)
+	if err := m.componentManager.Start(ctx, m); err != nil {
+		return fmt.Errorf("启动组件失败 err:%w", err)
 	}
 
-	glog.Infof("game-node started: id=%d, name=%s, address=%s:%d", m.node.GetID(), m.node.GetName(), m.node.GetAddress(), m.node.GetPort())
+	glog.Info("节点启动完成")
 
 	// 阻塞等待进程终止信号
 	sigChan := make(chan os.Signal, 1)
@@ -149,15 +144,12 @@ func (m *Node) SetPanicHook(panicHook func(entry zapcore.Entry)) {
 
 // Shutdown 优雅关闭节点，关闭所有组件
 func (m *Node) shutdown(ctx context.Context) error {
+
+	defer glog.Info("节点停止运行完成")
+
 	// 保存节点信息用于日志
-	nodeId := m.Self().GetID()
-	nodeName := m.node.GetName()
 
-	if nodeId == 0 {
-		return nil
-	}
-
-	glog.Infof("game-node stopping: id=%d, name=%s", nodeId, nodeName)
+	glog.Info("节点开始停止运行")
 
 	// 停止所有组件（按逆序停止：subscription -> messageQue -> discovery -> actor）
 	if m.componentManager != nil {
@@ -166,12 +158,10 @@ func (m *Node) shutdown(ctx context.Context) error {
 		}
 	}
 
-	m.node = nil
 	m.remote = nil
 	m.actorSystem = nil
 	m.componentManager = nil
 
 	timeoutCtx, _ := context.WithTimeout(context.Background(), time.Second*30)
-	glog.Infof("game-node stopped: id=%d", nodeId)
 	return lib.ShutdownGoroutines(timeoutCtx)
 }

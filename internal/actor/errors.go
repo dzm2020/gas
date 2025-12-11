@@ -77,23 +77,23 @@ func ErrClientHandlerThirdParameter(requestType string) error {
 }
 
 func ErrSyncHandlerSecondParameter(requestType string) error {
-	return fmt.Errorf("actor: sync handler second parameter (request) must be pointer, got %s", requestType)
+	return fmt.Errorf("actor: sync handler second parameter (request) must be pointer or []byte, got %s", requestType)
 }
 
 func ErrSyncHandlerThirdParameter(responseType string) error {
 	return fmt.Errorf("actor: sync handler third parameter (response) must be pointer, got %s", responseType)
 }
 
-func ErrAsyncHandlerSecondParameter(requestType string) error {
-	return fmt.Errorf("actor: async handler second parameter (request) must be pointer, got %s", requestType)
+func ErrHandlerReturnCount(got int) error {
+	return fmt.Errorf("actor: handler must return exactly one value (error), got %d", got)
 }
 
-func ErrAsyncHandlerReturnCount(got int) error {
-	return fmt.Errorf("actor: async handler must return exactly one value (error), got %d", got)
+func ErrHandlerReturnType() error {
+	return fmt.Errorf("actor: handler return type must be error")
 }
 
-func ErrAsyncHandlerReturnType() error {
-	return fmt.Errorf("actor: async handler return type must be error")
+func ErrAsyncHandlerSecondParameter(typ string) error {
+	return fmt.Errorf("actor: handler second paramter must be point ,got %s", typ)
 }
 
 func ErrUnknownHandlerType(msgId int64) error {
@@ -165,4 +165,3 @@ func ErrUnmarshalReplyFailed(err error) error {
 func ErrInvalidMessage(err error) error {
 	return fmt.Errorf("invalid message: %w", err)
 }
-

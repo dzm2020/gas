@@ -1,20 +1,20 @@
 package config
 
 import (
+	"encoding/json"
 	"fmt"
 	discoveryConfig "gas/pkg/discovery"
+	consulConfig "gas/pkg/discovery/provider/consul"
 	"gas/pkg/lib"
 	"gas/pkg/lib/glog"
 	messageQueConfig "gas/pkg/messageQue"
+	natsConfig "gas/pkg/messageQue/provider/nats"
 	"os"
+	"time"
 )
 
 // Config 节点配置
 type Config struct {
-	// Actor 配置
-	Actor struct {
-	} `json:"actor"`
-
 	// Node 配置
 	Node struct {
 		Id      uint64            `json:"id"`      // 节点ID
@@ -53,7 +53,6 @@ func Load(profileFilePath string) (*Config, error) {
 // Default 生成默认配置
 func Default() *Config {
 	return &Config{
-		Actor: struct{}{},
 		Node: struct {
 			Id      uint64            `json:"id"`
 			Name    string            `json:"name"`
@@ -81,39 +80,53 @@ func Default() *Config {
 				LocalTime:  true,
 			},
 		},
-		Cluster: struct {
+		Cluster: func() struct {
 			Name         string                  `json:"name"`
 			Discovery    discoveryConfig.Config  `json:"discovery"`
 			MessageQueue messageQueConfig.Config `json:"messageQueue"`
-		}{
-			Name: "cluster.game-node.",
-			Discovery: discoveryConfig.Config{
-				Type:    "consul",
-				Address: "127.0.0.1:8500",
-				Consul: discoveryConfig.ConsulConfig{
-					WatchWaitTimeMs:      5000,  // 5秒
-					HealthTTLMs:          10000, // 10秒
-					DeregisterIntervalMs: 30000, // 30秒
+		} {
+			// Consul 配置
+			consulCfg := consulConfig.Config{
+				Address:            "127.0.0.1:8500",
+				WatchWaitTime:      5 * time.Second,  // 5秒
+				HealthTTL:          10 * time.Second, // 10秒
+				DeregisterInterval: 30 * time.Second, // 30秒
+			}
+			consulCfgJSON, _ := json.Marshal(consulCfg)
+
+			// NATS 配置
+			natsCfg := natsConfig.Config{
+				Servers:              []string{"nats://127.0.0.1:4222"},
+				Name:                 "gas-game-node",
+				MaxReconnects:        -1,    // 无限重连
+				ReconnectWait:        2000,  // 2秒 = 2000毫秒
+				TimeoutMs:            5000,  // 5秒 = 5000毫秒
+				PingIntervalMs:       20000, // 20秒 = 20000毫秒
+				MaxPingsOut:          2,
+				AllowReconnect:       true,
+				Username:             "",
+				Password:             "",
+				Token:                "",
+				DisableNoEcho:        false,
+				RetryOnFailedConnect: true,
+			}
+			natsCfgJSON, _ := json.Marshal(natsCfg)
+
+			return struct {
+				Name         string                  `json:"name"`
+				Discovery    discoveryConfig.Config  `json:"discovery"`
+				MessageQueue messageQueConfig.Config `json:"messageQueue"`
+			}{
+				Name: "cluster.game-node.",
+				Discovery: discoveryConfig.Config{
+					Type:   "consul",
+					Config: consulCfgJSON,
 				},
-			},
-			MessageQueue: messageQueConfig.Config{
-				Type:    "nats",
-				Servers: []string{"nats://127.0.0.1:4222"},
-				Nats: messageQueConfig.NatsConfig{
-					Name:                 "gas-game-node",
-					MaxReconnects:        -1,    // 无限重连
-					ReconnectWaitMs:      2000,  // 2秒
-					TimeoutMs:            5000,  // 5秒
-					PingIntervalMs:       20000, // 20秒
-					MaxPingsOut:          2,
-					AllowReconnect:       true,
-					Username:             "",
-					Password:             "",
-					Token:                "",
-					DisableNoEcho:        false,
-					RetryOnFailedConnect: true,
+				MessageQueue: messageQueConfig.Config{
+					Type:   "nats",
+					Config: natsCfgJSON,
 				},
-			},
-		},
+			}
+		}(),
 	}
 }

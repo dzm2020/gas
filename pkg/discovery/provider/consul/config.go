@@ -5,10 +5,10 @@ import (
 )
 
 type Config struct {
-	Address            string
-	WatchWaitTime      time.Duration
-	HealthTTL          time.Duration
-	DeregisterInterval time.Duration
+	Address            string        `json:"address"`
+	WatchWaitTime      time.Duration `json:"watchWaitTime"`
+	HealthTTL          time.Duration `json:"healthTTL"`
+	DeregisterInterval time.Duration `json:"deregisterInterval"`
 }
 
 func defaultConfig() *Config {

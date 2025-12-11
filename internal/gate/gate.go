@@ -6,7 +6,6 @@ import (
 	"gas/internal/gate/codec"
 	"gas/internal/gate/protocol"
 	"gas/internal/iface"
-	"gas/pkg/lib/glog"
 	"gas/pkg/network"
 )
 
@@ -37,7 +36,6 @@ func (m *Gate) Start(ctx context.Context, node iface.INode) error {
 	if err = m.server.Start(); err != nil {
 		return err
 	}
-	glog.Infof("gate run listening on %s", m.server.Addr())
 	return nil
 }
 

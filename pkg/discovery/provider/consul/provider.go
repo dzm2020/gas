@@ -30,8 +30,11 @@ var _ iface.IDiscovery = (*Provider)(nil)
 func New(config *Config) (*Provider, error) {
 	client, err := newConsulClient(config.Address)
 	if err != nil {
+		glog.Error("Consul创建客户端失败", zap.String("address", config.Address), zap.Error(err))
 		return nil, err
 	}
+
+	glog.Info("Consul连接成功", zap.String("address", config.Address))
 	stopCh := make(chan struct{})
 	provider := &Provider{
 		client:          client,
@@ -65,14 +68,11 @@ func newConsulClient(addr string) (*api.Client, error) {
 	cfg.Address = addr
 	client, err := api.NewClient(cfg)
 	if err != nil {
-		glog.Error("Consul创建客户端失败", zap.String("address", addr), zap.Error(err))
 		return nil, err
 	}
 	if _, err = client.Status().Leader(); err != nil {
-		glog.Error("Consul连接Leader失败", zap.String("address", addr), zap.Error(err))
 		return nil, err
 	}
-	glog.Info("Consul连接成功", zap.String("address", addr))
 	return client, nil
 }
 

@@ -1,11 +1,3 @@
-/**
- * @Author: dingQingHui
- * @Description:
- * @File: func
- * @Version: 1.0.0
- * @Date: 2024/11/26 14:06
- */
-
 package lib
 
 import (

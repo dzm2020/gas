@@ -30,7 +30,7 @@ func (r *Remote) SetSerializer(ser lib.ISerializer) {
 }
 
 func (r *Remote) init() error {
-	node := r.node.Self()
+	node := r.node.Info()
 	// 注册到服务发现
 	if err := r.discovery.Add(node); err != nil {
 		return err
@@ -61,7 +61,6 @@ func (r *Remote) subscribe(nodeId uint64) error {
 		return fmt.Errorf("subscribe to game-node %d failed: %w", nodeId, err)
 	}
 
-	glog.Infof("subscribe  nodeSubject %s ", nodeSubject)
 	return nil
 }
 
@@ -147,28 +146,27 @@ func (r *Remote) Request(message *iface.Message, timeout time.Duration) *iface.R
 	return response
 }
 func (r *Remote) RegistryName(name string) error {
-	info := r.node.Self()
-	if slices.Contains(info.GetTags(), name) {
+	tags := r.node.GetTags()
+	if slices.Contains(tags, name) {
 		return nil
 	}
-	info.Tags = append(info.Tags, name)
-	return r.discovery.Add(info)
+	tags = append(tags, name)
+	return r.discovery.Add(r.node.Info())
 }
 
 func (r *Remote) UnregisterName(name string) error {
-	info := r.node.Self()
-	if !slices.Contains(info.GetTags(), name) {
+	tags := r.node.GetTags()
+	if !slices.Contains(tags, name) {
 		return nil
 	}
-	// 从 Tags 中移除名字
-	newTags := make([]string, 0, len(info.GetTags()))
-	for _, tag := range info.GetTags() {
+	newTags := make([]string, 0, len(tags))
+	for _, tag := range tags {
 		if tag != name {
 			newTags = append(newTags, tag)
 		}
 	}
-	info.Tags = newTags
-	return r.discovery.Add(info)
+	r.node.SetTags(newTags)
+	return r.discovery.Add(r.node.Info())
 }
 
 func (r *Remote) Select(service string, strategy iface.RouteStrategy) (*iface.Pid, error) {

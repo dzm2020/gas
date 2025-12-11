@@ -55,7 +55,7 @@ func (s *System) newPid() *iface.Pid {
 		ServiceId: s.uniqId.Add(1),
 	}
 	if s.node != nil {
-		pid.NodeId = s.node.GetId()
+		pid.NodeId = s.node.GetID()
 	}
 	return pid
 }
@@ -120,7 +120,7 @@ func (s *System) isLocalPid(pid *iface.Pid) bool {
 	if node == nil {
 		return false
 	}
-	return pid.GetNodeId() == node.GetId()
+	return pid.GetNodeId() == node.GetID()
 }
 
 // Send 发送消息到指定进程

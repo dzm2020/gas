@@ -50,7 +50,7 @@ func Init(cfg *Config) {
 	mulCore := zapcore.NewTee(cores...)
 	zapOpts := []zap.Option{
 		zap.AddCaller(),
-		zap.AddStacktrace(zap.DPanicLevel),
+		zap.AddStacktrace(zap.ErrorLevel),
 		zap.AddCallerSkip(1),
 	}
 	logger := zap.New(mulCore, zapOpts...)

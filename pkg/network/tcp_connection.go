@@ -93,12 +93,14 @@ func (c *TCPConnection) readLoop(ctx context.Context) {
 
 func (c *TCPConnection) read() error {
 	n, readErr := c.conn.Read(c.tmpBuf)
+
+	if n == 0 {
+		return ErrTCPReadZeroBytes
+	}
+
 	if readErr != nil {
 		glog.Error("TCP读取消息失败", zap.Int64("connectionId", c.ID()), zap.Error(readErr))
 		return readErr
-	}
-	if n == 0 {
-		return ErrTCPReadZeroBytes
 	}
 
 	if _, readErr = c.buffer.Write(c.tmpBuf[:n]); readErr != nil {
@@ -150,7 +152,7 @@ func (c *TCPConnection) writeLoop(ctx context.Context) {
 		case <-timeoutChan:
 			if c.isTimeout() {
 				err = ErrTCPConnectionKeepAlive
-				glog.Error("TCP心跳超时", zap.Int64("connectionId", c.ID()), zap.Error(err))
+				glog.Warn("TCP心跳超时", zap.Int64("connectionId", c.ID()), zap.Error(err))
 				return
 			}
 		}

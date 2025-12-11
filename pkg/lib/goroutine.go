@@ -1,11 +1,3 @@
-/**
- * @Author: dingQingHui
- * @Description:
- * @File: workers
- * @Version: 1.0.0
- * @Date: 2025/1/2 10:16
- */
-
 package lib
 
 import (

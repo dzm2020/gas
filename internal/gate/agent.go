@@ -7,18 +7,18 @@ import (
 	"gas/pkg/network"
 )
 
-func handlerPush(ctx iface.IContext, session iface.ISession, data []byte) {
+func handlerPush(ctx iface.IContext, session iface.ISession, data []byte) error {
 	agent := ctx.Actor().(IAgent)
 	agent.Push(session, data)
+	return nil
 }
 
-func handlerClose(ctx iface.IContext, session iface.ISession, data []byte) {
+func handlerClose(ctx iface.IContext, session iface.ISession, data []byte) error {
 	agent := ctx.Actor().(*Agent)
 	if agent.IConnection == nil {
-		//  todo 日志
-		return
+		return nil
 	}
-	_ = agent.IConnection.Close(nil)
+	return agent.IConnection.Close(nil)
 }
 
 type Factory func() iface.IActor

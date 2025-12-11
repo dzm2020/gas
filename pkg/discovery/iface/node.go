@@ -32,6 +32,10 @@ func (b *Node) GetMeta() map[string]string {
 	return b.Meta
 }
 
+func (b *Node) SetTags(tags []string) {
+	b.Tags = tags
+}
+
 type Topology struct {
 	All    []*Node
 	Alive  []*Node
