@@ -48,7 +48,7 @@ func (w *consulWatcher) loop(ctx context.Context, service string) {
 		case <-w.stopCh:
 			return
 		default:
-			if err := w.fetch(ctx, service, w.serviceListenerManager.Notify); err != nil {
+			if err := w.fetch(ctx, service, w.Notify); err != nil {
 				select {
 				case <-time.After(time.Second):
 				case <-w.stopCh:

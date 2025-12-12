@@ -39,14 +39,11 @@ func (m *Gate) OnConnect(entity network.IConnection) (err error) {
 	if factory == nil {
 		return errs.ErrAgentFactoryNil
 	}
-
 	system := m.node.GetActorSystem()
-
 	pid := system.Spawn(factory())
 
-	//  绑定
 	entity.SetContext(pid)
-	//  执行初始化
+
 	return system.PushTask(pid, func(ctx iface.IContext) error {
 		_agent := ctx.Actor().(IAgent)
 		return _agent.OnConnect(ctx, entity)

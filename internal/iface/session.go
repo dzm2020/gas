@@ -15,6 +15,7 @@ type ISession interface {
 	ResponseCode(code int64) error
 	Forward(toPid *Pid) error
 	Push(request interface{}) error
+	GetEntityId() int64
 }
 
 func NewSession(ctx IContext, session *Session) ISession {

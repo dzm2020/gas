@@ -1,73 +1,55 @@
 package gate
 
 import (
+	"errors"
 	"gas/internal/gate/protocol"
 	"gas/internal/iface"
-	"gas/pkg/lib/glog"
 	"gas/pkg/network"
 )
 
-func handlerPush(ctx iface.IContext, session iface.ISession, data []byte) error {
-	agent := ctx.Actor().(IAgent)
-	agent.Push(session, data)
-	return nil
+func (agent *Agent) handlerPush(ctx iface.IContext, session iface.ISession, data []byte) error {
+	entity := network.GetConnection(session.GetEntityId())
+	if entity == nil {
+		return errors.New("entity not found")
+	}
+	cmd, act := protocol.ParseId(uint16(session.GetMid()))
+	response := protocol.New(cmd, act, data)
+	response.Index = session.GetIndex() // 可以根据需要设置 Index
+	response.Error = uint16(session.GetCode())
+	return entity.Send(response)
+
 }
 
 func handlerClose(ctx iface.IContext, session iface.ISession, data []byte) error {
-	agent := ctx.Actor().(*Agent)
-	if agent.IConnection == nil {
-		return nil
-	}
-	return agent.IConnection.Close(nil)
+	//agent := ctx.Actor().(*Agent)
+	//if agent.IConnection == nil {
+	//	return nil
+	//}
+	//return agent.IConnection.Close(nil)
 }
 
 type Factory func() iface.IActor
 
 type IAgent interface {
 	iface.IActor
-	OnConnect(ctx iface.IContext, connection network.IConnection) error
-	OnClose(ctx iface.IContext) error
-	Push(session iface.ISession, data []byte)
+	OnConnectionOpen(ctx iface.IContext, connection network.IConnection) error
+	OnConnectionClose(ctx iface.IContext) error
 }
 
 type Agent struct {
 	iface.Actor
-	network.IConnection
 	ctx iface.IContext
 }
 
 func (agent *Agent) OnConnect(ctx iface.IContext, connection network.IConnection) error {
-
-	agent.IConnection = connection
-
 	router := ctx.GetRouter()
 	if router == nil {
 		return nil
 	}
 	router.Register(iface.MsgIdPushMessageToClient, handlerPush)
 	router.Register(iface.MsgIdCloseClientConnection, handlerClose)
-	return nil
-}
 
-func (agent *Agent) OnClose(ctx iface.IContext) error {
-	agent.IConnection = nil
-	_ = ctx.Process().Shutdown()
-	return nil
-}
+	ctx.System().PushTask(pid, handlerPush, arg1, arg2)
 
-func (agent *Agent) OnStop(ctx iface.IContext) error {
-	if agent.IConnection != nil {
-		_ = agent.IConnection.Close(nil)
-	}
 	return nil
-}
-
-func (agent *Agent) Push(session iface.ISession, data []byte) {
-	cmd, act := protocol.ParseId(uint16(session.GetMid()))
-	response := protocol.New(cmd, act, data)
-	response.Index = session.GetIndex() // 可以根据需要设置 Index
-	response.Error = uint16(session.GetCode())
-	if err := agent.IConnection.Send(response); err != nil {
-		glog.Errorf("send response error:%v", err)
-	}
 }
