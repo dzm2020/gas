@@ -1,6 +1,7 @@
 package nats
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"gas/pkg/lib/glog"
@@ -15,7 +16,6 @@ import (
 )
 
 func init() {
-	// 注册默认的 nats 提供者
 	_ = messageQue.Register("nats", func(configData json.RawMessage) (iface.IMessageQue, error) {
 		natsCfg := defaultConfig()
 		// 如果是从 Options 字段传入的 JSON 数据，尝试解析
@@ -24,40 +24,43 @@ func init() {
 				return nil, fmt.Errorf("failed to parse nats config: %w", err)
 			}
 		}
-		return New(natsCfg.Servers, natsCfg)
+		return New(natsCfg.Servers, natsCfg), nil
 	})
 }
 
-// New 创建 NATS 集群通信实例
-// 如果 cfg 为 nil，将使用默认配置
-// 配置会自动解析并合并默认值
-func New(servers []string, cfg *Config) (*Client, error) {
+func New(servers []string, cfg *Config) *Client {
 	if cfg == nil {
 		cfg = defaultConfig()
 	}
-	natsOpts := buildNatsOptions(cfg)
-	// 连接 NATS 集群
-	client, err := nats.Connect(strings.Join(servers, ","), natsOpts...)
-	if err != nil {
-		glog.Error("NATS连接失败", zap.Strings("servers", servers), zap.Error(err))
-		return nil, err
-	}
-	if client.Status() != nats.CONNECTED {
-		glog.Error("NATS连接失败", zap.Strings("servers", servers), zap.Error(err))
-		return nil, fmt.Errorf("nats connect failed: %s", client.Status().String())
-	}
-	glog.Info("NATS连接成功", zap.Strings("servers", servers))
 	return &Client{
-		conn:          client,
+		servers:       servers,
+		cfg:           cfg,
 		subscriptions: make(map[iface.ISubscription]struct{}),
-	}, nil
+	}
 }
 
-// Client 实现 Cluster 接口的 NATS 具体实现
 type Client struct {
+	servers       []string
+	cfg           *Config
 	conn          *nats.Conn
 	mu            sync.RWMutex
 	subscriptions map[iface.ISubscription]struct{}
+}
+
+func (n *Client) Run(ctx context.Context) error {
+	natsOpts := buildNatsOptions(n.cfg)
+	client, err := nats.Connect(strings.Join(n.servers, ","), natsOpts...)
+	if err != nil {
+		glog.Error("NATS连接失败", zap.Strings("servers", n.servers), zap.Error(err))
+		return err
+	}
+	if client.Status() != nats.CONNECTED {
+		glog.Error("NATS连接失败", zap.Strings("servers", n.servers), zap.Error(err))
+		return fmt.Errorf("nats connect failed: %s", client.Status().String())
+	}
+	n.conn = client
+	glog.Info("NATS连接成功", zap.Strings("servers", n.servers))
+	return nil
 }
 
 // Publish 实现 Cluster 接口的 Publish 方法
@@ -109,8 +112,7 @@ func (n *Client) removeSub(subscription iface.ISubscription) {
 	n.mu.Unlock()
 }
 
-// Close 实现 Cluster 接口的 Close 方法
-func (n *Client) Close() error {
+func (n *Client) Shutdown(ctx context.Context) error {
 	// 关闭所有 subscription
 	var subscriptions []iface.ISubscription
 	n.mu.RLock()
@@ -121,9 +123,7 @@ func (n *Client) Close() error {
 	for _, sub := range subscriptions {
 		_ = sub.Unsubscribe()
 	}
-
 	n.conn.Close()
-
 	glog.Info("NAT客户端关闭")
 	return nil
 }

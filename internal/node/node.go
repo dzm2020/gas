@@ -45,22 +45,22 @@ func NewWithConfig(config *config.Config) *Node {
 }
 
 type Node struct {
-	*discovery.Node
+	*discovery.Member
 
 	config *config.Config
 
 	actorSystem iface.ISystem
 	remote      iface.IRemote
 	// 组件管理器
-	componentManager *Manager
+	componentManager *ComponentManager
 
 	serializer lib.ISerializer
 
 	panicHook func(entry zapcore.Entry)
 }
 
-func (m *Node) Info() *discovery.Node {
-	return m.Node
+func (m *Node) Info() *discovery.Member {
+	return m.Member
 }
 func (m *Node) SetActorSystem(system iface.ISystem) {
 	m.actorSystem = system
@@ -93,9 +93,9 @@ func (m *Node) GetConfig() *config.Config {
 func (m *Node) StarUp(comps ...iface.IComponent) error {
 	defer lib.PrintCoreDump()
 	// 创建节点信息
-	m.Node = &discovery.Node{
+	m.Member = &discovery.Member{
 		Id:      m.config.Node.Id,
-		Name:    m.config.Node.Name,
+		Kind:    m.config.Node.Kind,
 		Address: m.config.Node.Address,
 		Port:    m.config.Node.Port,
 		Tags:    m.config.Node.Tags,
@@ -142,12 +142,16 @@ func (m *Node) SetPanicHook(panicHook func(entry zapcore.Entry)) {
 	m.panicHook = panicHook
 }
 
+func (m *Node) CallPanicHook(entry zapcore.Entry) {
+	if m.panicHook == nil {
+		return
+	}
+	m.panicHook(entry)
+}
+
 // Shutdown 优雅关闭节点，关闭所有组件
 func (m *Node) shutdown(ctx context.Context) error {
-
 	defer glog.Info("节点停止运行完成")
-
-	// 保存节点信息用于日志
 
 	glog.Info("节点开始停止运行")
 

@@ -152,11 +152,11 @@ func (s *System) Send(message *iface.Message) error {
 // Call 发送消息到指定进程
 func (s *System) Call(message *iface.Message, timeout time.Duration) *iface.Response {
 	if s.shuttingDown.Load() {
-		return iface.NewErrorResponse("system is shutting down")
+		return iface.NewErrorResponse(errs.ErrSystemShuttingDown)
 	}
 
 	if message == nil {
-		return iface.NewErrorResponse("message is nil")
+		return iface.NewErrorResponse(errs.ErrMessageIsNilInMsg)
 	}
 
 	to := message.GetTo()
@@ -164,7 +164,7 @@ func (s *System) Call(message *iface.Message, timeout time.Duration) *iface.Resp
 		// 本地消息，直接发送到本地进程
 		process, err := s.getProcessChecked(to)
 		if err != nil {
-			return iface.NewErrorResponse(err.Error())
+			return iface.NewErrorResponse(err)
 		}
 		return process.Call(message, timeout)
 	}
@@ -172,9 +172,9 @@ func (s *System) Call(message *iface.Message, timeout time.Duration) *iface.Resp
 	// 远程消息，通过远程接口发送
 	remote, err := s.getRemote()
 	if err != nil {
-		return iface.NewErrorResponse(err.Error())
+		return iface.NewErrorResponse(err)
 	}
-	return remote.Request(message, timeout)
+	return remote.Call(message, timeout)
 }
 
 func (s *System) PushTask(pid *iface.Pid, f iface.Task) error {
@@ -193,13 +193,13 @@ func (s *System) PushTaskAndWait(pid *iface.Pid, timeout time.Duration, task ifa
 	return process.PushTaskAndWait(timeout, task)
 }
 
-func (s *System) Select(name string, strategy iface.RouteStrategy) (*iface.Pid, error) {
+func (s *System) Select(name string, strategy iface.RouteStrategy) *iface.Pid {
 	if process := s.GetProcessByName(name); process != nil {
-		return process.Context().ID(), nil
+		return process.Context().ID()
 	}
 	remote, err := s.getRemote()
 	if err != nil {
-		return nil, err
+		return nil
 	}
 	return remote.Select(name, strategy)
 }

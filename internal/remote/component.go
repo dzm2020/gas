@@ -2,7 +2,6 @@ package remote
 
 import (
 	"context"
-	"gas/internal/errs"
 	"gas/internal/iface"
 	discoveryFactory "gas/pkg/discovery"
 	messageQueFactory "gas/pkg/messageQue"
@@ -29,26 +28,27 @@ func (r *Component) Start(ctx context.Context, node iface.INode) error {
 
 	config := r.node.GetConfig()
 	// 创建服务发现实例
-	discoveryInstance, err := discoveryFactory.NewFromConfig(config.Cluster.Discovery)
+	discoveryInstance, err := discoveryFactory.NewFromConfig(config.Remote.Discovery)
 	if err != nil {
-		return errs.ErrCreateDiscoveryFailed(err)
+		return err
 	}
 
 	// 创建远程通信管理器
-	messageQueue, err := messageQueFactory.NewFromConfig(config.Cluster.MessageQueue)
+	messageQueue, err := messageQueFactory.NewFromConfig(config.Remote.MessageQueue)
 	if err != nil {
-		return errs.ErrCreateMessageQueueFailed(err)
+		return err
 	}
 
 	r.remote = &Remote{
+		nodeSubjectPrefix: config.Remote.SubjectPrefix,
 		discovery:         discoveryInstance,
 		messageQue:        messageQueue,
 		serializer:        r.node.GetSerializer(),
-		nodeSubjectPrefix: config.Cluster.Name,
 		node:              r.node,
 	}
+
 	//  注册节点并订阅
-	if err = r.remote.init(); err != nil {
+	if err = r.remote.Start(ctx); err != nil {
 		return err
 	}
 	//  建立引用
@@ -63,5 +63,5 @@ func (r *Component) Stop(ctx context.Context) error {
 
 	r.node.SetRemote(nil)
 
-	return r.remote.Shutdown()
+	return r.remote.Shutdown(ctx)
 }

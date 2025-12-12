@@ -12,15 +12,15 @@ import (
 	"go.uber.org/zap"
 )
 
-func newConsulWatcher(client *api.Client, service string, config *Config, stopCh <-chan struct{}) *consulWatcher {
+func newConsulWatcher(client *api.Client, kind string, config *Config, stopCh <-chan struct{}) *consulWatcher {
 	return &consulWatcher{
 		client:                 client,
 		config:                 config,
 		stopCh:                 stopCh,
 		waitIndex:              0,
-		list:                   iface.NewNodeList(nil),
+		list:                   iface.NewMemberList(nil),
 		serviceListenerManager: newServiceListenerManager(),
-		service:                service,
+		kind:                   kind,
 	}
 }
 
@@ -30,13 +30,13 @@ type consulWatcher struct {
 	config    *Config
 	stopCh    <-chan struct{}
 	waitIndex uint64
-	list      *iface.NodeList
-	service   string
+	list      *iface.MemberList
+	kind      string
 }
 
 func (w *consulWatcher) start() {
 	lib.Go(func(ctx context.Context) {
-		w.loop(ctx, w.service)
+		w.loop(ctx, w.kind)
 	})
 }
 
@@ -59,26 +59,26 @@ func (w *consulWatcher) loop(ctx context.Context, service string) {
 	}
 }
 
-func (w *consulWatcher) fetch(ctx context.Context, service string, listener func(*iface.Topology)) error {
+func (w *consulWatcher) fetch(ctx context.Context, kind string, listener func(*iface.Topology)) error {
 	options := &api.QueryOptions{
 		WaitIndex: w.waitIndex,
 		WaitTime:  w.config.WatchWaitTime,
 	}
 	options.WithContext(ctx)
-	services, meta, err := w.client.Health().Service(service, "", true, options)
+	services, meta, err := w.client.Health().Service(kind, "", true, options)
 	if err != nil {
-		glog.Error("Consul获取服务失败", zap.String("service", service), zap.Error(err))
+		glog.Error("Consul获取服务失败", zap.String("service", kind), zap.Error(err))
 		return err
 	}
 
 	w.waitIndex = meta.LastIndex
 
-	nodeDict := make(map[uint64]*iface.Node, len(services))
+	nodeDict := make(map[uint64]*iface.Member, len(services))
 	for _, s := range services {
 		id, _ := convertor.ToInt(s.Service.ID)
-		nodeDict[uint64(id)] = &iface.Node{
+		nodeDict[uint64(id)] = &iface.Member{
 			Id:      uint64(id),
-			Name:    s.Service.Service,
+			Kind:    s.Service.Service,
 			Address: s.Service.Address,
 			Port:    s.Service.Port,
 			Tags:    s.Service.Tags,
@@ -86,11 +86,11 @@ func (w *consulWatcher) fetch(ctx context.Context, service string, listener func
 		}
 	}
 
-	list := iface.NewNodeList(nodeDict)
+	list := iface.NewMemberList(nodeDict)
 	topology := list.UpdateTopology(w.list)
 	if len(topology.Left) > 0 || len(topology.Joined) > 0 {
 		glog.Debug("Consul服务拓扑变化",
-			zap.String("service", service),
+			zap.String("kind", kind),
 			zap.Int("joined", len(topology.Joined)),
 			zap.Int("alive", len(topology.Alive)),
 			zap.Int("left", len(topology.Left)),
@@ -98,7 +98,7 @@ func (w *consulWatcher) fetch(ctx context.Context, service string, listener func
 
 	} else {
 		glog.Debug("Consul服务拓扑未变化",
-			zap.String("service", service),
+			zap.String("service", kind),
 			zap.Int("total", len(nodeDict)))
 	}
 	if listener != nil {

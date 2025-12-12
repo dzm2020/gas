@@ -11,7 +11,7 @@ import (
 
 type INode interface {
 	GetID() uint64
-	Info() *discovery.Node
+	Info() *discovery.Member
 	SetSerializer(ser lib.ISerializer)
 	GetSerializer() lib.ISerializer
 	GetActorSystem() ISystem

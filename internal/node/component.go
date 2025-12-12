@@ -27,16 +27,14 @@ func (m *LogComponent) Start(ctx context.Context, node iface.INode) error {
 	cfg := m.node.GetConfig()
 
 	// 使用节点配置中的 glog 配置初始化
-	if err := glog.InitFromConfig(&cfg.Glog); err != nil {
+	if err := glog.InitFromConfig(&cfg.Logger); err != nil {
 		return err
 	}
 	options := []zap.Option{
-		zap.Fields(zap.String("nodeName", m.node.GetName()), zap.Uint64("nodeId", m.node.GetID())),
+		zap.Fields(zap.String("nodeKind", m.node.GetKind()), zap.Uint64("nodeId", m.node.GetID())),
 		zap.Hooks(func(entry zapcore.Entry) error {
 			if entry.Level >= zap.DPanicLevel {
-				if m.node.panicHook != nil {
-					m.node.panicHook(entry)
-				}
+				m.node.CallPanicHook(entry)
 			}
 			return nil
 		}),

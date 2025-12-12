@@ -1,6 +1,7 @@
 package messageQue
 
 import (
+	"context"
 	"fmt"
 	"gas/pkg/messageQue/provider/nats"
 	"testing"
@@ -11,7 +12,8 @@ const Topic = "topic1"
 
 func TestMessageQue(t *testing.T) {
 
-	client, err := nats.New([]string{"127.0.0.1:4222"}, nil)
+	client := nats.New([]string{"127.0.0.1:4222"}, nil)
+	err := client.Run(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

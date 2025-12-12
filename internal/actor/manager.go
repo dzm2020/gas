@@ -5,6 +5,7 @@ import (
 	"gas/internal/iface"
 
 	"github.com/duke-git/lancet/v2/maputil"
+	"golang.org/x/exp/slices"
 )
 
 // Manager 管理进程
@@ -76,11 +77,16 @@ func (m *Manager) registerGlobalName(name string) error {
 	if m.node == nil {
 		return errs.ErrNodeNotInitialized()
 	}
+	info := m.node.Info()
+	if info == nil {
+		return errs.ErrNodeNotInitialized()
+	}
+	info.Tags = append(info.Tags, name)
 	remote := m.node.GetRemote()
 	if remote == nil {
-		return errs.ErrRemoteNotInitialized()
+		return errs.ErrRemoteIsNil
 	}
-	return remote.RegistryName(name)
+	return remote.UpdateNode()
 }
 
 // HasName 检查名字是否已注册
@@ -146,7 +152,14 @@ func (m *Manager) unregisterGlobalName(name string) {
 	if remote == nil {
 		return
 	}
-	_ = remote.UnregisterName(name)
+	info := m.node.Info()
+	if info == nil {
+		return
+	}
+	slices.DeleteFunc(info.Tags, func(s string) bool {
+		return s == name
+	})
+	_ = remote.UpdateNode()
 }
 
 // GetAllProcesses 获取所有进程

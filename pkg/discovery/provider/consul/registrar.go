@@ -32,14 +32,14 @@ func newConsulRegistrar(client *api.Client, config *Config, stopCh <-chan struct
 	}
 }
 
-func (r *consulRegistrar) Add(node *iface.Node) error {
+func (r *consulRegistrar) Add(node *iface.Member) error {
 	check := &api.AgentServiceCheck{
 		TTL:                            r.config.HealthTTL.String(),
 		DeregisterCriticalServiceAfter: r.config.DeregisterInterval.String(),
 	}
 	registration := &api.AgentServiceRegistration{
 		ID:      convertor.ToString(node.GetID()),
-		Name:    node.GetName(),
+		Name:    node.GetKind(),
 		Address: node.GetAddress(),
 		Port:    node.GetPort(),
 		Tags:    node.GetTags(),
@@ -48,7 +48,7 @@ func (r *consulRegistrar) Add(node *iface.Node) error {
 	}
 	if err := r.client.Agent().ServiceRegister(registration); err != nil {
 		glog.Error("Consul注册节点失败", zap.Uint64("nodeId", node.GetID()),
-			zap.String("name", node.GetName()), zap.Error(err))
+			zap.String("kind", node.GetKind()), zap.Error(err))
 		return err
 	}
 
@@ -63,7 +63,7 @@ func (r *consulRegistrar) Add(node *iface.Node) error {
 	})
 	glog.Info("Consul节点注册成功",
 		zap.Uint64("nodeId", node.GetID()),
-		zap.String("name", node.GetName()))
+		zap.String("kind", node.GetKind()))
 	return nil
 }
 

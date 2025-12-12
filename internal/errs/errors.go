@@ -33,6 +33,8 @@ var (
 	ErrNodeIsNil = errors.New("node is nil")
 	// ErrRemoteIsNil 远程接口为空
 	ErrRemoteIsNil = errors.New("remote is nil")
+
+	ErrActorSystemIsNil = errors.New("actor system is nil")
 )
 
 // 消息相关错误

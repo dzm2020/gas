@@ -1,6 +1,7 @@
 package consul
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"gas/pkg/discovery"
@@ -28,22 +29,14 @@ func init() {
 var _ iface.IDiscovery = (*Provider)(nil)
 
 func New(config *Config) (*Provider, error) {
-	client, err := newConsulClient(config.Address)
-	if err != nil {
-		glog.Error("Consul创建客户端失败", zap.String("address", config.Address), zap.Error(err))
-		return nil, err
-	}
 
-	glog.Info("Consul连接成功", zap.String("address", config.Address))
 	stopCh := make(chan struct{})
 	provider := &Provider{
-		client:          client,
-		config:          config,
-		stopCh:          stopCh,
-		nodes:           make(map[uint64]*iface.Node),
-		consulRegistrar: newConsulRegistrar(client, config, stopCh),
+		config:  config,
+		stopCh:  stopCh,
+		members: make(map[uint64]*iface.Member),
 	}
-	provider.serviceWatcher = newServiceWatcher(client, config, stopCh, provider.onNodeChange)
+
 	return provider, nil
 }
 
@@ -57,15 +50,29 @@ type Provider struct {
 	serviceWatcher *serviceWatcher
 
 	// 节点存储
-	nodesMu sync.RWMutex
-	nodes   map[uint64]*iface.Node
+	memberMu sync.RWMutex
+	members  map[uint64]*iface.Member
 
 	*consulRegistrar
 }
 
-func newConsulClient(addr string) (*api.Client, error) {
+func (c *Provider) Run(ctx context.Context) error {
+	client, err := c.connect()
+	if err != nil {
+		glog.Error("consul连接失败", zap.String("address", c.config.Address), zap.Error(err))
+		return err
+	}
+	c.client = client
+	glog.Info("consul连接成功", zap.String("address", c.config.Address))
+
+	c.serviceWatcher = newServiceWatcher(client, c.config, c.stopCh, c.onNodeChange)
+	c.consulRegistrar = newConsulRegistrar(client, c.config, c.stopCh)
+	return nil
+}
+
+func (c *Provider) connect() (*api.Client, error) {
 	cfg := api.DefaultConfig()
-	cfg.Address = addr
+	cfg.Address = c.config.Address
 	client, err := api.NewClient(cfg)
 	if err != nil {
 		return nil, err
@@ -76,78 +83,78 @@ func newConsulClient(addr string) (*api.Client, error) {
 	return client, nil
 }
 
-func (c *Provider) Subscribe(service string, listener iface.ServiceChangeListener) error {
-	watcher := c.serviceWatcher.GetOrCreateWatcher(service)
+func (c *Provider) Watch(kind string, listener iface.ServiceChangeListener) error {
+	watcher := c.serviceWatcher.GetOrCreateWatcher(kind)
 	watcher.Add(listener)
-	glog.Info("Consul订阅服务", zap.String("service", service))
+	glog.Info("consul监控", zap.String("kind", kind))
 	return nil
 }
 
-func (c *Provider) Unsubscribe(service string, listener iface.ServiceChangeListener) {
-	watcher := c.serviceWatcher.GetWatcher(service)
+func (c *Provider) Unwatch(kind string, listener iface.ServiceChangeListener) {
+	watcher := c.serviceWatcher.GetWatcher(kind)
 	if watcher == nil {
 		return
 	}
 	_ = watcher.Remove(listener)
-	glog.Info("Consul取消服务订阅", zap.String("service", service))
+	glog.Info("consul取消监控", zap.String("kind", kind))
 }
 
 // onNodeChange 节点变化回调，更新节点存储
 func (c *Provider) onNodeChange(topology *iface.Topology) {
-	c.nodesMu.Lock()
-	defer c.nodesMu.Unlock()
+	c.memberMu.Lock()
+	defer c.memberMu.Unlock()
 
-	for _, node := range topology.Joined {
-		if node != nil {
-			c.nodes[node.GetID()] = convertor.DeepClone(node)
+	for _, member := range topology.Joined {
+		if member != nil {
+			c.members[member.GetID()] = convertor.DeepClone(member)
 		}
 	}
-	for _, node := range topology.Alive {
-		if node != nil {
-			c.nodes[node.GetID()] = convertor.DeepClone(node)
+	for _, member := range topology.Alive {
+		if member != nil {
+			c.members[member.GetID()] = convertor.DeepClone(member)
 		}
 	}
-	for _, node := range topology.Left {
-		if node != nil {
-			delete(c.nodes, node.GetID())
+	for _, member := range topology.Left {
+		if member != nil {
+			delete(c.members, member.GetID())
 		}
 	}
 }
 
-func (c *Provider) GetById(nodeId uint64) *iface.Node {
-	c.nodesMu.RLock()
-	defer c.nodesMu.RUnlock()
-	if node, exists := c.nodes[nodeId]; exists {
-		return convertor.DeepClone(node)
+func (c *Provider) GetById(memberId uint64) *iface.Member {
+	c.memberMu.RLock()
+	defer c.memberMu.RUnlock()
+	if member, exists := c.members[memberId]; exists {
+		return convertor.DeepClone(member)
 	}
 	return nil
 }
 
-func (c *Provider) GetService(service string) []*iface.Node {
-	c.nodesMu.RLock()
-	defer c.nodesMu.RUnlock()
+func (c *Provider) GetByKind(service string) []*iface.Member {
+	c.memberMu.RLock()
+	defer c.memberMu.RUnlock()
 
-	result := make([]*iface.Node, 0)
-	for _, node := range c.nodes {
-		if node.GetName() == service {
-			result = append(result, convertor.DeepClone(node))
+	result := make([]*iface.Member, 0)
+	for _, member := range c.members {
+		if member.GetKind() == service {
+			result = append(result, convertor.DeepClone(member))
 		}
 	}
 	return result
 }
 
-func (c *Provider) GetAll() []*iface.Node {
-	c.nodesMu.RLock()
-	defer c.nodesMu.RUnlock()
+func (c *Provider) GetAll() []*iface.Member {
+	c.memberMu.RLock()
+	defer c.memberMu.RUnlock()
 
-	result := make([]*iface.Node, 0, len(c.nodes))
-	for _, node := range c.nodes {
-		result = append(result, convertor.DeepClone(node))
+	result := make([]*iface.Member, 0, len(c.members))
+	for _, member := range c.members {
+		result = append(result, convertor.DeepClone(member))
 	}
 	return result
 }
 
-func (c *Provider) Close() error {
+func (c *Provider) Shutdown(ctx context.Context) error {
 	c.stopOnce.Do(func() {
 		close(c.stopCh)
 	})

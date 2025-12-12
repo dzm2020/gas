@@ -63,7 +63,7 @@ func (sw *serviceWatcher) watch(ctx context.Context) {
 			return
 		default:
 			if err := sw.fetch(ctx); err != nil {
-				glog.Error("Consul获取服务列表失败", zap.Error(err))
+				glog.Error("consul获取服务列表失败", zap.Error(err))
 				select {
 				case <-time.After(time.Second):
 				case <-sw.stopCh:

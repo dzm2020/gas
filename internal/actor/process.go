@@ -128,11 +128,11 @@ func (p *Process) Call(message *iface.Message, timeout time.Duration) *iface.Res
 		waiter.Done(response)
 	})
 	if err := p.postMessage(msg); err != nil {
-		return iface.NewErrorResponse(err.Error())
+		return iface.NewErrorResponse(err)
 	}
 	res, err := waiter.Wait()
 	if err != nil {
-		return iface.NewErrorResponse(err.Error())
+		return iface.NewErrorResponse(err)
 	}
 	return res
 }

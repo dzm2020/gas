@@ -10,7 +10,7 @@ import (
 // RouteStrategy 路由策略函数，从节点列表中选择一个节点
 
 // RouteRandom 随机路由策略
-func RouteRandom(nodes []*discovery.Node) *discovery.Node {
+func RouteRandom(nodes []*discovery.Member) *discovery.Member {
 	if len(nodes) == 0 {
 		return nil
 	}
@@ -19,7 +19,7 @@ func RouteRandom(nodes []*discovery.Node) *discovery.Node {
 
 // RouteRoundRobin 轮询路由策略（需要外部维护状态）
 func RouteRoundRobin(counter *uint64) iface.RouteStrategy {
-	return func(nodes []*discovery.Node) *discovery.Node {
+	return func(nodes []*discovery.Member) *discovery.Member {
 		if len(nodes) == 0 {
 			return nil
 		}
@@ -29,7 +29,7 @@ func RouteRoundRobin(counter *uint64) iface.RouteStrategy {
 }
 
 // RouteFirst 选择第一个节点
-func RouteFirst(nodes []*discovery.Node) *discovery.Node {
+func RouteFirst(nodes []*discovery.Member) *discovery.Member {
 	if len(nodes) == 0 {
 		return nil
 	}

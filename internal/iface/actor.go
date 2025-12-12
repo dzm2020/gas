@@ -177,7 +177,7 @@ type ISystem interface {
 	// name: 进程名称
 	// strategy: 路由策略
 	// 返回: 进程 ID 和错误
-	Select(name string, strategy RouteStrategy) (*Pid, error)
+	Select(name string, strategy RouteStrategy) *Pid
 
 	// RegisterName 注册进程名称
 	// pid: 进程 ID

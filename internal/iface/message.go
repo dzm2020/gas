@@ -107,9 +107,9 @@ func (m *SyncMessage) SetResponse(f func(*Response)) {
 // NewErrorResponse 创建错误响应消息
 // errMsg: 错误消息
 // 返回: 错误响应消息对象
-func NewErrorResponse(errMsg string) *Response {
+func NewErrorResponse(err error) *Response {
 	return &Response{
-		Error: errMsg,
+		Error: err.Error(),
 	}
 }
 
