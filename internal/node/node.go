@@ -86,6 +86,48 @@ func (m *Node) GetSerializer() lib.ISerializer {
 	return m.serializer
 }
 
+func (m *Node) Marshal(request interface{}) []byte {
+	// 处理 nil 情况
+	if request == nil {
+		return []byte{}
+	}
+
+	// 如果已经是 []byte 类型，直接返回
+	if data, ok := request.([]byte); ok {
+		return data
+	}
+
+	// 使用序列化器序列化
+	if data, err := m.GetSerializer().Marshal(request); err != nil {
+		panic(err)
+	} else {
+		return data
+	}
+}
+
+func (m *Node) Unmarshal(data []byte, reply interface{}) {
+	// 如果数据为空，直接返回
+	if len(data) == 0 {
+		return
+	}
+
+	// 如果目标对象为空，直接返回
+	if reply == nil {
+		return
+	}
+
+	// 如果目标对象是指向 []byte 的指针，直接将数据赋值
+	if ptr, ok := reply.(*[]byte); ok {
+		*ptr = data
+		return
+	}
+
+	// 使用序列化器反序列化
+	if err := m.GetSerializer().Unmarshal(data, reply); err != nil {
+		panic(err)
+	}
+}
+
 func (m *Node) GetConfig() *config.Config {
 	return m.config
 }

@@ -137,6 +137,9 @@ type Subscription struct {
 // Unsubscribe 实现 Subscription 接口
 func (n *Subscription) Unsubscribe() error {
 	glog.Info("NAT取消订阅", zap.String("subject", n.sub.Subject))
+	if n.c == nil {
+		return nil
+	}
 	n.c.removeSub(n)
 	return n.sub.Unsubscribe()
 }

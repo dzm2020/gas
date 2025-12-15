@@ -85,9 +85,10 @@ type Message struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	To            *Pid                   `protobuf:"bytes,1,opt,name=to,proto3" json:"to,omitempty"`
 	From          *Pid                   `protobuf:"bytes,2,opt,name=from,proto3" json:"from,omitempty"`
-	Id            int64                  `protobuf:"varint,3,opt,name=id,proto3" json:"id,omitempty"`
+	Method        string                 `protobuf:"bytes,3,opt,name=method,proto3" json:"method,omitempty"`
 	Data          []byte                 `protobuf:"bytes,4,opt,name=data,proto3" json:"data,omitempty"`
-	Session       *Session               `protobuf:"bytes,5,opt,name=session,proto3" json:"session,omitempty"`
+	Async         bool                   `protobuf:"varint,5,opt,name=async,proto3" json:"async,omitempty"`
+	Session       *Session               `protobuf:"bytes,6,opt,name=session,proto3" json:"session,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -136,11 +137,11 @@ func (x *Message) GetFrom() *Pid {
 	return nil
 }
 
-func (x *Message) GetId() int64 {
+func (x *Message) GetMethod() string {
 	if x != nil {
-		return x.Id
+		return x.Method
 	}
-	return 0
+	return ""
 }
 
 func (x *Message) GetData() []byte {
@@ -148,6 +149,13 @@ func (x *Message) GetData() []byte {
 		return x.Data
 	}
 	return nil
+}
+
+func (x *Message) GetAsync() bool {
+	if x != nil {
+		return x.Async
+	}
+	return false
 }
 
 func (x *Message) GetSession() *Session {
@@ -301,15 +309,16 @@ const file_actor_proto_rawDesc = "" +
 	"\x03Pid\x12\x16\n" +
 	"\x06nodeId\x18\x01 \x01(\x04R\x06nodeId\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1c\n" +
-	"\tserviceId\x18\x03 \x01(\x04R\tserviceId\"\x93\x01\n" +
+	"\tserviceId\x18\x03 \x01(\x04R\tserviceId\"\xb1\x01\n" +
 	"\aMessage\x12\x1a\n" +
 	"\x02to\x18\x01 \x01(\v2\n" +
 	".actor.PidR\x02to\x12\x1e\n" +
 	"\x04from\x18\x02 \x01(\v2\n" +
-	".actor.PidR\x04from\x12\x0e\n" +
-	"\x02id\x18\x03 \x01(\x03R\x02id\x12\x12\n" +
-	"\x04data\x18\x04 \x01(\fR\x04data\x12(\n" +
-	"\asession\x18\x05 \x01(\v2\x0e.actor.SessionR\asession\"4\n" +
+	".actor.PidR\x04from\x12\x16\n" +
+	"\x06method\x18\x03 \x01(\tR\x06method\x12\x12\n" +
+	"\x04data\x18\x04 \x01(\fR\x04data\x12\x14\n" +
+	"\x05async\x18\x05 \x01(\bR\x05async\x12(\n" +
+	"\asession\x18\x06 \x01(\v2\x0e.actor.SessionR\asession\"4\n" +
 	"\bResponse\x12\x12\n" +
 	"\x04data\x18\x01 \x01(\fR\x04data\x12\x14\n" +
 	"\x05error\x18\x02 \x01(\tR\x05error\"\x9b\x01\n" +

@@ -24,7 +24,6 @@ func (a *Component) Name() string {
 func (a *Component) Start(ctx context.Context, node iface.INode) error {
 	a.node = node
 	a.system = NewSystem()
-	a.system.SetSerializer(a.node.GetSerializer())
 	a.system.SetNode(a.node)
 	a.node.SetActorSystem(a.system)
 	return nil

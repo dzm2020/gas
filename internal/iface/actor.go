@@ -25,21 +25,18 @@ type IContext interface {
 
 	// Send 异步发送消息到指定进程
 	// to: 目标进程 ID
-	// msgId: 消息 ID
+	// methodName: 方法名
 	// request: 请求数据，可以是任意类型，会自动序列化
 	// 返回: 发送错误，nil 表示成功
-	Send(to *Pid, msgId uint16, request interface{}) error
+	Send(to *Pid, methodName string, request interface{}) error
 
 	// Call 同步发送请求消息并等待响应
 	// to: 目标进程 ID
-	// msgId: 消息 ID
+	// methodName: 方法名
 	// request: 请求数据
 	// reply: 响应数据指针，用于接收反序列化后的响应
 	// 返回: 请求错误，nil 表示成功
-	Call(to *Pid, msgId uint16, request interface{}, reply interface{}) error
-
-	// GetSerializer 获取序列化器，用于消息的序列化和反序列化
-	GetSerializer() lib.ISerializer
+	Call(to *Pid, methodName string, request interface{}, reply interface{}) error
 
 	// AfterFunc 注册一次性定时器
 	// duration: 延迟时间
@@ -53,16 +50,12 @@ type IContext interface {
 	// 返回: 注册错误
 	RegisterName(name string, isGlobal bool) error
 
-	// SetRouter 设置消息路由器
-	// router: 路由器实例
-	SetRouter(router IRouter)
-
 	// GetRouter 获取消息路由器
 	GetRouter() IRouter
 
 	// Message 获取当前正在处理的消息
 	// 返回: 当前消息，如果没有则返回 nil
-	Message() *Message
+	Message() *ActorMessage
 
 	// System 获取 Actor 系统实例
 	System() ISystem
@@ -71,6 +64,8 @@ type IContext interface {
 	Shutdown() error
 
 	Process() IProcess
+
+	Node() INode
 }
 
 // IActor Actor 接口，定义 Actor 的生命周期和消息处理
@@ -113,14 +108,14 @@ type IProcess interface {
 	//  @Description:异步调用
 	//  @param message
 	//  @return error
-	Send(message *Message) error
+	Send(message *ActorMessage) error
 
 	// Call
 	//  @Description:
 	//  @param message
 	//  @param timeout
 	//  @return *RespondMessage
-	Call(message *Message, timeout time.Duration) *Response
+	Call(message *ActorMessage, timeout time.Duration) *Response
 
 	// Shutdown 退出进程，清理资源并等待所有任务完成
 	// 返回: 退出错误，nil 表示成功
@@ -136,13 +131,6 @@ type ISystem interface {
 	// GetNode 获取节点实例
 	GetNode() INode
 
-	// GetSerializer 获取序列化器
-	GetSerializer() lib.ISerializer
-
-	// SetSerializer 设置序列化器
-	// ser: 序列化器实例
-	SetSerializer(ser lib.ISerializer)
-
 	// Spawn 创建新的 Actor 进程
 	// actor: Actor 实例
 	// args: 初始化参数，会传递给 Actor.OnInit
@@ -152,13 +140,13 @@ type ISystem interface {
 	// Send 发送消息到指定进程（异步）
 	// message: 消息对象
 	// 返回: 发送错误，nil 表示成功
-	Send(message *Message) error
+	Send(message *ActorMessage) error
 
 	// Call 发送请求消息并等待响应（同步）
 	// message: 请求消息
 	// timeout: 超时时间
 	// 返回: 响应消息
-	Call(message *Message, timeout time.Duration) *Response
+	Call(message *ActorMessage, timeout time.Duration) *Response
 
 	// PushTask 推送任务到指定进程（异步）
 	// pid: 目标进程 ID
@@ -190,27 +178,22 @@ type ISystem interface {
 
 // IRouter 消息路由器接口，用于注册和处理消息处理器
 type IRouter interface {
-	// Register 注册消息处理器
-	// msgId: 消息 ID
-	// handler: 处理器函数，支持以下三种签名：
-	//   - 客户端消息: func(ctx IContext, session ISession, request *RequestType) error
-	//   - 同步消息: func(ctx IContext, request *RequestType, response *ResponseType) error
-	//   - 异步消息: func(ctx IContext, request *RequestType) error
-	// 注意: 如果注册失败，错误会通过日志输出
-	Register(msgId int64, handler interface{})
-
-	// Handle 处理消息
+	// Handle 基于方法名处理消息，从 message.Data 反序列化参数
 	// ctx: Actor 上下文
-	// msgId: 消息 ID
+	// methodName: 方法名
 	// session: 客户端会话（客户端消息时不为 nil）
-	// data: 消息数据（已序列化的字节数组）
+	// data: 参数数据（从 message.Data 获取）
 	// 返回: 响应数据（同步消息）和错误，异步调用时 response 为 nil
-	Handle(ctx IContext, msgId int64, session ISession, data []byte) ([]byte, error)
+	Handle(ctx IContext, methodName string, session ISession, data []byte) ([]byte, error)
 
-	// HasRoute 判断指定消息ID的路由是否存在
-	// msgId: 消息 ID
+	// HasRoute 判断指定方法名的路由是否存在
+	// methodName: 方法名
 	// 返回: 是否存在路由
-	HasRoute(msgId int64) bool
+	HasRoute(methodName string) bool
+
+	// AutoRegister 自动扫描并注册 actorContext 和 actor 的所有导出方法
+	// ctx: Actor 上下文（需要是 *actorContext 类型）
+	AutoRegister(actor IActor)
 }
 
 // Actor 基础 Actor 实现，提供默认的空实现

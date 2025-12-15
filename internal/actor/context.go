@@ -18,7 +18,10 @@ type IMessageInvoker interface {
 }
 
 func newActorContext() *actorContext {
-	ctx := &actorContext{}
+	ctx := &actorContext{
+		router: nil, // 稍后在 Spawn 时根据 actor 类型设置
+	}
+
 	return ctx
 }
 
@@ -29,7 +32,7 @@ type actorContext struct {
 	name    string
 	actor   iface.IActor
 	router  iface.IRouter
-	msg     *iface.Message
+	msg     *iface.ActorMessage
 }
 
 func (a *actorContext) ID() *iface.Pid {
@@ -42,9 +45,7 @@ func (a *actorContext) GetRouter() iface.IRouter {
 func (a *actorContext) System() iface.ISystem {
 	return a.system
 }
-func (a *actorContext) SetRouter(router iface.IRouter) {
-	a.router = router
-}
+
 func (a *actorContext) Process() iface.IProcess {
 	return a.process
 }
@@ -52,14 +53,11 @@ func (a *actorContext) Actor() iface.IActor {
 	return a.actor
 }
 
-func (a *actorContext) GetSerializer() lib.ISerializer {
-	if a.system != nil {
-		return a.system.GetSerializer()
-	}
-	return lib.Json // 默认序列化器
+func (a *actorContext) Node() iface.INode {
+	return a.system.GetNode()
 }
 
-func (a *actorContext) Message() *iface.Message {
+func (a *actorContext) Message() *iface.ActorMessage {
 	if a.msg == nil {
 		return nil
 	}
@@ -67,7 +65,7 @@ func (a *actorContext) Message() *iface.Message {
 }
 func (a *actorContext) InvokerMessage(msg interface{}) error {
 	if err := a.invokerMessage(msg); err != nil {
-		glog.Error("InvokerMessage", zap.Any("msg", msg), zap.Error(err))
+		glog.Error("InvokerMessage", zap.Any("pid", a.ID()), zap.Error(err))
 		return err
 	}
 	return nil
@@ -77,29 +75,19 @@ func (a *actorContext) invokerMessage(msg interface{}) error {
 	switch m := msg.(type) {
 	case *iface.TaskMessage:
 		return m.Task(a)
-	case *iface.Message:
+	case *iface.ActorMessage:
+		glog.Debug("InvokerMessage", zap.Any("pid", a.ID()), zap.Any("msg", msg))
 		return a.handleMessage(m)
-	case *iface.SyncMessage:
-		return a.handleSyncMessage(m)
 	default:
 		return errs.ErrUnsupportedMessageType(fmt.Sprintf("%T", msg))
 	}
 }
 
-// handleMessage 处理普通消息
-func (a *actorContext) handleMessage(m *iface.Message) error {
+// handleMessage
+func (a *actorContext) handleMessage(m *iface.ActorMessage) error {
 	a.msg = m
-	if a.router != nil && a.router.HasRoute(m.GetId()) {
-		_, err := a.execHandler(m)
-		return err
-	}
-	return a.actor.OnMessage(a, m)
-}
-
-// handleSyncMessage 处理同步消息
-func (a *actorContext) handleSyncMessage(m *iface.SyncMessage) error {
-	a.msg = m.Message
-	if a.router != nil && a.router.HasRoute(m.GetId()) {
+	methodName := m.Message.GetMethod()
+	if a.router != nil && methodName != "" && a.router.HasRoute(methodName) {
 		data, err := a.execHandler(m.Message)
 		m.Response(data, err)
 		return err
@@ -110,41 +98,33 @@ func (a *actorContext) handleSyncMessage(m *iface.SyncMessage) error {
 	return err
 }
 
+// execHandler 基于方法名执行处理器
 func (a *actorContext) execHandler(msg *iface.Message) ([]byte, error) {
-	if msg == nil {
-		return nil, errs.ErrMsgIsNil()
-	}
+	methodName := msg.GetMethod()
 	session := msg.GetSession()
-	wrapSession := iface.NewSession(a, session)
-	return a.router.Handle(a, msg.GetId(), wrapSession, msg.GetData())
+	var wrapSession iface.ISession
+	if session != nil {
+		wrapSession = iface.NewSession(a, session)
+	}
+	data := msg.GetData()
+	return a.router.Handle(a, methodName, wrapSession, data)
 }
 
-func (a *actorContext) Send(to *iface.Pid, msgId uint16, request interface{}) error {
-	message := iface.NewMessage(a.pid, to, int64(msgId))
-
-	data, err := iface.Marshal(a.GetSerializer(), request)
-	if err != nil {
-		return err
-	}
-	message.Data = data
-
+func (a *actorContext) Send(to *iface.Pid, methodName string, request interface{}) error {
+	message := iface.NewActorMessage(a.pid, to, methodName)
+	message.Data = a.Node().Marshal(request)
 	return a.system.Send(message)
 }
 
-func (a *actorContext) Call(to *iface.Pid, msgId uint16, request interface{}, reply interface{}) error {
-	message := iface.NewMessage(a.pid, to, int64(msgId))
-
-	data, err := iface.Marshal(a.GetSerializer(), request)
-	if err != nil {
-		return err
-	}
-	message.Data = data
-
+func (a *actorContext) Call(to *iface.Pid, methodName string, request interface{}, reply interface{}) error {
+	message := iface.NewActorMessage(a.pid, to, methodName)
+	message.Data = a.Node().Marshal(request)
 	response := a.system.Call(message, time.Second*3)
 	if response.Error != "" {
 		return errors.New(response.Error)
 	}
-	return iface.Unmarshal(a.GetSerializer(), response.GetData(), reply)
+	a.Node().Unmarshal(response.GetData(), reply)
+	return nil
 }
 
 func (a *actorContext) RegisterName(name string, isGlobal bool) error {

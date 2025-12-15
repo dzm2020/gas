@@ -43,7 +43,6 @@ func (r *Component) Start(ctx context.Context, node iface.INode) error {
 		nodeSubjectPrefix: config.Remote.SubjectPrefix,
 		discovery:         discoveryInstance,
 		messageQue:        messageQueue,
-		serializer:        r.node.GetSerializer(),
 		node:              r.node,
 	}
 

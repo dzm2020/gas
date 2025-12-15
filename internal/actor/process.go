@@ -116,18 +116,19 @@ func (p *Process) pushTaskAndWait(timeout time.Duration, task iface.Task) error 
 }
 
 // Send 发送消息到进程
-func (p *Process) Send(message *iface.Message) error {
+func (p *Process) Send(message *iface.ActorMessage) error {
+	message.Async = true
 	return p.postMessage(message)
 }
 
 // Call 发送同步请求消息并等待响应
-func (p *Process) Call(message *iface.Message, timeout time.Duration) *iface.Response {
+func (p *Process) Call(message *iface.ActorMessage, timeout time.Duration) *iface.Response {
+	message.Async = false
 	waiter := newChanWaiter[*iface.Response](timeout)
-	msg := &iface.SyncMessage{Message: message}
-	msg.SetResponse(func(response *iface.Response) {
+	message.SetResponse(func(response *iface.Response) {
 		waiter.Done(response)
 	})
-	if err := p.postMessage(msg); err != nil {
+	if err := p.postMessage(message); err != nil {
 		return iface.NewErrorResponse(err)
 	}
 	res, err := waiter.Wait()

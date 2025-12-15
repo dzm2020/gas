@@ -7,7 +7,7 @@ import (
 	"gas/pkg/network"
 )
 
-func (agent *Agent) handlerPush(ctx iface.IContext, session iface.ISession, data []byte) error {
+func (agent *Agent) PushMessageToClient(ctx iface.IContext, session iface.ISession, data []byte) error {
 	entity := network.GetConnection(session.GetEntityId())
 	if entity == nil {
 		return errors.New("entity not found")
@@ -20,36 +20,36 @@ func (agent *Agent) handlerPush(ctx iface.IContext, session iface.ISession, data
 
 }
 
-func handlerClose(ctx iface.IContext, session iface.ISession, data []byte) error {
-	//agent := ctx.Actor().(*Agent)
-	//if agent.IConnection == nil {
-	//	return nil
-	//}
-	//return agent.IConnection.Close(nil)
+func (agent *Agent) CloseClientConnection(ctx iface.IContext, session iface.ISession, data []byte) error {
+	entity := network.GetConnection(session.GetEntityId())
+	if entity == nil {
+		return errors.New("entity not found")
+	}
+	return entity.Close(nil)
 }
 
 type Factory func() iface.IActor
 
 type IAgent interface {
 	iface.IActor
-	OnConnectionOpen(ctx iface.IContext, connection network.IConnection) error
-	OnConnectionClose(ctx iface.IContext) error
+	OnNetworkOpen(ctx iface.IContext, session iface.ISession) error
+	OnNetworkMessage(ctx iface.IContext, session iface.ISession, data []byte) error
+	OnNetworkClose(ctx iface.IContext, session iface.ISession) error
 }
+
+var _ IAgent = (*Agent)(nil)
 
 type Agent struct {
 	iface.Actor
-	ctx iface.IContext
 }
 
-func (agent *Agent) OnConnect(ctx iface.IContext, connection network.IConnection) error {
-	router := ctx.GetRouter()
-	if router == nil {
-		return nil
-	}
-	router.Register(iface.MsgIdPushMessageToClient, handlerPush)
-	router.Register(iface.MsgIdCloseClientConnection, handlerClose)
+func (agent *Agent) OnNetworkOpen(ctx iface.IContext, session iface.ISession) error {
+	return nil
+}
 
-	ctx.System().PushTask(pid, handlerPush, arg1, arg2)
-
+func (agent *Agent) OnNetworkMessage(ctx iface.IContext, session iface.ISession, data []byte) error {
+	return nil
+}
+func (agent *Agent) OnNetworkClose(ctx iface.IContext, session iface.ISession) error {
 	return nil
 }

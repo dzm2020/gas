@@ -74,19 +74,9 @@ func (m *Manager) RegisterName(pid *iface.Pid, process iface.IProcess, name stri
 
 // registerGlobalName 在远程注册全局名字
 func (m *Manager) registerGlobalName(name string) error {
-	if m.node == nil {
-		return errs.ErrNodeNotInitialized()
-	}
 	info := m.node.Info()
-	if info == nil {
-		return errs.ErrNodeNotInitialized()
-	}
 	info.Tags = append(info.Tags, name)
-	remote := m.node.GetRemote()
-	if remote == nil {
-		return errs.ErrRemoteIsNil
-	}
-	return remote.UpdateNode()
+	return m.node.GetRemote().UpdateNode()
 }
 
 // HasName 检查名字是否已注册
@@ -149,13 +139,7 @@ func (m *Manager) unregisterGlobalName(name string) {
 		return
 	}
 	remote := m.node.GetRemote()
-	if remote == nil {
-		return
-	}
 	info := m.node.Info()
-	if info == nil {
-		return
-	}
 	slices.DeleteFunc(info.Tags, func(s string) bool {
 		return s == name
 	})

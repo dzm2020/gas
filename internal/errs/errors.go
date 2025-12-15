@@ -23,6 +23,8 @@ var (
 	ErrTaskIsNil = errors.New("task is nil")
 	// ErrMessageIsNil 消息为空
 	ErrMessageIsNil = errors.New("message is nil")
+
+	ErrMessageMethodIsNil = fmt.Errorf("msg method is nil")
 )
 
 // 系统相关错误
@@ -69,6 +71,10 @@ func ErrHandlerFirstParameterMustBeContext() error {
 	return fmt.Errorf("actor: handler first parameter must be actor.IContext")
 }
 
+func ErrHandlerSecondParameterMustBeContext() error {
+	return fmt.Errorf("actor: handler second parameter must be actor.IContext")
+}
+
 func ErrHandlerAlreadyRegistered(msgId int64) error {
 	return fmt.Errorf("actor: handler already registered for msgId=%d", msgId)
 }
@@ -99,6 +105,22 @@ func ErrHandlerReturnType() error {
 
 func ErrAsyncHandlerSecondParameter(typ string) error {
 	return fmt.Errorf("actor: handler second paramter must be point ,got %s", typ)
+}
+
+func ErrAsyncHandlerThirdParameter(typ string) error {
+	return fmt.Errorf("actor: async handler third parameter (request) must be pointer or []byte, got %s", typ)
+}
+
+func ErrClientHandlerFourthParameter(typ string) error {
+	return fmt.Errorf("actor: client handler fourth parameter (request) must be pointer or []byte, got %s", typ)
+}
+
+func ErrSyncHandlerFourthParameter(responseType string) error {
+	return fmt.Errorf("actor: sync handler fourth parameter (response) must be pointer, got %s", responseType)
+}
+
+func ErrActorIsNil() error {
+	return fmt.Errorf("actor: actor is nil")
 }
 
 func ErrUnknownHandlerType(msgId int64) error {

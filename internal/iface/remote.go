@@ -10,8 +10,8 @@ type RouteStrategy func(nodes []*discovery.Member) *discovery.Member
 
 type IRemote interface {
 	Start(ctx context.Context) error
-	Send(message *Message) error
-	Call(message *Message, timeout time.Duration) *Response
+	Send(message *ActorMessage) error
+	Call(message *ActorMessage, timeout time.Duration) *Response
 	Select(service string, strategy RouteStrategy) *Pid
 	UpdateNode() error
 	Shutdown(ctx context.Context) error

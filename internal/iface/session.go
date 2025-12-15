@@ -1,11 +1,6 @@
 package iface
 
-import "gas/internal/errs"
-
-const (
-	MsgIdPushMessageToClient   = -1
-	MsgIdCloseClientConnection = -2
-)
+import "github.com/duke-git/lancet/v2/convertor"
 
 type ISession interface {
 	GetMid() int64
@@ -13,10 +8,15 @@ type ISession interface {
 	GetCode() int64
 	Response(request interface{}) error
 	ResponseCode(code int64) error
-	Forward(toPid *Pid) error
-	Push(request interface{}) error
+	Forward(toPid *Pid, method string) error
+	Push(msgId uint16, request interface{}) error
 	GetEntityId() int64
 }
+
+const (
+	PushMessageToClientMethod   = "PushMessageToClient"
+	CloseClientConnectionMethod = "CloseClientConnection"
+)
 
 func NewSession(ctx IContext, session *Session) ISession {
 	return &WrapSession{
@@ -31,43 +31,36 @@ type WrapSession struct {
 }
 
 func (a *WrapSession) Response(request interface{}) error {
-	message, err := a.buildMessage(MsgIdPushMessageToClient, request)
-	if err != nil {
-		return err
-	}
+	message := NewActorMessage(a.ctx.ID(), a.GetAgent(), PushMessageToClientMethod)
+	message.Session = convertor.DeepClone(a.Session)
+	message.Data = a.ctx.Node().Marshal(request)
 	return a.send(message)
 }
 
 func (a *WrapSession) ResponseCode(code int64) error {
-	a.Session.Code = code
-	message, err := a.buildMessage(MsgIdPushMessageToClient, []byte{})
-	if err != nil {
-		return err
-	}
+	message := NewActorMessage(a.ctx.ID(), a.GetAgent(), PushMessageToClientMethod)
+	message.Session = convertor.DeepClone(a.Session)
+	message.Session.Code = code
 	return a.send(message)
 }
 
-func (a *WrapSession) Forward(toPid *Pid) error {
-	msg := a.ctx.Message()
-	if msg == nil {
-		return errs.ErrNoMessageToForwardInSession
-	}
-	msg.To = toPid
-	msg.From = a.ctx.ID()
-	return a.ctx.System().Send(msg)
+func (a *WrapSession) Forward(toPid *Pid, method string) error {
+	message := convertor.DeepClone(a.ctx.Message())
+	message.To = toPid
+	message.Method = method
+	return a.ctx.System().Send(message)
 }
 
-func (a *WrapSession) Push(request interface{}) error {
-	message, err := a.buildMessage(MsgIdPushMessageToClient, request)
-	if err != nil {
-		return err
-	}
+func (a *WrapSession) Push(msgId uint16, request interface{}) error {
+	message := NewActorMessage(a.ctx.ID(), a.GetAgent(), PushMessageToClientMethod)
+	message.Session = convertor.DeepClone(a.Session)
+	message.Session.Mid = int64(msgId)
+	message.Data = a.ctx.Node().Marshal(request)
 	return a.send(message)
 }
 
 // sendToSession 发送消息到会话，如果是本地则直接调用，否则通过系统发送
-func (a *WrapSession) send(message *Message) error {
-	message.Session = a.Session
+func (a *WrapSession) send(message *ActorMessage) error {
 	if a.GetAgent() == a.ctx.ID() {
 		return a.ctx.InvokerMessage(message)
 	}
@@ -75,19 +68,6 @@ func (a *WrapSession) send(message *Message) error {
 }
 
 func (a *WrapSession) Close() error {
-	message, err := a.buildMessage(MsgIdCloseClientConnection, []byte{})
-	if err != nil {
-		return err
-	}
+	message := NewActorMessage(a.ctx.ID(), a.GetAgent(), CloseClientConnectionMethod)
 	return a.send(message)
-}
-
-func (a *WrapSession) buildMessage(msgId int64, request interface{}) (*Message, error) {
-	message := NewMessage(a.ctx.ID(), a.GetAgent(), msgId)
-	data, err := Marshal(a.ctx.GetSerializer(), request)
-	if err != nil {
-		return nil, err
-	}
-	message.Data = data
-	return message, nil
 }

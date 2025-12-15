@@ -13,7 +13,6 @@ type INode interface {
 	GetID() uint64
 	Info() *discovery.Member
 	SetSerializer(ser lib.ISerializer)
-	GetSerializer() lib.ISerializer
 	GetActorSystem() ISystem
 	SetActorSystem(system ISystem)
 	GetRemote() IRemote
@@ -23,6 +22,8 @@ type INode interface {
 	SetPanicHook(panicHook func(entry zapcore.Entry))
 	GetTags() []string
 	SetTags([]string)
+	Marshal(request interface{}) []byte
+	Unmarshal(data []byte, reply interface{})
 }
 
 // IComponent 组件接口
