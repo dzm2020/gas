@@ -28,7 +28,7 @@ type IContext interface {
 	// methodName: 方法名
 	// request: 请求数据，可以是任意类型，会自动序列化
 	// 返回: 发送错误，nil 表示成功
-	Send(to *Pid, methodName string, request interface{}) error
+	Send(to interface{}, methodName string, request interface{}) error
 
 	// Call 同步发送请求消息并等待响应
 	// to: 目标进程 ID
@@ -36,7 +36,7 @@ type IContext interface {
 	// request: 请求数据
 	// reply: 响应数据指针，用于接收反序列化后的响应
 	// 返回: 请求错误，nil 表示成功
-	Call(to *Pid, methodName string, request interface{}, reply interface{}) error
+	Call(to interface{}, methodName string, request interface{}, reply interface{}) error
 
 	// AfterFunc 注册一次性定时器
 	// duration: 延迟时间
@@ -174,6 +174,13 @@ type ISystem interface {
 	// isGlobal: 是否全局注册
 	// 返回: 注册错误
 	RegisterName(pid *Pid, process IProcess, name string, isGlobal bool) error
+	//
+	// CastPid
+	//  @Description: 转换PID
+	//  @param pid
+	//  @return *Pid
+	//
+	CastPid(pid interface{}) *Pid
 }
 
 // IRouter 消息路由器接口，用于注册和处理消息处理器

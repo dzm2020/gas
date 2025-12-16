@@ -100,25 +100,21 @@ func (a *actorContext) handleMessage(m *iface.ActorMessage) error {
 
 // execHandler 基于方法名执行处理器
 func (a *actorContext) execHandler(msg *iface.Message) ([]byte, error) {
-	methodName := msg.GetMethod()
-	session := msg.GetSession()
-	var wrapSession iface.ISession
-	if session != nil {
-		wrapSession = iface.NewSession(a, session)
-	}
-	data := msg.GetData()
-	return a.router.Handle(a, methodName, wrapSession, data)
+	session := iface.NewSession(a, msg.GetSession())
+	return a.router.Handle(a, msg.GetMethod(), session, msg.GetData())
 }
 
-func (a *actorContext) Send(to *iface.Pid, methodName string, request interface{}) error {
-	message := iface.NewActorMessage(a.pid, to, methodName)
-	message.Data = a.Node().Marshal(request)
+func (a *actorContext) Send(to interface{}, methodName string, request interface{}) error {
+	toPid := a.System().CastPid(to)
+	bin := a.Node().Marshal(request)
+	message := iface.NewActorMessage(a.pid, toPid, methodName, bin)
 	return a.system.Send(message)
 }
 
-func (a *actorContext) Call(to *iface.Pid, methodName string, request interface{}, reply interface{}) error {
-	message := iface.NewActorMessage(a.pid, to, methodName)
-	message.Data = a.Node().Marshal(request)
+func (a *actorContext) Call(to interface{}, methodName string, request interface{}, reply interface{}) error {
+	toPid := a.System().CastPid(to)
+	bin := a.Node().Marshal(request)
+	message := iface.NewActorMessage(a.pid, toPid, methodName, bin)
 	response := a.system.Call(message, time.Second*3)
 	if response.Error != "" {
 		return errors.New(response.Error)

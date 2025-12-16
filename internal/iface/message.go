@@ -36,12 +36,13 @@ func (m *TaskMessage) Validate() error {
 // from: 发送方进程 ID
 // to: 接收方进程 ID
 // methodName: 方法名
-func NewActorMessage(from, to *Pid, methodName string) *ActorMessage {
+func NewActorMessage(from, to *Pid, methodName string, data []byte) *ActorMessage {
 	message := &ActorMessage{
 		Message: &Message{
 			To:      to,
 			From:    from,
 			Method:  methodName,
+			Data:    data,
 			Session: &Session{},
 		},
 	}

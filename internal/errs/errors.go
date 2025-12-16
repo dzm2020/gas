@@ -173,6 +173,10 @@ func ErrNameChangeNotAllowed() error {
 	return fmt.Errorf("name change is not allowed")
 }
 
+func ErrUnsupportedPidType(typ string) error {
+	return fmt.Errorf("unsupported pid type: %s", typ)
+}
+
 // 上下文相关错误构造函数
 
 func ErrUnsupportedMessageType(msgType string) error {

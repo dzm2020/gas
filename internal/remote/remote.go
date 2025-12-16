@@ -3,7 +3,6 @@ package remote
 import (
 	"context"
 	"fmt"
-	"gas/internal/errs"
 	"gas/internal/iface"
 	discovery "gas/pkg/discovery/iface"
 	"gas/pkg/lib/glog"
@@ -17,14 +16,10 @@ import (
 
 // Remote 远程通信管理器，负责处理跨节点的消息传递
 type Remote struct {
-	node iface.INode
-
-	messageQue messageQue.IMessageQue
-
-	// 节点主题前缀
+	node              iface.INode
+	discovery         discovery.IDiscovery
+	messageQue        messageQue.IMessageQue
 	nodeSubjectPrefix string
-
-	discovery discovery.IDiscovery
 }
 
 func (r *Remote) Start(ctx context.Context) error {
@@ -34,59 +29,50 @@ func (r *Remote) Start(ctx context.Context) error {
 	if err := r.discovery.Run(ctx); err != nil {
 		return err
 	}
-	// 加入节点
 	if err := r.discovery.Add(r.node.Info()); err != nil {
 		return err
 	}
-	//  监听集群消息
 	if err := r.listen(); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (r *Remote) SetNode(node iface.INode) {
-	r.node = node
-}
-
 func (r *Remote) Node() iface.INode {
 	return r.node
 }
 
-func (r *Remote) listen() error {
-	nodeId := r.node.GetID()
-	// 订阅消息主题
-	handler := func(data []byte, reply func([]byte) error) {
-		r.onRemoteProcess(data, reply)
-	}
-	nodeSubject := fmt.Sprintf("%s%d", r.nodeSubjectPrefix, nodeId)
-	_, err := r.messageQue.Subscribe(nodeSubject, handler)
-	if err != nil {
-		return err
-	}
-	return nil
+func (r *Remote) makeTopic(nodeId uint64) string {
+	return fmt.Sprintf("%s%d", r.nodeSubjectPrefix, nodeId)
 }
 
-// onRemoteHandler 处理远程消息
-func (r *Remote) onRemoteProcess(data []byte, reply func([]byte) error) {
-	//  解析消息
+func (r *Remote) listen() error {
+	nodeId := r.node.GetID()
+	handler := func(data []byte, reply func([]byte) error) {
+		if err := r.onRemoteProcess(data, reply); err != nil {
+			glog.Error("远程通信: 处理远程消息失败", zap.Error(err))
+		}
+	}
+	subject := r.makeTopic(nodeId)
+	_, err := r.messageQue.Subscribe(subject, handler)
+	return err
+}
+
+// onRemoteProcess 处理远程消息
+func (r *Remote) onRemoteProcess(data []byte, reply func([]byte) error) error {
 	message := &iface.Message{}
 	r.Node().Unmarshal(data, message)
-	//  处理
+
+	glog.Debug("远程通信: 处理远程消息", zap.Any("message", message))
+
 	msg := &iface.ActorMessage{Message: message}
 	if reply != nil {
 		response := r.node.GetActorSystem().Call(msg, 5*time.Second)
 		responseData := r.Node().Marshal(response)
-		if err := reply(responseData); err != nil {
-			glog.Error("远程通信: 发送回复失败", zap.Error(err))
-		}
+		return reply(responseData)
 	} else {
-		// Send 模式
-		if err := r.node.GetActorSystem().Send(msg); err != nil {
-			glog.Error("远程通信: 发送消息到 Actor 失败", zap.Error(err))
-		}
+		return r.node.GetActorSystem().Send(msg)
 	}
-	glog.Debug("远程通信: 发送消息到 Actor", zap.Any("message", message), zap.String("method", message.GetMethod()))
 }
 
 // sendError 发送错误响应
@@ -107,11 +93,8 @@ func (r *Remote) Send(rpcMessage *iface.ActorMessage) error {
 	}
 	toNodeId := rpcMessage.To.GetNodeId()
 	data := r.Node().Marshal(rpcMessage)
-	subject := fmt.Sprintf("%s%d", r.nodeSubjectPrefix, toNodeId)
-	if err := r.messageQue.Publish(subject, data); err != nil {
-		return errs.ErrPublishToRemoteNodeFailed(toNodeId, err)
-	}
-	return nil
+	subject := r.makeTopic(toNodeId)
+	return r.messageQue.Publish(subject, data)
 }
 
 // Call 向远程节点发送请求并等待回复
@@ -122,7 +105,7 @@ func (r *Remote) Call(rpcMessage *iface.ActorMessage, timeout time.Duration) *if
 	}
 	toNodeId := rpcMessage.To.GetNodeId()
 	data := r.Node().Marshal(rpcMessage.Message)
-	subject := fmt.Sprintf("%s%d", r.nodeSubjectPrefix, toNodeId)
+	subject := r.makeTopic(toNodeId)
 	responseData, err := r.messageQue.Request(subject, data, timeout)
 	if err != nil {
 		return iface.NewErrorResponse(err)
@@ -138,7 +121,7 @@ func (r *Remote) UpdateNode() error {
 
 func (r *Remote) Select(service string, strategy iface.RouteStrategy) *iface.Pid {
 	if strategy == nil {
-		strategy = RouteRandom
+		strategy = iface.RouteRandom
 	}
 
 	// 通过服务发现获取节点列表

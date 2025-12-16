@@ -8,7 +8,7 @@ type ISession interface {
 	GetCode() int64
 	Response(request interface{}) error
 	ResponseCode(code int64) error
-	Forward(toPid *Pid, method string) error
+	Forward(to interface{}, method string) error
 	Push(msgId uint16, request interface{}) error
 	GetEntityId() int64
 }
@@ -18,6 +18,12 @@ const (
 	CloseClientConnectionMethod = "CloseClientConnection"
 )
 
+func NewSessionWithPid(ctx IContext, agent *Pid) ISession {
+	return &WrapSession{
+		Session: &Session{Agent: agent},
+		ctx:     ctx,
+	}
+}
 func NewSession(ctx IContext, session *Session) ISession {
 	return &WrapSession{
 		Session: session,
@@ -31,20 +37,21 @@ type WrapSession struct {
 }
 
 func (a *WrapSession) Response(request interface{}) error {
-	message := NewActorMessage(a.ctx.ID(), a.GetAgent(), PushMessageToClientMethod)
+	bin := a.ctx.Node().Marshal(request)
+	message := NewActorMessage(a.ctx.ID(), a.GetAgent(), PushMessageToClientMethod, bin)
 	message.Session = convertor.DeepClone(a.Session)
-	message.Data = a.ctx.Node().Marshal(request)
 	return a.send(message)
 }
 
 func (a *WrapSession) ResponseCode(code int64) error {
-	message := NewActorMessage(a.ctx.ID(), a.GetAgent(), PushMessageToClientMethod)
+	message := NewActorMessage(a.ctx.ID(), a.GetAgent(), PushMessageToClientMethod, nil)
 	message.Session = convertor.DeepClone(a.Session)
 	message.Session.Code = code
 	return a.send(message)
 }
 
-func (a *WrapSession) Forward(toPid *Pid, method string) error {
+func (a *WrapSession) Forward(to interface{}, method string) error {
+	toPid := a.ctx.System().CastPid(to)
 	message := convertor.DeepClone(a.ctx.Message())
 	message.To = toPid
 	message.Method = method
@@ -52,10 +59,10 @@ func (a *WrapSession) Forward(toPid *Pid, method string) error {
 }
 
 func (a *WrapSession) Push(msgId uint16, request interface{}) error {
-	message := NewActorMessage(a.ctx.ID(), a.GetAgent(), PushMessageToClientMethod)
+	bin := a.ctx.Node().Marshal(request)
+	message := NewActorMessage(a.ctx.ID(), a.GetAgent(), PushMessageToClientMethod, bin)
 	message.Session = convertor.DeepClone(a.Session)
 	message.Session.Mid = int64(msgId)
-	message.Data = a.ctx.Node().Marshal(request)
 	return a.send(message)
 }
 
@@ -68,6 +75,6 @@ func (a *WrapSession) send(message *ActorMessage) error {
 }
 
 func (a *WrapSession) Close() error {
-	message := NewActorMessage(a.ctx.ID(), a.GetAgent(), CloseClientConnectionMethod)
+	message := NewActorMessage(a.ctx.ID(), a.GetAgent(), CloseClientConnectionMethod, nil)
 	return a.send(message)
 }

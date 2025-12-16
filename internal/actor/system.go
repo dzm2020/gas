@@ -37,6 +37,14 @@ func (s *System) GetNode() iface.INode {
 	return s.node
 }
 
+// checkShuttingDown 检查系统是否正在关闭
+func (s *System) checkShuttingDown() error {
+	if s.shuttingDown.Load() {
+		return errs.ErrSystemShuttingDown
+	}
+	return nil
+}
+
 // newPid 创建新的进程ID
 func (s *System) newPid() *iface.Pid {
 	pid := &iface.Pid{
@@ -68,14 +76,6 @@ func (s *System) Spawn(actor iface.IActor, args ...interface{}) *iface.Pid {
 	return pid
 }
 
-// checkShuttingDown 检查系统是否正在关闭
-func (s *System) checkShuttingDown() error {
-	if s.shuttingDown.Load() {
-		return errs.ErrSystemShuttingDown
-	}
-	return nil
-}
-
 // getRemote 获取远程通信接口，并进行空指针检测
 func (s *System) getRemote() iface.IRemote {
 	return s.node.GetRemote()
@@ -91,6 +91,7 @@ func (s *System) Send(message *iface.ActorMessage) error {
 	if err := s.checkShuttingDown(); err != nil {
 		return err
 	}
+
 	to := message.GetTo()
 	if s.isLocalPid(to) {
 		// 本地消息，直接发送到本地进程
@@ -152,6 +153,18 @@ func (s *System) Select(name string, strategy iface.RouteStrategy) *iface.Pid {
 		return process.Context().ID()
 	}
 	return s.getRemote().Select(name, strategy)
+}
+
+func (s *System) CastPid(to interface{}) *iface.Pid {
+	var pid *iface.Pid
+	switch _to := to.(type) {
+	case string:
+		return s.Select(_to, iface.RouteRandom)
+	case *iface.Pid:
+		return pid
+	default:
+		return nil
+	}
 }
 
 // Shutdown 优雅关闭 Actor 系统

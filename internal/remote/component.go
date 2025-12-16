@@ -45,13 +45,12 @@ func (r *Component) Start(ctx context.Context, node iface.INode) error {
 		messageQue:        messageQueue,
 		node:              r.node,
 	}
-
+	//  建立引用
+	r.node.SetRemote(r.remote)
 	//  注册节点并订阅
 	if err = r.remote.Start(ctx); err != nil {
 		return err
 	}
-	//  建立引用
-	r.node.SetRemote(r.remote)
 	return nil
 }
 

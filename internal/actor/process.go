@@ -106,7 +106,6 @@ func (p *Process) pushTaskAndWait(timeout time.Duration, task iface.Task) error 
 
 	// 直接调用 mailbox.PostMessage，绕过 checkShutdown 检查
 	if err := p.mailbox.PostMessage(&iface.TaskMessage{Task: syncTask}); err != nil {
-		// 如果发送失败，确保 waiter 收到响应，避免 goroutine 泄漏
 		waiter.Done(err)
 		return err
 	}

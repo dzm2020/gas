@@ -14,7 +14,7 @@ func (agent *Agent) PushMessageToClient(ctx iface.IContext, session iface.ISessi
 	}
 	cmd, act := protocol.ParseId(uint16(session.GetMid()))
 	response := protocol.New(cmd, act, data)
-	response.Index = session.GetIndex() // 可以根据需要设置 Index
+	response.Index = session.GetIndex()
 	response.Error = uint16(session.GetCode())
 	return entity.Send(response)
 
@@ -46,7 +46,6 @@ type Agent struct {
 func (agent *Agent) OnNetworkOpen(ctx iface.IContext, session iface.ISession) error {
 	return nil
 }
-
 func (agent *Agent) OnNetworkMessage(ctx iface.IContext, session iface.ISession, data []byte) error {
 	return nil
 }

@@ -21,6 +21,7 @@ type Gate struct {
 func (m *Gate) Name() string {
 	return "gate"
 }
+
 func (m *Gate) Start(ctx context.Context, node iface.INode) error {
 	m.node = node
 	var err error
@@ -35,18 +36,16 @@ func (m *Gate) Start(ctx context.Context, node iface.INode) error {
 }
 
 func (m *Gate) OnConnect(entity network.IConnection) (err error) {
-	factory := m.Factory
-	if factory == nil {
-		return errs.ErrAgentFactoryNil
-	}
 	system := m.node.GetActorSystem()
-	pid := system.Spawn(factory())
+
+	actor := m.Factory()
+	pid := system.Spawn(actor)
 
 	entity.SetContext(pid)
 
 	return system.PushTask(pid, func(ctx iface.IContext) error {
 		_agent := ctx.Actor().(IAgent)
-		session := iface.NewSession(ctx, &iface.Session{Agent: pid})
+		session := iface.NewSessionWithPid(ctx, pid)
 		return _agent.OnNetworkOpen(ctx, session)
 	})
 }
@@ -64,17 +63,10 @@ func (m *Gate) OnMessage(entity network.IConnection, msg interface{}) error {
 	if !ok {
 		return errs.ErrInvalidMessageType
 	}
-	session := &iface.Session{
-		Agent:    pid,
-		Mid:      int64(clientMessage.ID()),
-		Index:    clientMessage.Index,
-		EntityId: entity.ID(),
-	}
 
-	message := iface.NewActorMessage(pid, pid, "OnNetworkMessage")
-	message.Session = session
-	message.Data = clientMessage.Data
-	return system.Send(message)
+	actorMsg := m.clientToActorMessage(pid, entity, clientMessage)
+
+	return system.Send(actorMsg)
 }
 
 func (m *Gate) OnClose(entity network.IConnection, wrong error) error {
@@ -84,12 +76,22 @@ func (m *Gate) OnClose(entity network.IConnection, wrong error) error {
 	}
 
 	system := m.node.GetActorSystem()
-	return system.PushTask(pid, func(ctx iface.IContext) (wrong error) {
+	return system.PushTask(pid, func(ctx iface.IContext) error {
 		_agent := ctx.Actor().(IAgent)
-		session := iface.NewSession(ctx, &iface.Session{Agent: pid})
-		wrong = _agent.OnNetworkClose(ctx, session)
-		return
+		session := iface.NewSessionWithPid(ctx, pid)
+		return _agent.OnNetworkClose(ctx, session)
 	})
+}
+
+func (m *Gate) clientToActorMessage(agent *iface.Pid, entity network.IConnection, clientMessage *protocol.Message) *iface.ActorMessage {
+	message := iface.NewActorMessage(agent, agent, "OnNetworkMessage", clientMessage.Data)
+	message.Session = &iface.Session{
+		Agent:    agent,
+		Mid:      int64(clientMessage.ID()),
+		Index:    clientMessage.Index,
+		EntityId: entity.ID(),
+	}
+	return message
 }
 
 func (m *Gate) Stop(ctx context.Context) error {
