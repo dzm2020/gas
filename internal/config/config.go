@@ -1,38 +1,33 @@
 package config
 
 import (
-	"encoding/json"
 	"gas/internal/errs"
 	discoveryConfig "gas/pkg/discovery"
-	consulConfig "gas/pkg/discovery/provider/consul"
 	"gas/pkg/lib"
 	"gas/pkg/lib/glog"
 	messageQueConfig "gas/pkg/messageQue"
-	natsConfig "gas/pkg/messageQue/provider/nats"
 	"os"
-	"time"
 )
+
+type Node struct {
+	Id      uint64            `json:"id"`      // 节点ID
+	Kind    string            `json:"kind"`    // 节点类型
+	Address string            `json:"address"` // 节点地址
+	Port    int               `json:"port"`    // 节点端口
+	Tags    []string          `json:"tags"`    // 节点标签
+	Meta    map[string]string `json:"meta"`    // 节点元数据
+}
+type Remote struct {
+	SubjectPrefix string                   `json:"subject_prefix"`
+	Discovery     *discoveryConfig.Config  `json:"discovery"`
+	MessageQueue  *messageQueConfig.Config `json:"messageQueue"`
+}
 
 // Config 节点配置
 type Config struct {
-	// Node 配置
-	Node struct {
-		Id      uint64            `json:"id"`      // 节点ID
-		Kind    string            `json:"kind"`    // 节点类型
-		Address string            `json:"address"` // 节点地址
-		Port    int               `json:"port"`    // 节点端口
-		Tags    []string          `json:"tags"`    // 节点标签
-		Meta    map[string]string `json:"meta"`    // 节点元数据
-	} `json:"game-node"`
-
-	Logger glog.Config `json:"logger"`
-
-	// Remote 配置
-	Remote struct {
-		SubjectPrefix string                  `json:"subject_prefix"`
-		Discovery     discoveryConfig.Config  `json:"discovery"`
-		MessageQueue  messageQueConfig.Config `json:"messageQueue"`
-	} `json:"remote"`
+	Node   *Node        `json:"node"`
+	Logger *glog.Config `json:"logger"`
+	Remote *Remote      `json:"remote"`
 }
 
 func Load(profileFilePath string) (*Config, error) {
@@ -50,22 +45,15 @@ func Load(profileFilePath string) (*Config, error) {
 // Default 生成默认配置
 func Default() *Config {
 	return &Config{
-		Node: struct {
-			Id      uint64            `json:"id"`
-			Kind    string            `json:"kind"`
-			Address string            `json:"address"`
-			Port    int               `json:"port"`
-			Tags    []string          `json:"tags"`
-			Meta    map[string]string `json:"meta"`
-		}{
+		Node: &Node{
 			Id:      1,
-			Kind:    "game-node-1",
+			Kind:    "node1",
 			Address: "127.0.0.1",
 			Port:    9000,
 			Tags:    []string{},
 			Meta:    make(map[string]string),
 		},
-		Logger: glog.Config{
+		Logger: &glog.Config{
 			Path:         "./logs/app.log",
 			Level:        "info",
 			PrintConsole: true,
@@ -77,53 +65,17 @@ func Default() *Config {
 				LocalTime:  true,
 			},
 		},
-		Remote: func() struct {
-			SubjectPrefix string                  `json:"subject_prefix"`
-			Discovery     discoveryConfig.Config  `json:"discovery"`
-			MessageQueue  messageQueConfig.Config `json:"messageQueue"`
-		} {
-			// Consul 配置
-			consulCfg := consulConfig.Config{
-				Address:            "127.0.0.1:8500",
-				WatchWaitTime:      5 * time.Second,  // 5秒
-				HealthTTL:          10 * time.Second, // 10秒
-				DeregisterInterval: 30 * time.Second, // 30秒
-			}
-			consulCfgJSON, _ := json.Marshal(consulCfg)
+		Remote: &Remote{
+			SubjectPrefix: "",
+			Discovery: &discoveryConfig.Config{
+				Type:   "consul",
+				Config: nil,
+			},
 
-			// NATS 配置
-			natsCfg := natsConfig.Config{
-				Servers:              []string{"nats://127.0.0.1:4222"},
-				Name:                 "gas-game-node",
-				MaxReconnects:        -1,    // 无限重连
-				ReconnectWait:        2000,  // 2秒 = 2000毫秒
-				TimeoutMs:            5000,  // 5秒 = 5000毫秒
-				PingIntervalMs:       20000, // 20秒 = 20000毫秒
-				MaxPingsOut:          2,
-				AllowReconnect:       true,
-				Username:             "",
-				Password:             "",
-				Token:                "",
-				DisableNoEcho:        false,
-				RetryOnFailedConnect: true,
-			}
-			natsCfgJSON, _ := json.Marshal(natsCfg)
-
-			return struct {
-				SubjectPrefix string                  `json:"subject_prefix"`
-				Discovery     discoveryConfig.Config  `json:"discovery"`
-				MessageQueue  messageQueConfig.Config `json:"messageQueue"`
-			}{
-				SubjectPrefix: "cluster.node.",
-				Discovery: discoveryConfig.Config{
-					Type:   "consul",
-					Config: consulCfgJSON,
-				},
-				MessageQueue: messageQueConfig.Config{
-					Type:   "nats",
-					Config: natsCfgJSON,
-				},
-			}
-		}(),
+			MessageQueue: &messageQueConfig.Config{
+				Type:   "nats",
+				Config: nil,
+			},
+		},
 	}
 }

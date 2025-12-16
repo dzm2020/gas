@@ -15,15 +15,13 @@ type Gate struct {
 	Options []network.Option
 	Factory Factory
 	server  network.IServer
-	node    iface.INode
 }
 
 func (m *Gate) Name() string {
 	return "gate"
 }
 
-func (m *Gate) Start(ctx context.Context, node iface.INode) error {
-	m.node = node
+func (m *Gate) Start(ctx context.Context) error {
 	var err error
 	m.server, err = network.NewServer(m.Address, append(m.Options, network.WithHandler(m), network.WithCodec(codec.New()))...)
 	if err != nil {
@@ -36,7 +34,7 @@ func (m *Gate) Start(ctx context.Context, node iface.INode) error {
 }
 
 func (m *Gate) OnConnect(entity network.IConnection) (err error) {
-	system := m.node.GetActorSystem()
+	system := iface.GetNode().System()
 
 	actor := m.Factory()
 	pid := system.Spawn(actor)
@@ -56,7 +54,7 @@ func (m *Gate) OnMessage(entity network.IConnection, msg interface{}) error {
 		return errs.ErrAgentNoBindConnection
 	}
 
-	system := m.node.GetActorSystem()
+	system := iface.GetNode().System()
 
 	//  将网关消息转为内容消息
 	clientMessage, ok := msg.(*protocol.Message)
@@ -75,7 +73,7 @@ func (m *Gate) OnClose(entity network.IConnection, wrong error) error {
 		return errs.ErrAgentNoBindConnection
 	}
 
-	system := m.node.GetActorSystem()
+	system := iface.GetNode().System()
 	return system.PushTask(pid, func(ctx iface.IContext) error {
 		_agent := ctx.Actor().(IAgent)
 		session := iface.NewSessionWithPid(ctx, pid)

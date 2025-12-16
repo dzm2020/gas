@@ -57,15 +57,10 @@ type IContext interface {
 	// 返回: 当前消息，如果没有则返回 nil
 	Message() *ActorMessage
 
-	// System 获取 Actor 系统实例
-	System() ISystem
-
 	// Shutdown 退出当前 Actor，清理资源并触发 OnStop 回调
 	Shutdown() error
 
 	Process() IProcess
-
-	Node() INode
 }
 
 // IActor Actor 接口，定义 Actor 的生命周期和消息处理
@@ -122,14 +117,21 @@ type IProcess interface {
 	Shutdown() error
 }
 
+type IActorManager interface {
+	Add(pid *Pid, process IProcess)
+	Remove(pid *Pid)
+	RegisterName(pid *Pid, process IProcess, name string, isGlobal bool) error
+	HasName(name string) bool
+	GetProcess(pid *Pid) IProcess
+	GetProcessById(id uint64) IProcess
+	GetProcessByName(name string) IProcess
+	UnregisterName(pid *Pid)
+	GetAllProcesses() []IProcess
+}
+
 // ISystem Actor 系统接口，管理所有 Actor 进程和消息传递
 type ISystem interface {
-	// SetNode 设置节点实例
-	// n: 节点实例
-	SetNode(n INode)
-
-	// GetNode 获取节点实例
-	GetNode() INode
+	IActorManager
 
 	// Spawn 创建新的 Actor 进程
 	// actor: Actor 实例
@@ -181,6 +183,8 @@ type ISystem interface {
 	//  @return *Pid
 	//
 	CastPid(pid interface{}) *Pid
+
+	Shutdown(timeout time.Duration) error
 }
 
 // IRouter 消息路由器接口，用于注册和处理消息处理器

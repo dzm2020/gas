@@ -48,6 +48,11 @@ func (m *ComponentManager) ComponentCount() int {
 	return len(m.order)
 }
 
+func (m *ComponentManager) GetComponent(name string) iface.IComponent {
+	component, _ := m.components.Get(name)
+	return component
+}
+
 // GetComponentNames 返回所有已注册组件的名称
 func (m *ComponentManager) GetComponentNames() []string {
 	m.orderMu.RLock()
@@ -87,7 +92,7 @@ func (m *ComponentManager) Register(component iface.IComponent) error {
 }
 
 // Start 启动所有已注册的组件
-func (m *ComponentManager) Start(ctx context.Context, node iface.INode) error {
+func (m *ComponentManager) Start(ctx context.Context) error {
 	if m.started.Load() {
 		return errs.ErrManagerAlreadyStarted()
 	}
@@ -112,7 +117,7 @@ func (m *ComponentManager) Start(ctx context.Context, node iface.INode) error {
 
 		glog.Info("组件: 正在启动组件", zap.String("component", component.Name()), zap.Int("current", i+1), zap.Int("total", count))
 
-		if err := component.Start(ctx, node); err != nil {
+		if err := component.Start(ctx); err != nil {
 			glog.Error("组件: 启动组件失败", zap.String("component", component.Name()), zap.Error(err))
 			// 停止已启动的组件（逆序）
 			_ = m.stopComponents(ctx, started, true)

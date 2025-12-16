@@ -43,6 +43,16 @@ func (m *MemberList) UpdateTopology(old *MemberList) *Topology {
 	return topology
 }
 
+type IMember interface {
+	GetKind() string
+	GetID() uint64
+	GetAddress() string
+	GetPort() int
+	GetTags() []string
+	GetMeta() map[string]string
+	SetTags(tags []string)
+}
+
 type Member struct {
 	Id            uint64
 	Kind, Address string

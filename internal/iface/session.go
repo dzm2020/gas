@@ -37,7 +37,7 @@ type WrapSession struct {
 }
 
 func (a *WrapSession) Response(request interface{}) error {
-	bin := a.ctx.Node().Marshal(request)
+	bin := GetNode().Marshal(request)
 	message := NewActorMessage(a.ctx.ID(), a.GetAgent(), PushMessageToClientMethod, bin)
 	message.Session = convertor.DeepClone(a.Session)
 	return a.send(message)
@@ -51,15 +51,15 @@ func (a *WrapSession) ResponseCode(code int64) error {
 }
 
 func (a *WrapSession) Forward(to interface{}, method string) error {
-	toPid := a.ctx.System().CastPid(to)
+	toPid := GetNode().System().CastPid(to)
 	message := convertor.DeepClone(a.ctx.Message())
 	message.To = toPid
 	message.Method = method
-	return a.ctx.System().Send(message)
+	return GetNode().System().Send(message)
 }
 
 func (a *WrapSession) Push(msgId uint16, request interface{}) error {
-	bin := a.ctx.Node().Marshal(request)
+	bin := GetNode().Marshal(request)
 	message := NewActorMessage(a.ctx.ID(), a.GetAgent(), PushMessageToClientMethod, bin)
 	message.Session = convertor.DeepClone(a.Session)
 	message.Session.Mid = int64(msgId)
@@ -71,7 +71,7 @@ func (a *WrapSession) send(message *ActorMessage) error {
 	if a.GetAgent() == a.ctx.ID() {
 		return a.ctx.InvokerMessage(message)
 	}
-	return a.ctx.System().Send(message)
+	return GetNode().System().Send(message)
 }
 
 func (a *WrapSession) Close() error {

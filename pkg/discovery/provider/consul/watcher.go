@@ -89,17 +89,12 @@ func (w *consulWatcher) fetch(ctx context.Context, kind string, listener func(*i
 	list := iface.NewMemberList(nodeDict)
 	topology := list.UpdateTopology(w.list)
 	if len(topology.Left) > 0 || len(topology.Joined) > 0 {
-		glog.Debug("Consul服务拓扑变化",
-			zap.String("kind", kind),
-			zap.Int("joined", len(topology.Joined)),
-			zap.Int("alive", len(topology.Alive)),
-			zap.Int("left", len(topology.Left)),
-			zap.Int("total", len(nodeDict)))
+		glog.Debug("Consul服务拓扑变化", zap.String("kind", kind),
+			zap.Int("joined", len(topology.Joined)), zap.Int("alive", len(topology.Alive)),
+			zap.Int("left", len(topology.Left)), zap.Int("total", len(nodeDict)))
 
 	} else {
-		glog.Debug("Consul服务拓扑未变化",
-			zap.String("service", kind),
-			zap.Int("total", len(nodeDict)))
+		glog.Debug("Consul服务拓扑未变化", zap.String("kind", kind), zap.Int("total", len(nodeDict)))
 	}
 	if listener != nil {
 		listener(topology)

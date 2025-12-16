@@ -26,7 +26,6 @@ func newActorContext() *actorContext {
 }
 
 type actorContext struct {
-	system  *System
 	process iface.IProcess // 保存自己的 process 引用
 	pid     *iface.Pid
 	name    string
@@ -42,19 +41,12 @@ func (a *actorContext) ID() *iface.Pid {
 func (a *actorContext) GetRouter() iface.IRouter {
 	return a.router
 }
-func (a *actorContext) System() iface.ISystem {
-	return a.system
-}
 
 func (a *actorContext) Process() iface.IProcess {
 	return a.process
 }
 func (a *actorContext) Actor() iface.IActor {
 	return a.actor
-}
-
-func (a *actorContext) Node() iface.INode {
-	return a.system.GetNode()
 }
 
 func (a *actorContext) Message() *iface.ActorMessage {
@@ -105,26 +97,29 @@ func (a *actorContext) execHandler(msg *iface.Message) ([]byte, error) {
 }
 
 func (a *actorContext) Send(to interface{}, methodName string, request interface{}) error {
-	toPid := a.System().CastPid(to)
-	bin := a.Node().Marshal(request)
+	system := iface.GetNode().System()
+	toPid := system.CastPid(to)
+	bin := iface.GetNode().Marshal(request)
 	message := iface.NewActorMessage(a.pid, toPid, methodName, bin)
-	return a.system.Send(message)
+	return system.Send(message)
 }
 
 func (a *actorContext) Call(to interface{}, methodName string, request interface{}, reply interface{}) error {
-	toPid := a.System().CastPid(to)
-	bin := a.Node().Marshal(request)
+	system := iface.GetNode().System()
+	toPid := system.CastPid(to)
+	bin := iface.GetNode().Marshal(request)
 	message := iface.NewActorMessage(a.pid, toPid, methodName, bin)
-	response := a.system.Call(message, time.Second*3)
+	response := system.Call(message, time.Second*3)
 	if response.Error != "" {
 		return errors.New(response.Error)
 	}
-	a.Node().Unmarshal(response.GetData(), reply)
+	iface.GetNode().Unmarshal(response.GetData(), reply)
 	return nil
 }
 
 func (a *actorContext) RegisterName(name string, isGlobal bool) error {
-	return a.system.RegisterName(a.pid, a.process, name, isGlobal)
+	system := iface.GetNode().System()
+	return system.RegisterName(a.pid, a.process, name, isGlobal)
 }
 
 // AfterFunc 注册一次性定时器
@@ -135,7 +130,8 @@ func (a *actorContext) AfterFunc(duration time.Duration, callback iface.Task) *l
 }
 
 func (a *actorContext) exit() {
-	a.system.Remove(a.pid)
+	system := iface.GetNode().System()
+	system.Remove(a.pid)
 	_ = a.actor.OnStop(a)
 }
 

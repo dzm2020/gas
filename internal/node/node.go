@@ -2,11 +2,9 @@ package node
 
 import (
 	"context"
-	"gas/internal/actor"
 	"gas/internal/config"
 	"gas/internal/errs"
 	"gas/internal/iface"
-	"gas/internal/remote"
 	"gas/pkg/lib"
 	"gas/pkg/lib/glog"
 	"os"
@@ -16,6 +14,8 @@ import (
 	"time"
 
 	discovery "gas/pkg/discovery/iface"
+	_ "gas/pkg/discovery/provider/consul"
+	_ "gas/pkg/messageQue/provider/nats"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -25,7 +25,7 @@ import (
 func New(path string) *Node {
 	node := &Node{
 		serializer:       lib.Json,
-		componentManager: NewComponentsMgr(),
+		ComponentManager: NewComponentsMgr(),
 	}
 	c, err := config.Load(path)
 	if err != nil {
@@ -39,20 +39,18 @@ func NewWithConfig(config *config.Config) *Node {
 	node := &Node{
 		config:           config,
 		serializer:       lib.Json,
-		componentManager: NewComponentsMgr(),
+		ComponentManager: NewComponentsMgr(),
 	}
 	return node
 }
 
 type Node struct {
 	*discovery.Member
-
+	*ComponentManager
 	config *config.Config
 
 	actorSystem iface.ISystem
 	remote      iface.IRemote
-	// 组件管理器
-	componentManager *ComponentManager
 
 	serializer lib.ISerializer
 
@@ -62,17 +60,17 @@ type Node struct {
 func (m *Node) Info() *discovery.Member {
 	return m.Member
 }
-func (m *Node) SetActorSystem(system iface.ISystem) {
+func (m *Node) SetSystem(system iface.ISystem) {
 	m.actorSystem = system
 }
-func (m *Node) GetActorSystem() iface.ISystem {
+func (m *Node) System() iface.ISystem {
 	return m.actorSystem
 }
+
 func (m *Node) SetRemote(remote iface.IRemote) {
 	m.remote = remote
 }
-
-func (m *Node) GetRemote() iface.IRemote {
+func (m *Node) Remote() iface.IRemote {
 	return m.remote
 }
 
@@ -81,8 +79,7 @@ func (m *Node) SetSerializer(ser lib.ISerializer) {
 	m.serializer = ser
 }
 
-// GetSerializer 获取序列化器
-func (m *Node) GetSerializer() lib.ISerializer {
+func (m *Node) Serializer() lib.ISerializer {
 	return m.serializer
 }
 
@@ -98,7 +95,7 @@ func (m *Node) Marshal(request interface{}) []byte {
 	}
 
 	// 使用序列化器序列化
-	if data, err := m.GetSerializer().Marshal(request); err != nil {
+	if data, err := m.Serializer().Marshal(request); err != nil {
 		panic(err)
 	} else {
 		return data
@@ -123,7 +120,7 @@ func (m *Node) Unmarshal(data []byte, reply interface{}) {
 	}
 
 	// 使用序列化器反序列化
-	if err := m.GetSerializer().Unmarshal(data, reply); err != nil {
+	if err := m.Serializer().Unmarshal(data, reply); err != nil {
 		panic(err)
 	}
 }
@@ -132,7 +129,7 @@ func (m *Node) GetConfig() *config.Config {
 	return m.config
 }
 
-func (m *Node) StarUp(comps ...iface.IComponent) error {
+func (m *Node) Startup(comps ...iface.IComponent) error {
 	defer lib.PrintCoreDump()
 	// 创建节点信息
 	m.Member = &discovery.Member{
@@ -147,8 +144,8 @@ func (m *Node) StarUp(comps ...iface.IComponent) error {
 	// 注册组件（注意顺序：glog 应该最先初始化，因为其他组件可能会使用日志）
 	components := []iface.IComponent{
 		NewLogComponent(),
-		actor.NewComponent(),
-		remote.NewComponent(),
+		NewActorComponent(),
+		NewRemoteComponent(),
 	}
 
 	lib.SetPanicHandler(func(err interface{}) {
@@ -159,14 +156,14 @@ func (m *Node) StarUp(comps ...iface.IComponent) error {
 	components = append(components, comps...)
 
 	for _, com := range components {
-		if err := m.componentManager.Register(com); err != nil {
+		if err := m.ComponentManager.Register(com); err != nil {
 			return errs.ErrRegisterComponentFailed(com.Name(), err)
 		}
 	}
 
 	// 启动所有组件
 	ctx := context.Background()
-	if err := m.componentManager.Start(ctx, m); err != nil {
+	if err := m.ComponentManager.Start(ctx); err != nil {
 		return errs.ErrStartComponentFailed(err)
 	}
 
@@ -198,16 +195,14 @@ func (m *Node) shutdown(ctx context.Context) error {
 	glog.Info("节点开始停止运行")
 
 	// 停止所有组件(按逆序停止)
-	if m.componentManager != nil {
-		if err := m.componentManager.Stop(ctx); err != nil {
-			return err
-		}
+	if err := m.ComponentManager.Stop(ctx); err != nil {
+		return err
 	}
 
 	m.remote = nil
 	m.actorSystem = nil
-	m.componentManager = nil
+	m.ComponentManager = nil
 
-	timeoutCtx, _ := context.WithTimeout(context.Background(), time.Second*30)
+	timeoutCtx, _ := context.WithTimeout(ctx, time.Second*30)
 	return lib.ShutdownGoroutines(timeoutCtx)
 }

@@ -13,7 +13,6 @@ type Manager struct {
 	processDict *maputil.ConcurrentMap[uint64, iface.IProcess] // ID到进程的映射
 	nameDict    *maputil.ConcurrentMap[string, iface.IProcess] // 名字到进程的映射
 	globalNames *maputil.ConcurrentMap[string, bool]           // 跟踪全局注册的名字
-	node        iface.INode                                    // 节点实例，用于全局注册
 }
 
 // NewNameManager 创建新的名字管理器
@@ -23,11 +22,6 @@ func NewNameManager() *Manager {
 		nameDict:    maputil.NewConcurrentMap[string, iface.IProcess](10),
 		globalNames: maputil.NewConcurrentMap[string, bool](10),
 	}
-}
-
-// SetNode 设置节点实例
-func (m *Manager) SetNode(node iface.INode) {
-	m.node = node
 }
 
 // Add 注册进程
@@ -74,9 +68,9 @@ func (m *Manager) RegisterName(pid *iface.Pid, process iface.IProcess, name stri
 
 // registerGlobalName 在远程注册全局名字
 func (m *Manager) registerGlobalName(name string) error {
-	info := m.node.Info()
+	info := iface.GetNode().Info()
 	info.Tags = append(info.Tags, name)
-	return m.node.GetRemote().UpdateNode()
+	return iface.GetNode().Remote().UpdateNode()
 }
 
 // HasName 检查名字是否已注册
@@ -135,11 +129,8 @@ func (m *Manager) UnregisterName(pid *iface.Pid) {
 
 // unregisterGlobalName 从远程注销全局名字
 func (m *Manager) unregisterGlobalName(name string) {
-	if m.node == nil {
-		return
-	}
-	remote := m.node.GetRemote()
-	info := m.node.Info()
+	remote := iface.GetNode().Remote()
+	info := iface.GetNode().Info()
 	slices.DeleteFunc(info.Tags, func(s string) bool {
 		return s == name
 	})

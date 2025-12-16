@@ -14,9 +14,16 @@ import (
 	"golang.org/x/exp/slices"
 )
 
+func New(discovery discovery.IDiscovery, messageQue messageQue.IMessageQue, subjectPrefix string) *Remote {
+	return &Remote{
+		discovery:         discovery,
+		messageQue:        messageQue,
+		nodeSubjectPrefix: subjectPrefix,
+	}
+}
+
 // Remote 远程通信管理器，负责处理跨节点的消息传递
 type Remote struct {
-	node              iface.INode
 	discovery         discovery.IDiscovery
 	messageQue        messageQue.IMessageQue
 	nodeSubjectPrefix string
@@ -29,7 +36,7 @@ func (r *Remote) Start(ctx context.Context) error {
 	if err := r.discovery.Run(ctx); err != nil {
 		return err
 	}
-	if err := r.discovery.Add(r.node.Info()); err != nil {
+	if err := r.discovery.Add(iface.GetNode().Info()); err != nil {
 		return err
 	}
 	if err := r.listen(); err != nil {
@@ -38,16 +45,12 @@ func (r *Remote) Start(ctx context.Context) error {
 	return nil
 }
 
-func (r *Remote) Node() iface.INode {
-	return r.node
-}
-
 func (r *Remote) makeTopic(nodeId uint64) string {
 	return fmt.Sprintf("%s%d", r.nodeSubjectPrefix, nodeId)
 }
 
 func (r *Remote) listen() error {
-	nodeId := r.node.GetID()
+	nodeId := iface.GetNode().GetID()
 	handler := func(data []byte, reply func([]byte) error) {
 		if err := r.onRemoteProcess(data, reply); err != nil {
 			glog.Error("远程通信: 处理远程消息失败", zap.Error(err))
@@ -61,17 +64,17 @@ func (r *Remote) listen() error {
 // onRemoteProcess 处理远程消息
 func (r *Remote) onRemoteProcess(data []byte, reply func([]byte) error) error {
 	message := &iface.Message{}
-	r.Node().Unmarshal(data, message)
+	iface.GetNode().Unmarshal(data, message)
 
 	glog.Debug("远程通信: 处理远程消息", zap.Any("message", message))
 
 	msg := &iface.ActorMessage{Message: message}
 	if reply != nil {
-		response := r.node.GetActorSystem().Call(msg, 5*time.Second)
-		responseData := r.Node().Marshal(response)
+		response := iface.GetNode().System().Call(msg, 5*time.Second)
+		responseData := iface.GetNode().Marshal(response)
 		return reply(responseData)
 	} else {
-		return r.node.GetActorSystem().Send(msg)
+		return iface.GetNode().System().Send(msg)
 	}
 }
 
@@ -82,7 +85,7 @@ func (r *Remote) sendError(reply func([]byte) error, err error) {
 	}
 	glog.Error("远程通信: 发送错误响应", zap.Error(err))
 	errorResponse := iface.NewErrorResponse(err)
-	_ = reply(r.Node().Marshal(errorResponse))
+	_ = reply(iface.GetNode().Marshal(errorResponse))
 }
 
 // Send 发送消息到远程节点
@@ -92,7 +95,7 @@ func (r *Remote) Send(rpcMessage *iface.ActorMessage) error {
 		return err
 	}
 	toNodeId := rpcMessage.To.GetNodeId()
-	data := r.Node().Marshal(rpcMessage)
+	data := iface.GetNode().Marshal(rpcMessage)
 	subject := r.makeTopic(toNodeId)
 	return r.messageQue.Publish(subject, data)
 }
@@ -104,19 +107,19 @@ func (r *Remote) Call(rpcMessage *iface.ActorMessage, timeout time.Duration) *if
 		return iface.NewErrorResponse(err)
 	}
 	toNodeId := rpcMessage.To.GetNodeId()
-	data := r.Node().Marshal(rpcMessage.Message)
+	data := iface.GetNode().Marshal(rpcMessage.Message)
 	subject := r.makeTopic(toNodeId)
 	responseData, err := r.messageQue.Request(subject, data, timeout)
 	if err != nil {
 		return iface.NewErrorResponse(err)
 	}
 	response := &iface.Response{}
-	r.Node().Unmarshal(responseData, response)
+	iface.GetNode().Unmarshal(responseData, response)
 	return response
 }
 
 func (r *Remote) UpdateNode() error {
-	return r.discovery.Add(r.node.Info())
+	return r.discovery.Add(iface.GetNode().Info())
 }
 
 func (r *Remote) Select(service string, strategy iface.RouteStrategy) *iface.Pid {

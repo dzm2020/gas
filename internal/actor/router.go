@@ -290,7 +290,7 @@ func (r *Router) handleSyncMessage(ctx iface.IContext, methodName string, data [
 
 	// 序列化响应（response 是最后一个参数）
 	responseValue := callArgs[len(callArgs)-1]
-	responseData := ctx.Node().Marshal(responseValue.Interface())
+	responseData := iface.GetNode().Marshal(responseValue.Interface())
 
 	return responseData, nil
 }
@@ -314,6 +314,6 @@ func (r *Router) createRequestValue(requestType reflect.Type, isByteRequest bool
 	// 其他类型（指针类型）需要反序列化
 	requestValue := reflect.New(requestType.Elem())
 
-	ctx.Node().Unmarshal(data, requestValue.Interface())
+	iface.GetNode().Unmarshal(data, requestValue.Interface())
 	return requestValue, nil
 }

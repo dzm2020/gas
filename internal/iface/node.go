@@ -9,19 +9,36 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+var currentNode INode
+
+func SetNode(node INode) {
+	currentNode = node
+}
+
+func GetNode() INode {
+	return currentNode
+}
+
+type IComponentManager interface {
+	ComponentCount() int
+	GetComponent(name string) IComponent
+	GetComponentNames() []string
+	Register(component IComponent) error
+}
+
 type INode interface {
-	GetID() uint64
+	IComponentManager
+	discovery.IMember
 	Info() *discovery.Member
 	SetSerializer(ser lib.ISerializer)
-	GetActorSystem() ISystem
-	SetActorSystem(system ISystem)
-	GetRemote() IRemote
+	System() ISystem
+	SetSystem(system ISystem)
+	Remote() IRemote
 	SetRemote(IRemote)
 	GetConfig() *config.Config
-	StarUp(comps ...IComponent) error
+	Startup(comps ...IComponent) error
 	SetPanicHook(panicHook func(entry zapcore.Entry))
-	GetTags() []string
-	SetTags([]string)
+	CallPanicHook(entry zapcore.Entry)
 	Marshal(request interface{}) []byte
 	Unmarshal(data []byte, reply interface{})
 }
@@ -29,7 +46,7 @@ type INode interface {
 // IComponent 组件接口
 type IComponent interface {
 	// Start 启动组件
-	Start(ctx context.Context, node INode) error
+	Start(ctx context.Context) error
 	// Stop 停止组件，ctx 用于控制超时
 	Stop(ctx context.Context) error
 	// Name 返回组件名称，用于日志和错误报告
