@@ -23,10 +23,10 @@ func NewLogComponent() iface.IComponent {
 	return &LogComponent{}
 }
 
-func (m *LogComponent) Name() string {
+func (c *LogComponent) Name() string {
 	return "log"
 }
-func (m *LogComponent) Start(ctx context.Context) error {
+func (c *LogComponent) Start(ctx context.Context) error {
 
 	cfg := iface.GetNode().GetConfig()
 
@@ -46,7 +46,7 @@ func (m *LogComponent) Start(ctx context.Context) error {
 	glog.WithOptions(options...)
 	return nil
 }
-func (m *LogComponent) Stop(ctx context.Context) error {
+func (c *LogComponent) Stop(ctx context.Context) error {
 	glog.Stop()
 	return nil
 }

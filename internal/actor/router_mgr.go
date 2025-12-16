@@ -34,10 +34,10 @@ func GetRouterForActor(actor iface.IActor) iface.IRouter {
 		return router
 	}
 
-	return RegistryRouter(actor)
+	return RegisterRouter(actor)
 }
 
-func RegistryRouter(actor iface.IActor) iface.IRouter {
+func RegisterRouter(actor iface.IActor) iface.IRouter {
 	actorType := reflect.TypeOf(actor)
 	if actorType.Kind() == reflect.Ptr {
 		actorType = actorType.Elem()

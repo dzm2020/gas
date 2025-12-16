@@ -57,33 +57,33 @@ type Node struct {
 	panicHook func(entry zapcore.Entry)
 }
 
-func (m *Node) Info() *discovery.Member {
-	return m.Member
+func (n *Node) Info() *discovery.Member {
+	return n.Member
 }
-func (m *Node) SetSystem(system iface.ISystem) {
-	m.actorSystem = system
+func (n *Node) SetSystem(system iface.ISystem) {
+	n.actorSystem = system
 }
-func (m *Node) System() iface.ISystem {
-	return m.actorSystem
+func (n *Node) System() iface.ISystem {
+	return n.actorSystem
 }
 
-func (m *Node) SetRemote(remote iface.IRemote) {
-	m.remote = remote
+func (n *Node) SetRemote(remote iface.IRemote) {
+	n.remote = remote
 }
-func (m *Node) Remote() iface.IRemote {
-	return m.remote
+func (n *Node) Remote() iface.IRemote {
+	return n.remote
 }
 
 // SetSerializer 设置序列化器
-func (m *Node) SetSerializer(ser lib.ISerializer) {
-	m.serializer = ser
+func (n *Node) SetSerializer(ser lib.ISerializer) {
+	n.serializer = ser
 }
 
-func (m *Node) Serializer() lib.ISerializer {
-	return m.serializer
+func (n *Node) Serializer() lib.ISerializer {
+	return n.serializer
 }
 
-func (m *Node) Marshal(request interface{}) []byte {
+func (n *Node) Marshal(request interface{}) []byte {
 	// 处理 nil 情况
 	if request == nil {
 		return []byte{}
@@ -95,14 +95,14 @@ func (m *Node) Marshal(request interface{}) []byte {
 	}
 
 	// 使用序列化器序列化
-	if data, err := m.Serializer().Marshal(request); err != nil {
+	if data, err := n.Serializer().Marshal(request); err != nil {
 		panic(err)
 	} else {
 		return data
 	}
 }
 
-func (m *Node) Unmarshal(data []byte, reply interface{}) {
+func (n *Node) Unmarshal(data []byte, reply interface{}) {
 	// 如果数据为空，直接返回
 	if len(data) == 0 {
 		return
@@ -120,25 +120,25 @@ func (m *Node) Unmarshal(data []byte, reply interface{}) {
 	}
 
 	// 使用序列化器反序列化
-	if err := m.Serializer().Unmarshal(data, reply); err != nil {
+	if err := n.Serializer().Unmarshal(data, reply); err != nil {
 		panic(err)
 	}
 }
 
-func (m *Node) GetConfig() *config.Config {
-	return m.config
+func (n *Node) GetConfig() *config.Config {
+	return n.config
 }
 
-func (m *Node) Startup(comps ...iface.IComponent) error {
+func (n *Node) Startup(comps ...iface.IComponent) error {
 	defer lib.PrintCoreDump()
 	// 创建节点信息
-	m.Member = &discovery.Member{
-		Id:      m.config.Node.Id,
-		Kind:    m.config.Node.Kind,
-		Address: m.config.Node.Address,
-		Port:    m.config.Node.Port,
-		Tags:    m.config.Node.Tags,
-		Meta:    m.config.Node.Meta,
+	n.Member = &discovery.Member{
+		Id:      n.config.Node.Id,
+		Kind:    n.config.Node.Kind,
+		Address: n.config.Node.Address,
+		Port:    n.config.Node.Port,
+		Tags:    n.config.Node.Tags,
+		Meta:    n.config.Node.Meta,
 	}
 
 	// 注册组件（注意顺序：glog 应该最先初始化，因为其他组件可能会使用日志）
@@ -155,15 +155,15 @@ func (m *Node) Startup(comps ...iface.IComponent) error {
 	//  注册外部传入的
 	components = append(components, comps...)
 
-	for _, com := range components {
-		if err := m.ComponentManager.Register(com); err != nil {
-			return errs.ErrRegisterComponentFailed(com.Name(), err)
+	for _, comp := range components {
+		if err := n.ComponentManager.Register(comp); err != nil {
+			return errs.ErrRegisterComponentFailed(comp.Name(), err)
 		}
 	}
 
 	// 启动所有组件
 	ctx := context.Background()
-	if err := m.ComponentManager.Start(ctx); err != nil {
+	if err := n.ComponentManager.Start(ctx); err != nil {
 		return errs.ErrStartComponentFailed(err)
 	}
 
@@ -174,34 +174,34 @@ func (m *Node) Startup(comps ...iface.IComponent) error {
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 	<-sigChan
 
-	return m.shutdown(context.Background())
+	return n.shutdown(context.Background())
 }
 
-func (m *Node) SetPanicHook(panicHook func(entry zapcore.Entry)) {
-	m.panicHook = panicHook
+func (n *Node) SetPanicHook(panicHook func(entry zapcore.Entry)) {
+	n.panicHook = panicHook
 }
 
-func (m *Node) CallPanicHook(entry zapcore.Entry) {
-	if m.panicHook == nil {
+func (n *Node) CallPanicHook(entry zapcore.Entry) {
+	if n.panicHook == nil {
 		return
 	}
-	m.panicHook(entry)
+	n.panicHook(entry)
 }
 
 // Shutdown 优雅关闭节点，关闭所有组件
-func (m *Node) shutdown(ctx context.Context) error {
+func (n *Node) shutdown(ctx context.Context) error {
 	defer glog.Info("节点停止运行完成")
 
 	glog.Info("节点开始停止运行")
 
 	// 停止所有组件(按逆序停止)
-	if err := m.ComponentManager.Stop(ctx); err != nil {
+	if err := n.ComponentManager.Stop(ctx); err != nil {
 		return err
 	}
 
-	m.remote = nil
-	m.actorSystem = nil
-	m.ComponentManager = nil
+	n.remote = nil
+	n.actorSystem = nil
+	n.ComponentManager = nil
 
 	timeoutCtx, _ := context.WithTimeout(ctx, time.Second*30)
 	return lib.ShutdownGoroutines(timeoutCtx)

@@ -133,16 +133,16 @@ func (r *Remote) Select(service string, strategy iface.RouteStrategy) *iface.Pid
 		return nil
 	}
 
-	var _member []*discovery.Member
+	var filteredMembers []*discovery.Member
 	for _, node := range members {
 		if !slices.Contains(node.Tags, service) {
 			continue
 		}
-		_member = append(_member, node)
+		filteredMembers = append(filteredMembers, node)
 	}
 
 	// 使用路由策略选择节点
-	selectedNode := strategy(_member)
+	selectedNode := strategy(filteredMembers)
 	if selectedNode == nil {
 		return nil
 	}

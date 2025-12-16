@@ -32,40 +32,40 @@ func NewComponentsMgr() *ComponentManager {
 }
 
 // IsStarted 检查管理器是否已启动
-func (m *ComponentManager) IsStarted() bool {
-	return m.started.Load()
+func (cm *ComponentManager) IsStarted() bool {
+	return cm.started.Load()
 }
 
 // IsStopped 检查管理器是否已停止
-func (m *ComponentManager) IsStopped() bool {
-	return m.stopped.Load()
+func (cm *ComponentManager) IsStopped() bool {
+	return cm.stopped.Load()
 }
 
 // ComponentCount 返回已注册的组件数量
-func (m *ComponentManager) ComponentCount() int {
-	m.orderMu.RLock()
-	defer m.orderMu.RUnlock()
-	return len(m.order)
+func (cm *ComponentManager) ComponentCount() int {
+	cm.orderMu.RLock()
+	defer cm.orderMu.RUnlock()
+	return len(cm.order)
 }
 
-func (m *ComponentManager) GetComponent(name string) iface.IComponent {
-	component, _ := m.components.Get(name)
+func (cm *ComponentManager) GetComponent(name string) iface.IComponent {
+	component, _ := cm.components.Get(name)
 	return component
 }
 
 // GetComponentNames 返回所有已注册组件的名称
-func (m *ComponentManager) GetComponentNames() []string {
-	m.orderMu.RLock()
-	defer m.orderMu.RUnlock()
+func (cm *ComponentManager) GetComponentNames() []string {
+	cm.orderMu.RLock()
+	defer cm.orderMu.RUnlock()
 
-	names := make([]string, len(m.order))
-	copy(names, m.order)
+	names := make([]string, len(cm.order))
+	copy(names, cm.order)
 	return names
 }
 
 // Register 注册组件，按注册顺序启动，按逆序停止
-func (m *ComponentManager) Register(component iface.IComponent) error {
-	if m.started.Load() {
+func (cm *ComponentManager) Register(component iface.IComponent) error {
+	if cm.started.Load() {
 		return errs.ErrCannotRegisterComponentAfterStarted()
 	}
 
@@ -76,41 +76,41 @@ func (m *ComponentManager) Register(component iface.IComponent) error {
 		return errs.ErrComponentNameCannotBeEmpty()
 	}
 
-	m.orderMu.Lock()
-	defer m.orderMu.Unlock()
+	cm.orderMu.Lock()
+	defer cm.orderMu.Unlock()
 
 	// 检查是否已注册同名组件
-	if _, exists := m.components.Get(component.Name()); exists {
+	if _, exists := cm.components.Get(component.Name()); exists {
 		return errs.ErrComponentAlreadyRegistered(component.Name())
 	}
 
 	// 注册组件
-	m.components.Set(component.Name(), component)
-	m.order = append(m.order, component.Name())
+	cm.components.Set(component.Name(), component)
+	cm.order = append(cm.order, component.Name())
 	glog.Debug("组件: 已注册组件", zap.String("component", component.Name()))
 	return nil
 }
 
 // Start 启动所有已注册的组件
-func (m *ComponentManager) Start(ctx context.Context) error {
-	if m.started.Load() {
+func (cm *ComponentManager) Start(ctx context.Context) error {
+	if cm.started.Load() {
 		return errs.ErrManagerAlreadyStarted()
 	}
-	if m.stopped.Load() {
+	if cm.stopped.Load() {
 		return errs.ErrManagerStoppedCannotRestart()
 	}
 
-	m.orderMu.RLock()
-	order := make([]string, len(m.order))
-	copy(order, m.order)
+	cm.orderMu.RLock()
+	order := make([]string, len(cm.order))
+	copy(order, cm.order)
 	count := len(order)
-	m.orderMu.RUnlock()
+	cm.orderMu.RUnlock()
 
 	glog.Info("组件: 正在启动组件", zap.Int("count", count))
 
 	var started []iface.IComponent
 	for i, name := range order {
-		component, exists := m.components.Get(name)
+		component, exists := cm.components.Get(name)
 		if !exists {
 			continue
 		}
@@ -120,7 +120,7 @@ func (m *ComponentManager) Start(ctx context.Context) error {
 		if err := component.Start(ctx); err != nil {
 			glog.Error("组件: 启动组件失败", zap.String("component", component.Name()), zap.Error(err))
 			// 停止已启动的组件（逆序）
-			_ = m.stopComponents(ctx, started, true)
+			_ = cm.stopComponents(ctx, started, true)
 			return errs.ErrFailedToStartComponent(component.Name(), err)
 		}
 
@@ -128,7 +128,7 @@ func (m *ComponentManager) Start(ctx context.Context) error {
 		glog.Info("组件: 组件启动成功", zap.String("component", component.Name()))
 	}
 
-	m.started.Store(true)
+	cm.started.Store(true)
 
 	glog.Info("组件: 所有组件启动成功", zap.Int("count", count))
 	return nil
@@ -136,39 +136,39 @@ func (m *ComponentManager) Start(ctx context.Context) error {
 
 // Stop 停止所有已注册的组件
 // 按注册顺序的逆序依次停止，确保依赖关系正确
-func (m *ComponentManager) Stop(ctx context.Context) error {
+func (cm *ComponentManager) Stop(ctx context.Context) error {
 	var err error
-	m.stopOnce.Do(func() {
-		if !m.started.Load() {
+	cm.stopOnce.Do(func() {
+		if !cm.started.Load() {
 			return
 		}
-		if m.stopped.Load() {
+		if cm.stopped.Load() {
 			return
 		}
-		m.stopped.Store(true)
+		cm.stopped.Store(true)
 
-		m.orderMu.RLock()
-		order := make([]string, len(m.order))
-		copy(order, m.order)
-		m.orderMu.RUnlock()
+		cm.orderMu.RLock()
+		order := make([]string, len(cm.order))
+		copy(order, cm.order)
+		cm.orderMu.RUnlock()
 
 		// 按逆序获取组件
 		components := make([]iface.IComponent, 0, len(order))
 		for i := len(order) - 1; i >= 0; i-- {
-			if component, exists := m.components.Get(order[i]); exists {
+			if component, exists := cm.components.Get(order[i]); exists {
 				components = append(components, component)
 			}
 		}
 
 		glog.Info("组件: 正在停止组件", zap.Int("count", len(components)))
-		err = m.stopComponents(ctx, components, false)
+		err = cm.stopComponents(ctx, components, false)
 	})
 
 	return err
 }
 
 // stopComponents 停止组件列表（组件列表应该已经是逆序的）
-func (m *ComponentManager) stopComponents(ctx context.Context, components []iface.IComponent, isRollback bool) error {
+func (cm *ComponentManager) stopComponents(ctx context.Context, components []iface.IComponent, isRollback bool) error {
 	var lastErr error
 	stopType := "正在停止"
 	if isRollback {
@@ -199,9 +199,9 @@ func (m *ComponentManager) stopComponents(ctx context.Context, components []ifac
 }
 
 // StopWithTimeout 使用超时停止所有组件
-func (m *ComponentManager) StopWithTimeout(timeout time.Duration) error {
+func (cm *ComponentManager) StopWithTimeout(timeout time.Duration) error {
 	ctx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
-	return m.Stop(ctx)
+	return cm.Stop(ctx)
 }

@@ -25,15 +25,15 @@ func NewNameManager() *Manager {
 }
 
 // Add 注册进程
-func (m *Manager) Add(pid *iface.Pid, process iface.IProcess) {
-	m.processDict.Set(pid.GetServiceId(), process)
+func (mgr *Manager) Add(pid *iface.Pid, process iface.IProcess) {
+	mgr.processDict.Set(pid.GetServiceId(), process)
 	if pid.GetName() == "" {
 		return
 	}
-	_ = m.RegisterName(pid, process, pid.GetName(), false)
+	_ = mgr.RegisterName(pid, process, pid.GetName(), false)
 }
 
-func (m *Manager) RegisterName(pid *iface.Pid, process iface.IProcess, name string, isGlobal bool) error {
+func (mgr *Manager) RegisterName(pid *iface.Pid, process iface.IProcess, name string, isGlobal bool) error {
 	if len(name) == 0 {
 		return errs.ErrNameCannotBeEmpty()
 	}
@@ -44,91 +44,91 @@ func (m *Manager) RegisterName(pid *iface.Pid, process iface.IProcess, name stri
 	}
 
 	// 检查2: 名字是否已被其他进程注册
-	if m.HasName(name) {
+	if mgr.HasName(name) {
 		return errs.ErrNameAlreadyRegistered(name)
 	}
 
 	// 如果是全局注册，还需要在远程注册
 	if isGlobal {
-		if err := m.registerGlobalName(name); err != nil {
+		if err := mgr.registerGlobalName(name); err != nil {
 			return errs.ErrRemoteRegistryNameFailed(err)
 		}
 		// 记录全局注册的名字
-		m.globalNames.Set(name, true)
+		mgr.globalNames.Set(name, true)
 	}
 
 	// 注册名字：更新 pid 的名称
 	pid.Name = name
 
 	// 在本地注册新名称
-	m.nameDict.Set(name, process)
+	mgr.nameDict.Set(name, process)
 
 	return nil
 }
 
 // registerGlobalName 在远程注册全局名字
-func (m *Manager) registerGlobalName(name string) error {
+func (mgr *Manager) registerGlobalName(name string) error {
 	info := iface.GetNode().Info()
 	info.Tags = append(info.Tags, name)
 	return iface.GetNode().Remote().UpdateNode()
 }
 
 // HasName 检查名字是否已注册
-func (m *Manager) HasName(name string) bool {
-	_, exists := m.nameDict.Get(name)
+func (mgr *Manager) HasName(name string) bool {
+	_, exists := mgr.nameDict.Get(name)
 	return exists
 }
 
 // GetProcess 根据 Pid 获取进程
-func (m *Manager) GetProcess(pid *iface.Pid) iface.IProcess {
+func (mgr *Manager) GetProcess(pid *iface.Pid) iface.IProcess {
 	if pid == nil {
 		return nil
 	}
 	if pid.GetServiceId() > 0 {
-		return m.GetProcessById(pid.GetServiceId())
+		return mgr.GetProcessById(pid.GetServiceId())
 	}
 	if pid.GetName() != "" {
-		return m.GetProcessByName(pid.GetName())
+		return mgr.GetProcessByName(pid.GetName())
 	}
 	return nil
 }
 
 // GetProcessById 根据 ID 获取进程
-func (m *Manager) GetProcessById(id uint64) iface.IProcess {
-	process, _ := m.processDict.Get(id)
+func (mgr *Manager) GetProcessById(id uint64) iface.IProcess {
+	process, _ := mgr.processDict.Get(id)
 	return process
 }
 
 // GetProcessByName 根据名字获取进程
-func (m *Manager) GetProcessByName(name string) iface.IProcess {
+func (mgr *Manager) GetProcessByName(name string) iface.IProcess {
 	if name == "" {
 		return nil
 	}
-	process, _ := m.nameDict.Get(name)
+	process, _ := mgr.nameDict.Get(name)
 	return process
 }
 
-func (m *Manager) Remove(pid *iface.Pid) {
-	m.processDict.Delete(pid.GetServiceId())
-	m.UnregisterName(pid)
+func (mgr *Manager) Remove(pid *iface.Pid) {
+	mgr.processDict.Delete(pid.GetServiceId())
+	mgr.UnregisterName(pid)
 }
 
 // UnregisterName 注销名字
-func (m *Manager) UnregisterName(pid *iface.Pid) {
+func (mgr *Manager) UnregisterName(pid *iface.Pid) {
 	if pid.GetName() == "" {
 		return
 	}
 	name := pid.GetName()
-	m.nameDict.Delete(name)
+	mgr.nameDict.Delete(name)
 	// 如果是全局注册的名字，需要从远程注销
-	if _, isGlobal := m.globalNames.Get(name); isGlobal {
-		m.unregisterGlobalName(name)
-		m.globalNames.Delete(name)
+	if _, isGlobal := mgr.globalNames.Get(name); isGlobal {
+		mgr.unregisterGlobalName(name)
+		mgr.globalNames.Delete(name)
 	}
 }
 
 // unregisterGlobalName 从远程注销全局名字
-func (m *Manager) unregisterGlobalName(name string) {
+func (mgr *Manager) unregisterGlobalName(name string) {
 	remote := iface.GetNode().Remote()
 	info := iface.GetNode().Info()
 	slices.DeleteFunc(info.Tags, func(s string) bool {
@@ -138,9 +138,9 @@ func (m *Manager) unregisterGlobalName(name string) {
 }
 
 // GetAllProcesses 获取所有进程
-func (m *Manager) GetAllProcesses() []iface.IProcess {
+func (mgr *Manager) GetAllProcesses() []iface.IProcess {
 	var processes []iface.IProcess
-	m.processDict.Range(func(_ uint64, value iface.IProcess) bool {
+	mgr.processDict.Range(func(_ uint64, value iface.IProcess) bool {
 		processes = append(processes, value)
 		return true
 	})

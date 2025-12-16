@@ -36,24 +36,24 @@ func NewMailbox() *Mailbox {
 	return m
 }
 
-func (m *Mailbox) RegisterHandlers(invoker IMessageInvoker, dispatcher IDispatcher) {
-	m.invoker = invoker
-	m.dispatch = dispatcher
+func (mb *Mailbox) RegisterHandlers(invoker IMessageInvoker, dispatcher IDispatcher) {
+	mb.invoker = invoker
+	mb.dispatch = dispatcher
 }
 
-func (m *Mailbox) PostMessage(msg interface{}) error {
+func (mb *Mailbox) PostMessage(msg interface{}) error {
 	if msg == nil {
 		return nil
 	}
-	m.queue.Push(msg)
-	return m.schedule()
+	mb.queue.Push(msg)
+	return mb.schedule()
 }
 
-func (m *Mailbox) schedule() error {
-	if !m.dispatchStat.CompareAndSwap(idle, running) {
+func (mb *Mailbox) schedule() error {
+	if !mb.dispatchStat.CompareAndSwap(idle, running) {
 		return nil
 	}
-	if err := m.dispatch.Schedule(m.process, func(err interface{}) {
+	if err := mb.dispatch.Schedule(mb.process, func(err interface{}) {
 		glog.Errorf("Mailbox dispatch schedule panic:%+v stack:%+v", err, zap.Stack("stack"))
 	}); err != nil {
 		glog.Errorf("Mailbox dispatch schedule error:%v", err)
@@ -62,20 +62,20 @@ func (m *Mailbox) schedule() error {
 	return nil
 }
 
-func (m *Mailbox) process() {
+func (mb *Mailbox) process() {
 	defer func() {
 		// 确保无论是否发生 panic，状态都能被重置
-		m.dispatchStat.CompareAndSwap(running, idle)
+		mb.dispatchStat.CompareAndSwap(running, idle)
 	}()
-	m.run()
+	mb.run()
 }
 
-func (m *Mailbox) run() {
-	throughput := m.dispatch.Throughput()
+func (mb *Mailbox) run() {
+	throughput := mb.dispatch.Throughput()
 	var processed int
 
 	for {
-		if m.queue.Empty() {
+		if mb.queue.Empty() {
 			return
 		}
 
@@ -87,19 +87,19 @@ func (m *Mailbox) run() {
 		}
 
 		processed++
-		msg := m.queue.Pop()
+		msg := mb.queue.Pop()
 		if msg == nil {
 			return
 		}
-		_ = m.invokerMessage(msg)
+		_ = mb.invokerMessage(msg)
 	}
 }
 
-func (m *Mailbox) invokerMessage(msg interface{}) error {
-	return m.invoker.InvokerMessage(msg)
+func (mb *Mailbox) invokerMessage(msg interface{}) error {
+	return mb.invoker.InvokerMessage(msg)
 }
 
 // IsEmpty 检查 mailbox 队列是否为空
-func (m *Mailbox) IsEmpty() bool {
-	return m.queue.Empty()
+func (mb *Mailbox) IsEmpty() bool {
+	return mb.queue.Empty()
 }

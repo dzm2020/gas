@@ -17,20 +17,20 @@ type chanWaiter[T any] struct {
 	after <-chan time.Time
 }
 
-func (f *chanWaiter[T]) Wait() (T, error) {
+func (w *chanWaiter[T]) Wait() (T, error) {
 	var t T
 	select {
-	case e := <-f.ch:
+	case e := <-w.ch:
 		return e, nil
-	case <-f.after:
+	case <-w.after:
 		return t, errs.ErrWaiterTimeout
 	}
 }
 
-func (f *chanWaiter[T]) Done(reply T) {
+func (w *chanWaiter[T]) Done(reply T) {
 	// 使用 select 实现非阻塞发送，避免多次调用 Done 时阻塞
 	select {
-	case f.ch <- reply:
+	case w.ch <- reply:
 	default:
 	}
 }

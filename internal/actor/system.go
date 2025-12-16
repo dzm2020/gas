@@ -135,9 +135,9 @@ func (s *System) Select(name string, strategy iface.RouteStrategy) *iface.Pid {
 
 func (s *System) CastPid(to interface{}) *iface.Pid {
 	var pid *iface.Pid
-	switch _to := to.(type) {
+	switch toValue := to.(type) {
 	case string:
-		return s.Select(_to, iface.RouteRandom)
+		return s.Select(toValue, iface.RouteRandom)
 	case *iface.Pid:
 		return pid
 	default:
