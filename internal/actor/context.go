@@ -2,7 +2,6 @@
 package actor
 
 import (
-	"errors"
 	"fmt"
 	"gas/internal/errs"
 	"gas/internal/iface"
@@ -26,12 +25,13 @@ func newActorContext() *actorContext {
 }
 
 type actorContext struct {
-	process iface.IProcess // 保存自己的 process 引用
-	pid     *iface.Pid
-	name    string
-	actor   iface.IActor
-	router  iface.IRouter
-	msg     *iface.ActorMessage
+	isGlobalName bool
+	name         string
+	process      iface.IProcess // 保存自己的 process 引用
+	pid          *iface.Pid
+	actor        iface.IActor
+	router       iface.IRouter
+	msg          *iface.ActorMessage
 }
 
 func (a *actorContext) ID() *iface.Pid {
@@ -97,41 +97,63 @@ func (a *actorContext) execHandler(msg *iface.Message) ([]byte, error) {
 }
 
 func (a *actorContext) Send(to interface{}, methodName string, request interface{}) error {
-	system := iface.GetNode().System()
-	toPid := system.CastPid(to)
-	bin := iface.GetNode().Marshal(request)
-	message := iface.NewActorMessage(a.pid, toPid, methodName, bin)
-	return system.Send(message)
+	node := iface.GetNode()
+	toPid := node.CastPid(to)
+	message := iface.NewActorMessage(a.pid, toPid, methodName, node.Marshal(request))
+	message.Async = true
+	return node.Send(message)
 }
 
 func (a *actorContext) Call(to interface{}, methodName string, request interface{}, reply interface{}) error {
+	node := iface.GetNode()
+	toPid := node.CastPid(to)
+
+	message := iface.NewActorMessage(a.pid, toPid, methodName, node.Marshal(request))
+	message.Deadline = time.Now().Add(time.Second * 3).Unix()
+	message.Async = false
+
+	data, err := node.Call(message)
+	iface.GetNode().Unmarshal(data, reply)
+	return err
+}
+
+func (a *actorContext) RegisterName(name string, global bool) error {
 	system := iface.GetNode().System()
-	toPid := system.CastPid(to)
-	bin := iface.GetNode().Marshal(request)
-	message := iface.NewActorMessage(a.pid, toPid, methodName, bin)
-	response := system.Call(message, time.Second*3)
-	if response.Error != "" {
-		return errors.New(response.Error)
+
+	//  本地注册
+	if err := system.RegisterName(a.pid, a.process, name); err != nil {
+		return err
 	}
-	iface.GetNode().Unmarshal(response.GetData(), reply)
+	//  集群注册
+	if global {
+		iface.GetNode().AddTag(name)
+		if err := iface.GetNode().Update(); err != nil {
+			return err
+		}
+	}
+	a.name = name
+	a.isGlobalName = global
+
 	return nil
 }
 
-func (a *actorContext) RegisterName(name string, isGlobal bool) error {
-	system := iface.GetNode().System()
-	return system.RegisterName(a.pid, a.process, name, isGlobal)
-}
-
 // AfterFunc 注册一次性定时器
-func (a *actorContext) AfterFunc(duration time.Duration, callback iface.Task) *lib.Timer {
+func (a *actorContext) AfterFunc(duration time.Duration, task iface.Task) *lib.Timer {
 	return lib.AfterFunc(duration, func() {
-		_ = a.process.PushTask(callback)
+		msg := iface.NewTaskMessage(task)
+		_ = a.process.Input(msg)
 	})
 }
 
 func (a *actorContext) exit() {
 	system := iface.GetNode().System()
+	//  本地移除
 	system.Remove(a.pid)
+	//  移除全局名字
+	if a.isGlobalName {
+		iface.GetNode().RemoteTag(a.name)
+		_ = iface.GetNode().Update()
+	}
 	_ = a.actor.OnStop(a)
 }
 

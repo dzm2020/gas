@@ -3,8 +3,8 @@ package node
 import (
 	"context"
 	"gas/internal/actor"
+	"gas/internal/cluster"
 	"gas/internal/iface"
-	"gas/internal/remote"
 	discoveryFactory "gas/pkg/discovery"
 	"gas/pkg/lib/glog"
 	messageQueFactory "gas/pkg/messageQue"
@@ -51,9 +51,9 @@ func (c *LogComponent) Stop(ctx context.Context) error {
 	return nil
 }
 
-// RemoteComponent 远程通信组件
+// RemoteComponent 集群通信组件
 type RemoteComponent struct {
-	iface.IRemote
+	iface.ICluster
 }
 
 // NewRemoteComponent 创建 remote 组件
@@ -63,7 +63,7 @@ func NewRemoteComponent() *RemoteComponent {
 }
 
 func (r *RemoteComponent) Name() string {
-	return "remote"
+	return "cluster"
 }
 
 func (r *RemoteComponent) Start(ctx context.Context) error {
@@ -74,25 +74,25 @@ func (r *RemoteComponent) Start(ctx context.Context) error {
 		return err
 	}
 
-	// 创建远程通信管理器
+	// 创建集群通信管理器
 	messageQueue, err := messageQueFactory.NewFromConfig(*config.Remote.MessageQueue)
 	if err != nil {
 		return err
 	}
 
-	r.IRemote = remote.New(discoveryInstance, messageQueue, config.Remote.SubjectPrefix)
+	r.ICluster = cluster.New(discoveryInstance, messageQueue, config.Remote.SubjectPrefix)
 	//  建立引用
-	iface.GetNode().SetRemote(r.IRemote)
+	iface.GetNode().SetCluster(r.ICluster)
 	//  注册节点并订阅
-	if err = r.IRemote.Start(ctx); err != nil {
+	if err = r.ICluster.Start(ctx); err != nil {
 		return err
 	}
 	return nil
 }
 
 func (r *RemoteComponent) Stop(ctx context.Context) error {
-	iface.GetNode().SetRemote(nil)
-	return r.IRemote.Shutdown(ctx)
+	iface.GetNode().SetCluster(nil)
+	return r.ICluster.Shutdown(ctx)
 }
 
 // ActorComponent actor 系统组件适配器

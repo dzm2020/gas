@@ -1,6 +1,10 @@
 package iface
 
-import "context"
+import (
+	"context"
+
+	"golang.org/x/exp/slices"
+)
 
 type IDiscovery interface {
 	Run(ctx context.Context) error
@@ -51,6 +55,8 @@ type IMember interface {
 	GetTags() []string
 	GetMeta() map[string]string
 	SetTags(tags []string)
+	RemoteTag(tag string)
+	AddTag(tag string)
 }
 
 type Member struct {
@@ -87,6 +93,18 @@ func (b *Member) GetMeta() map[string]string {
 
 func (b *Member) SetTags(tags []string) {
 	b.Tags = tags
+}
+
+func (b *Member) RemoteTag(tag string) {
+	slices.DeleteFunc(b.Tags, func(s string) bool {
+		return s == tag
+	})
+}
+func (b *Member) AddTag(tag string) {
+	if slices.Contains(b.Tags, tag) {
+		return
+	}
+	b.Tags = append(b.Tags, tag)
 }
 
 type Topology struct {

@@ -27,3 +27,12 @@ func AfterFunc(duration time.Duration, callback func()) *Timer {
 	})
 	return &Timer{Timer: t}
 }
+
+func NowDelay(sec, nsec int64) time.Duration {
+	targetTime := time.Unix(sec, nsec)
+	return targetTime.Sub(time.Now())
+}
+
+func TimeAdd() {
+	
+}

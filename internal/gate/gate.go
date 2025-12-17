@@ -34,15 +34,17 @@ func (g *Gate) Start(ctx context.Context) error {
 }
 
 func (g *Gate) OnConnect(entity network.IConnection) (err error) {
-	system := iface.GetNode().System()
+	node := iface.GetNode()
+
+	system := node.System()
 
 	actor := g.Factory()
 	pid := system.Spawn(actor)
 
 	entity.SetContext(pid)
 
-	return system.PushTask(pid, func(ctx iface.IContext) error {
-		agent := ctx.Actor().(IAgent)
+	return system.SubmitTask(pid, func(ctx iface.IContext) error {
+		agent, _ := ctx.Actor().(IAgent)
 		session := iface.NewSessionWithPid(ctx, pid)
 		return agent.OnNetworkOpen(ctx, session)
 	})
@@ -54,8 +56,6 @@ func (g *Gate) OnMessage(entity network.IConnection, msg interface{}) error {
 		return errs.ErrAgentNoBindConnection
 	}
 
-	system := iface.GetNode().System()
-
 	//  将网关消息转为内容消息
 	clientMessage, ok := msg.(*protocol.Message)
 	if !ok {
@@ -64,7 +64,7 @@ func (g *Gate) OnMessage(entity network.IConnection, msg interface{}) error {
 
 	actorMsg := g.clientToActorMessage(pid, entity, clientMessage)
 
-	return system.Send(actorMsg)
+	return iface.GetNode().Send(actorMsg)
 }
 
 func (g *Gate) OnClose(entity network.IConnection, wrong error) error {
@@ -73,8 +73,11 @@ func (g *Gate) OnClose(entity network.IConnection, wrong error) error {
 		return errs.ErrAgentNoBindConnection
 	}
 
-	system := iface.GetNode().System()
-	return system.PushTask(pid, func(ctx iface.IContext) error {
+	node := iface.GetNode()
+
+	system := node.System()
+
+	return system.SubmitTask(pid, func(ctx iface.IContext) error {
 		agent := ctx.Actor().(IAgent)
 		session := iface.NewSessionWithPid(ctx, pid)
 		return agent.OnNetworkClose(ctx, session)

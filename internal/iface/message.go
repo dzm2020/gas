@@ -17,6 +17,12 @@ var (
 	_ IMessageValidator = (*TaskMessage)(nil)
 )
 
+func NewTaskMessage(task Task) *TaskMessage {
+	return &TaskMessage{
+		Task: task,
+	}
+}
+
 type TaskMessage struct {
 	Task Task
 }
@@ -55,7 +61,7 @@ func (m *Message) Response(data []byte, err error) {
 
 type ActorMessage struct {
 	*Message
-	response func(message *Response)
+	response ResponseFunc
 }
 
 // Validate 验证同步消息是否合法
@@ -76,10 +82,7 @@ func (m *ActorMessage) Validate() error {
 	if m.GetTo().GetServiceId() == 0 && m.GetTo().GetName() == "" {
 		return errs.ErrMessageTargetInvalid
 	}
-	// 同步消息必须设置响应回调
-	if m.response == nil && !m.GetAsync() {
-		return errs.ErrSyncMessageResponseCallbackIsNil
-	}
+
 	return nil
 }
 
@@ -87,17 +90,15 @@ func (m *ActorMessage) Response(data []byte, err error) {
 	if m.response == nil {
 		return
 	}
-	response := &Response{
-		Data: data,
-	}
-	if err != nil {
-		response.Error = err.Error()
-	}
-	m.response(response)
+	m.response(data, err)
 }
 
-func (m *ActorMessage) SetResponse(f func(*Response)) {
+func (m *ActorMessage) SetResponse(f ResponseFunc) {
 	m.response = f
+}
+
+func (m *ActorMessage) GetResponse() ResponseFunc {
+	return m.response
 }
 
 // NewErrorResponse 创建错误响应消息
@@ -108,3 +109,5 @@ func NewErrorResponse(err error) *Response {
 		Error: err.Error(),
 	}
 }
+
+type ResponseFunc func(data []byte, err error)

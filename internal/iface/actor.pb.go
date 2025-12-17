@@ -89,6 +89,7 @@ type Message struct {
 	Data          []byte                 `protobuf:"bytes,4,opt,name=data,proto3" json:"data,omitempty"`
 	Async         bool                   `protobuf:"varint,5,opt,name=async,proto3" json:"async,omitempty"`
 	Session       *Session               `protobuf:"bytes,6,opt,name=session,proto3" json:"session,omitempty"`
+	Deadline      int64                  `protobuf:"varint,7,opt,name=deadline,proto3" json:"deadline,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -163,6 +164,13 @@ func (x *Message) GetSession() *Session {
 		return x.Session
 	}
 	return nil
+}
+
+func (x *Message) GetDeadline() int64 {
+	if x != nil {
+		return x.Deadline
+	}
+	return 0
 }
 
 type Response struct {
@@ -309,7 +317,7 @@ const file_actor_proto_rawDesc = "" +
 	"\x03Pid\x12\x16\n" +
 	"\x06nodeId\x18\x01 \x01(\x04R\x06nodeId\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1c\n" +
-	"\tserviceId\x18\x03 \x01(\x04R\tserviceId\"\xb1\x01\n" +
+	"\tserviceId\x18\x03 \x01(\x04R\tserviceId\"\xcd\x01\n" +
 	"\aMessage\x12\x1a\n" +
 	"\x02to\x18\x01 \x01(\v2\n" +
 	".actor.PidR\x02to\x12\x1e\n" +
@@ -318,7 +326,8 @@ const file_actor_proto_rawDesc = "" +
 	"\x06method\x18\x03 \x01(\tR\x06method\x12\x12\n" +
 	"\x04data\x18\x04 \x01(\fR\x04data\x12\x14\n" +
 	"\x05async\x18\x05 \x01(\bR\x05async\x12(\n" +
-	"\asession\x18\x06 \x01(\v2\x0e.actor.SessionR\asession\"4\n" +
+	"\asession\x18\x06 \x01(\v2\x0e.actor.SessionR\asession\x12\x1a\n" +
+	"\bdeadline\x18\a \x01(\x03R\bdeadline\"4\n" +
 	"\bResponse\x12\x12\n" +
 	"\x04data\x18\x01 \x01(\fR\x04data\x12\x14\n" +
 	"\x05error\x18\x02 \x01(\tR\x05error\"\x9b\x01\n" +

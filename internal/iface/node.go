@@ -19,39 +19,43 @@ func GetNode() INode {
 	return currentNode
 }
 
-type IComponentManager interface {
-	ComponentCount() int
-	GetComponent(name string) IComponent
-	GetComponentNames() []string
-	Register(component IComponent) error
-}
+type (
+	IComponent interface {
+		Start(ctx context.Context) error
+		Stop(ctx context.Context) error
+		Name() string
+	}
 
-type INode interface {
-	IComponentManager
-	discovery.IMember
-	Info() *discovery.Member
-	SetSerializer(ser lib.ISerializer)
-	System() ISystem
-	SetSystem(system ISystem)
-	Remote() IRemote
-	SetRemote(IRemote)
-	GetConfig() *config.Config
-	Startup(comps ...IComponent) error
-	SetPanicHook(panicHook func(entry zapcore.Entry))
-	CallPanicHook(entry zapcore.Entry)
-	Marshal(request interface{}) []byte
-	Unmarshal(data []byte, reply interface{})
-}
+	IComponentManager interface {
+		ComponentCount() int
+		GetComponent(name string) IComponent
+		GetComponentNames() []string
+		Register(component IComponent) error
+	}
 
-// IComponent 组件接口
-type IComponent interface {
-	// Start 启动组件
-	Start(ctx context.Context) error
-	// Stop 停止组件，ctx 用于控制超时
-	Stop(ctx context.Context) error
-	// Name 返回组件名称，用于日志和错误报告
-	Name() string
-}
+	INode interface {
+		IComponentManager
+		discovery.IMember
+		Info() *discovery.Member
+		SetSerializer(ser lib.ISerializer)
+		System() ISystem
+		SetSystem(system ISystem)
+		Cluster() ICluster
+		SetCluster(ICluster)
+		GetConfig() *config.Config
+		Startup(comps ...IComponent) error
+		SetPanicHook(panicHook func(entry zapcore.Entry))
+		CallPanicHook(entry zapcore.Entry)
+		Marshal(request interface{}) []byte
+		Unmarshal(data []byte, reply interface{})
+		Update() error
+		Select(name string, strategy RouteStrategy) *Pid
+		CastPid(to interface{}) *Pid
+
+		Send(message *ActorMessage) (err error)
+		Call(message *ActorMessage) (data []byte, err error)
+	}
+)
 
 type BaseComponent struct {
 }

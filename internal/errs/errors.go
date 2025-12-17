@@ -85,8 +85,8 @@ func ErrNameCannotBeEmpty() error {
 	return fmt.Errorf("name cannot be empty")
 }
 
-func ErrRemoteRegistryNameFailed(err error) error {
-	return fmt.Errorf("remote registry name failed: %w", err)
+func ErrClusterRegistryNameFailed(err error) error {
+	return fmt.Errorf("cluster registry name failed: %w", err)
 }
 
 func ErrNameAlreadyRegistered(name string) error {

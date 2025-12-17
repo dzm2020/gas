@@ -5,15 +5,14 @@ import (
 	discovery "gas/pkg/discovery/iface"
 	"math/rand"
 	"sync/atomic"
-	"time"
 )
 
 type RouteStrategy func(nodes []*discovery.Member) *discovery.Member
 
-type IRemote interface {
+type ICluster interface {
+	Send(message *ActorMessage) (err error)
+	Call(message *ActorMessage) (data []byte, err error)
 	Start(ctx context.Context) error
-	Send(message *ActorMessage) error
-	Call(message *ActorMessage, timeout time.Duration) *Response
 	Select(service string, strategy RouteStrategy) *Pid
 	UpdateNode() error
 	Shutdown(ctx context.Context) error
