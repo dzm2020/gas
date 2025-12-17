@@ -26,8 +26,8 @@ type (
 		UnregisterName(pid *Pid)
 		GetAllProcesses() []IProcess
 
-		SubmitTask(to *Pid, task Task) (err error)
-		SubmitTaskAndWait(to *Pid, task Task, timeout time.Duration) (err error)
+		SubmitTask(to interface{}, task Task) (err error)
+		SubmitTaskAndWait(to interface{}, task Task, timeout time.Duration) (err error)
 		Send(message *ActorMessage) (err error)
 		Call(message *ActorMessage) (data []byte, err error)
 
@@ -40,7 +40,7 @@ type (
 		Actor() IActor
 		Send(to interface{}, methodName string, request interface{}) error
 		Call(to interface{}, methodName string, request interface{}, reply interface{}) error
-		AfterFunc(duration time.Duration, callback Task) *lib.Timer
+		AfterFunc(duration time.Duration, task Task) *lib.Timer
 		RegisterName(name string, isGlobal bool) error
 		GetRouter() IRouter
 		Message() *ActorMessage

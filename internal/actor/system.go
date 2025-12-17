@@ -12,10 +12,9 @@ import (
 
 // System 管理本地进程
 type System struct {
-	uniqId      atomic.Uint64
-	processDict *maputil.ConcurrentMap[uint64, iface.IProcess] // ID到进程的映射
-	nameDict    *maputil.ConcurrentMap[string, iface.IProcess] // 名字到进程的映射
-	//globalNames  *maputil.ConcurrentMap[string, bool]           // 跟踪全局注册的名字
+	uniqId       atomic.Uint64
+	processDict  *maputil.ConcurrentMap[uint64, iface.IProcess] // ID到进程的映射
+	nameDict     *maputil.ConcurrentMap[string, iface.IProcess] // 名字到进程的映射
 	shuttingDown atomic.Bool
 }
 
@@ -162,68 +161,33 @@ func (s *System) GetAllProcesses() []iface.IProcess {
 }
 
 func (s *System) Call(message *iface.ActorMessage) (data []byte, err error) {
-	if err = s.checkShuttingDown(); err != nil {
-		return
-	}
-
-	process := s.GetProcess(message.GetTo())
-	if process == nil {
-		err = errs.ErrProcessNotFound
-		return
-	}
-
 	waiter := lib.NewChanWaiter(message.GetDeadline())
 	message.SetResponse(func(bin []byte, e error) {
 		data = bin
 		err = e
 	})
 
-	if err = process.Input(message); err != nil {
+	if err = s.sendToProcess(message.To, message); err != nil {
 		waiter.Done()
 		return
 	}
-
 	err = waiter.Wait()
 	return
 }
 
 func (s *System) Send(message *iface.ActorMessage) (err error) {
-	if err = s.checkShuttingDown(); err != nil {
-		return
-	}
-
-	process := s.GetProcess(message.GetTo())
-	if process == nil {
-		err = errs.ErrProcessNotFound
-		return
-	}
-
-	return process.Input(message)
+	return s.sendToProcess(message.To, message)
 }
 
-func (s *System) SubmitTask(to *iface.Pid, task iface.Task) (err error) {
+func (s *System) SubmitTask(to interface{}, task iface.Task) (err error) {
 	if err = s.checkShuttingDown(); err != nil {
-		return
-	}
-	process := s.GetProcess(to)
-	if process == nil {
-		err = errs.ErrProcessNotFound
 		return
 	}
 	msg := iface.NewTaskMessage(task)
-	return process.Input(msg)
+	return s.sendToProcess(to, msg)
 }
 
-func (s *System) SubmitTaskAndWait(to *iface.Pid, task iface.Task, timeout time.Duration) (err error) {
-	if err = s.checkShuttingDown(); err != nil {
-		return
-	}
-	process := s.GetProcess(to)
-	if process == nil {
-		err = errs.ErrProcessNotFound
-		return
-	}
-
+func (s *System) SubmitTaskAndWait(to interface{}, task iface.Task, timeout time.Duration) (err error) {
 	deadline := time.Now().Add(timeout).Unix()
 	waiter := lib.NewChanWaiter(deadline)
 
@@ -237,18 +201,34 @@ func (s *System) SubmitTaskAndWait(to *iface.Pid, task iface.Task, timeout time.
 
 	msg := iface.NewTaskMessage(syncTask)
 
-	if err = process.Input(msg); err != nil {
+	if err = s.sendToProcess(to, msg); err != nil {
 		waiter.Done()
 		return
 	}
 
 	err = waiter.Wait()
-
 	return
 }
 
-// Shutdown 优雅关闭 Actor 系统
+func (s *System) sendToProcess(to, msg interface{}) (err error) {
+	if err = s.checkShuttingDown(); err != nil {
+		return
+	}
+	var process iface.IProcess
+	switch toValue := to.(type) {
+	case string:
+		process = s.GetProcessByName(toValue)
+	case *iface.Pid:
+		process = s.GetProcess(toValue)
+	}
+	if process == nil {
+		err = errs.ErrProcessNotFound
+		return
+	}
+	return process.Input(msg)
+}
 
+// Shutdown 优雅关闭 Actor 系统
 func (s *System) Shutdown(timeout time.Duration) error {
 	// 标记为关闭状态，拒绝新的消息和进程创建
 	if !s.shuttingDown.CompareAndSwap(false, true) {
