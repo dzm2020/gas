@@ -227,12 +227,13 @@ func (x *Response) GetError() string {
 
 type Session struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        uint64                 `protobuf:"varint,1,opt,name=userId,proto3" json:"userId,omitempty"`
-	Agent         *Pid                   `protobuf:"bytes,2,opt,name=agent,proto3" json:"agent,omitempty"`
-	Index         uint32                 `protobuf:"varint,3,opt,name=index,proto3" json:"index,omitempty"`
-	EntityId      int64                  `protobuf:"varint,4,opt,name=entityId,proto3" json:"entityId,omitempty"`
-	Code          int64                  `protobuf:"varint,5,opt,name=code,proto3" json:"code,omitempty"`
-	Mid           int64                  `protobuf:"varint,6,opt,name=mid,proto3" json:"mid,omitempty"`
+	Agent         *Pid                   `protobuf:"bytes,1,opt,name=agent,proto3" json:"agent,omitempty"`
+	EntityId      int64                  `protobuf:"varint,2,opt,name=entityId,proto3" json:"entityId,omitempty"`
+	UserId        uint64                 `protobuf:"varint,3,opt,name=userId,proto3" json:"userId,omitempty"`
+	Index         uint32                 `protobuf:"varint,4,opt,name=index,proto3" json:"index,omitempty"`
+	Cmd           uint32                 `protobuf:"varint,5,opt,name=cmd,proto3" json:"cmd,omitempty"`
+	Act           uint32                 `protobuf:"varint,6,opt,name=act,proto3" json:"act,omitempty"`
+	Code          int64                  `protobuf:"varint,7,opt,name=code,proto3" json:"code,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -267,25 +268,11 @@ func (*Session) Descriptor() ([]byte, []int) {
 	return file_actor_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *Session) GetUserId() uint64 {
-	if x != nil {
-		return x.UserId
-	}
-	return 0
-}
-
 func (x *Session) GetAgent() *Pid {
 	if x != nil {
 		return x.Agent
 	}
 	return nil
-}
-
-func (x *Session) GetIndex() uint32 {
-	if x != nil {
-		return x.Index
-	}
-	return 0
 }
 
 func (x *Session) GetEntityId() int64 {
@@ -295,16 +282,37 @@ func (x *Session) GetEntityId() int64 {
 	return 0
 }
 
-func (x *Session) GetCode() int64 {
+func (x *Session) GetUserId() uint64 {
 	if x != nil {
-		return x.Code
+		return x.UserId
 	}
 	return 0
 }
 
-func (x *Session) GetMid() int64 {
+func (x *Session) GetIndex() uint32 {
 	if x != nil {
-		return x.Mid
+		return x.Index
+	}
+	return 0
+}
+
+func (x *Session) GetCmd() uint32 {
+	if x != nil {
+		return x.Cmd
+	}
+	return 0
+}
+
+func (x *Session) GetAct() uint32 {
+	if x != nil {
+		return x.Act
+	}
+	return 0
+}
+
+func (x *Session) GetCode() int64 {
+	if x != nil {
+		return x.Code
 	}
 	return 0
 }
@@ -330,15 +338,16 @@ const file_actor_proto_rawDesc = "" +
 	"\bdeadline\x18\a \x01(\x03R\bdeadline\"4\n" +
 	"\bResponse\x12\x12\n" +
 	"\x04data\x18\x01 \x01(\fR\x04data\x12\x14\n" +
-	"\x05error\x18\x02 \x01(\tR\x05error\"\x9b\x01\n" +
-	"\aSession\x12\x16\n" +
-	"\x06userId\x18\x01 \x01(\x04R\x06userId\x12 \n" +
-	"\x05agent\x18\x02 \x01(\v2\n" +
-	".actor.PidR\x05agent\x12\x14\n" +
-	"\x05index\x18\x03 \x01(\rR\x05index\x12\x1a\n" +
-	"\bentityId\x18\x04 \x01(\x03R\bentityId\x12\x12\n" +
-	"\x04code\x18\x05 \x01(\x03R\x04code\x12\x10\n" +
-	"\x03mid\x18\x06 \x01(\x03R\x03midB\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\"\xad\x01\n" +
+	"\aSession\x12 \n" +
+	"\x05agent\x18\x01 \x01(\v2\n" +
+	".actor.PidR\x05agent\x12\x1a\n" +
+	"\bentityId\x18\x02 \x01(\x03R\bentityId\x12\x16\n" +
+	"\x06userId\x18\x03 \x01(\x04R\x06userId\x12\x14\n" +
+	"\x05index\x18\x04 \x01(\rR\x05index\x12\x10\n" +
+	"\x03cmd\x18\x05 \x01(\rR\x03cmd\x12\x10\n" +
+	"\x03act\x18\x06 \x01(\rR\x03act\x12\x12\n" +
+	"\x04code\x18\a \x01(\x03R\x04codeB\n" +
 	"Z\b./;ifaceb\x06proto3"
 
 var (

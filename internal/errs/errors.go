@@ -110,9 +110,9 @@ func ErrInvalidMessage(err error) error {
 // ========== Gate 相关错误 ==========
 
 var (
-	ErrAgentFactoryNil       = errors.New("gate: agent factory is nil")
-	ErrAgentNoBindConnection = errors.New("no bind connection")
-	ErrInvalidMessageType    = errors.New("gate: invalid message type")
+	ErrAgentFactoryNil    = errors.New("gate: agent factory is nil")
+	ErrNoBindConnection   = errors.New("no bind connection")
+	ErrInvalidMessageType = errors.New("gate: invalid message type")
 )
 
 // ========== Component 相关错误 ==========

@@ -6,7 +6,10 @@ import (
 	"gas/internal/gate/codec"
 	"gas/internal/gate/protocol"
 	"gas/internal/iface"
+	"gas/internal/session"
 	"gas/pkg/network"
+
+	"github.com/duke-git/lancet/v2/convertor"
 )
 
 type Gate struct {
@@ -41,20 +44,31 @@ func (g *Gate) OnConnect(entity network.IConnection) (err error) {
 	actor := g.Factory()
 	pid := system.Spawn(actor)
 
-	entity.SetContext(pid)
+	s := &session.Session{
+		Session: &iface.Session{
+			Agent:    pid,
+			EntityId: entity.ID(),
+		},
+	}
 
-	return system.SubmitTask(pid, func(ctx iface.IContext) error {
+	entity.SetContext(s)
+
+	ss := convertor.DeepClone(s)
+
+	return system.SubmitTask(s.GetAgent(), func(ctx iface.IContext) error {
 		agent, _ := ctx.Actor().(IAgent)
-		session := iface.NewSessionWithPid(ctx, pid)
-		return agent.OnNetworkOpen(ctx, session)
+		ss.SetContext(ctx)
+		return agent.OnNetworkOpen(ctx, ss)
 	})
 }
 
 func (g *Gate) OnMessage(entity network.IConnection, msg interface{}) error {
-	pid, _ := entity.Context().(*iface.Pid)
-	if pid == nil {
-		return errs.ErrAgentNoBindConnection
+	s, _ := entity.Context().(*session.Session)
+	if s == nil {
+		return errs.ErrNoBindConnection
 	}
+
+	ss := convertor.DeepClone(s)
 
 	//  将网关消息转为内容消息
 	clientMessage, ok := msg.(*protocol.Message)
@@ -65,34 +79,35 @@ func (g *Gate) OnMessage(entity network.IConnection, msg interface{}) error {
 	node := iface.GetNode()
 	system := node.System()
 
-	actorMsg := g.clientToActorMessage(pid, entity, clientMessage)
+	actorMsg := g.convertMessage(ss, clientMessage)
 
 	return system.Send(actorMsg)
 }
 
 func (g *Gate) OnClose(entity network.IConnection, wrong error) error {
-	pid, _ := entity.Context().(*iface.Pid)
-	if pid == nil {
-		return errs.ErrAgentNoBindConnection
+	s, _ := entity.Context().(*session.Session)
+	if s == nil {
+		return errs.ErrNoBindConnection
 	}
 
 	node := iface.GetNode()
 	system := node.System()
 
-	return system.SubmitTask(pid, func(ctx iface.IContext) error {
+	ss := convertor.DeepClone(s)
+	return system.SubmitTask(ss.GetAgent(), func(ctx iface.IContext) error {
 		agent := ctx.Actor().(IAgent)
-		session := iface.NewSessionWithPid(ctx, pid)
-		return agent.OnNetworkClose(ctx, session)
+		ss.SetContext(ctx)
+		return agent.OnNetworkClose(ctx, s)
 	})
 }
 
-func (g *Gate) clientToActorMessage(agent *iface.Pid, entity network.IConnection, clientMessage *protocol.Message) *iface.ActorMessage {
-	message := iface.NewActorMessage(agent, agent, "OnNetworkMessage", clientMessage.Data)
+func (g *Gate) convertMessage(s *session.Session, msg *protocol.Message) *iface.ActorMessage {
+	agent := s.GetAgent()
+	message := iface.NewActorMessage(agent, agent, "OnNetworkMessage", msg.Data)
 	message.Session = &iface.Session{
-		Agent:    agent,
-		Mid:      int64(clientMessage.ID()),
-		Index:    clientMessage.Index,
-		EntityId: entity.ID(),
+		Cmd:   uint32(msg.Cmd),
+		Act:   uint32(msg.Act),
+		Index: msg.Index,
 	}
 	return message
 }

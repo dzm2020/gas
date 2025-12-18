@@ -151,14 +151,14 @@ func (r *Cluster) Call(rpcMessage *iface.ActorMessage) (bin []byte, err error) {
 	data := node.Marshal(rpcMessage.Message)
 	subject := r.makeTopic(toNodeId)
 
-	rspData, w := r.messageQue.Request(subject, data, lib.NowDelay(rpcMessage.Deadline, 0))
+	bytes, w := r.messageQue.Request(subject, data, lib.NowDelay(rpcMessage.Deadline, 0))
 	if w != nil {
 		err = w
 		return
 	}
 
 	response := &iface.Response{}
-	node.Unmarshal(rspData, response)
+	node.Unmarshal(bytes, response)
 
 	bin, err = response.Data, errors.New(response.Error)
 	return
@@ -168,15 +168,15 @@ func (r *Cluster) UpdateMember() error {
 	return r.discovery.Add(iface.GetNode().Info())
 }
 
-func (r *Cluster) Select(service string, strategy iface.RouteStrategy) *iface.Pid {
+func (r *Cluster) Select(service string, strategy discovery.RouteStrategy) uint64 {
 	if strategy == nil {
-		strategy = iface.RouteRandom
+		strategy = discovery.RouteRandom
 	}
 
 	// 通过服务发现获取节点列表
 	members := r.discovery.GetAll()
 	if len(members) == 0 {
-		return nil
+		return 0
 	}
 
 	var filteredMembers []*discovery.Member
@@ -190,14 +190,10 @@ func (r *Cluster) Select(service string, strategy iface.RouteStrategy) *iface.Pi
 	// 使用路由策略选择节点
 	selectedNode := strategy(filteredMembers)
 	if selectedNode == nil {
-		return nil
+		return 0
 	}
 
-	// 设置消息的目标节点ID
-	return &iface.Pid{
-		NodeId: selectedNode.GetID(),
-		Name:   service,
-	}
+	return selectedNode.GetID()
 }
 
 // Broadcast 向服务的所有节点广播消息

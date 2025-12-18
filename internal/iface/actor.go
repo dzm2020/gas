@@ -45,6 +45,7 @@ type (
 		Actor() IActor
 		Send(to interface{}, methodName string, request interface{}) error
 		Call(to interface{}, methodName string, request interface{}, reply interface{}) error
+		Forward(to interface{}, method string) error
 		AfterFunc(duration time.Duration, task Task) *lib.Timer
 		Message() *ActorMessage
 		Process() IProcess

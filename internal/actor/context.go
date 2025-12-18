@@ -2,18 +2,16 @@
 package actor
 
 import (
+	"gas/internal/errs"
 	"gas/internal/iface"
+	"gas/internal/session"
 	"gas/pkg/lib"
 	"gas/pkg/lib/glog"
 	"time"
 
+	"github.com/duke-git/lancet/v2/convertor"
 	"go.uber.org/zap"
 )
-
-func newActorContext() *actorContext {
-	ctx := &actorContext{}
-	return ctx
-}
 
 type actorContext struct {
 	process iface.IProcess // 保存自己的 process 引用
@@ -70,13 +68,15 @@ func (a *actorContext) handleMessage(m *iface.ActorMessage) error {
 	// 如果没有路由，调用 actor.OnMessage
 	err := a.actor.OnMessage(a, m.Message)
 	m.Response(nil, err)
+	a.msg = nil
 	return err
 }
 
 // execHandler 基于方法名执行处理器
 func (a *actorContext) execHandler(msg *iface.Message) ([]byte, error) {
-	session := iface.NewSession(a, msg.GetSession())
-	return a.router.Handle(a, msg.GetMethod(), session, msg.GetData())
+	s := session.New(msg.GetSession())
+	s.SetContext(a)
+	return a.router.Handle(a, msg.GetMethod(), s, msg.GetData())
 }
 
 func (a *actorContext) Send(to interface{}, methodName string, request interface{}) error {
@@ -103,6 +103,20 @@ func (a *actorContext) Call(to interface{}, methodName string, request interface
 	data, err := system.Call(message)
 	node.Unmarshal(data, reply)
 	return err
+}
+
+func (a *actorContext) Forward(to interface{}, method string) error {
+	node := iface.GetNode()
+	system := node.System()
+	if a.Message() == nil {
+		return errs.ErrMessageIsNil
+	}
+	toPid := system.GenPid(to, iface.RouteRandom)
+	message := convertor.DeepClone(a.Message())
+	message.To = toPid
+	message.Method = method
+
+	return system.Send(message)
 }
 
 func (a *actorContext) Named(name string) (err error) {
