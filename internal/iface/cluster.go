@@ -14,7 +14,7 @@ type ICluster interface {
 	Call(message *ActorMessage) (data []byte, err error)
 	Start(ctx context.Context) error
 	Select(service string, strategy RouteStrategy) *Pid
-	UpdateNode() error
+	UpdateMember() error
 	Shutdown(ctx context.Context) error
 }
 

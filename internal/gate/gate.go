@@ -62,9 +62,12 @@ func (g *Gate) OnMessage(entity network.IConnection, msg interface{}) error {
 		return errs.ErrInvalidMessageType
 	}
 
+	node := iface.GetNode()
+	system := node.System()
+
 	actorMsg := g.clientToActorMessage(pid, entity, clientMessage)
 
-	return iface.GetNode().Send(actorMsg)
+	return system.Send(actorMsg)
 }
 
 func (g *Gate) OnClose(entity network.IConnection, wrong error) error {
@@ -74,7 +77,6 @@ func (g *Gate) OnClose(entity network.IConnection, wrong error) error {
 	}
 
 	node := iface.GetNode()
-
 	system := node.System()
 
 	return system.SubmitTask(pid, func(ctx iface.IContext) error {

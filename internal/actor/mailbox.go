@@ -1,6 +1,7 @@
 package actor
 
 import (
+	"gas/internal/iface"
 	"gas/pkg/lib"
 	"gas/pkg/lib/glog"
 	"runtime"
@@ -16,14 +17,14 @@ const (
 
 type IMailbox interface {
 	PostMessage(msg interface{}) error
-	RegisterHandlers(invoker IMessageInvoker, dispatcher IDispatcher)
+	RegisterHandlers(invoker iface.IMessageInvoker, dispatcher IDispatcher)
 	IsEmpty() bool
 }
 
 var _ IMailbox = &Mailbox{}
 
 type Mailbox struct {
-	invoker      IMessageInvoker
+	invoker      iface.IMessageInvoker
 	queue        *lib.Mpsc
 	dispatch     IDispatcher
 	dispatchStat atomic.Int32
@@ -36,7 +37,7 @@ func NewMailbox() *Mailbox {
 	return m
 }
 
-func (mb *Mailbox) RegisterHandlers(invoker IMessageInvoker, dispatcher IDispatcher) {
+func (mb *Mailbox) RegisterHandlers(invoker iface.IMessageInvoker, dispatcher IDispatcher) {
 	mb.invoker = invoker
 	mb.dispatch = dispatcher
 }

@@ -2,6 +2,7 @@ package iface
 
 import (
 	"gas/internal/errs"
+	"gas/pkg/lib"
 )
 
 // IMessageValidator 消息验证接口，用于判断消息内容是否合法
@@ -111,3 +112,11 @@ func NewErrorResponse(err error) *Response {
 }
 
 type ResponseFunc func(data []byte, err error)
+
+func (p *Pid) IsLocal() bool {
+	return p.NodeId == GetNode().GetID()
+}
+
+func (p *Pid) IsGlobalName() bool {
+	return lib.IsFirstLetterUppercase(p.GetName())
+}

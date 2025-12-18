@@ -62,7 +62,8 @@ func (r *Cluster) makeTopic(nodeId uint64) string {
 }
 
 func (r *Cluster) listen() error {
-	nodeId := iface.GetNode().GetID()
+	node := iface.GetNode()
+	nodeId := node.GetID()
 	handler := func(data []byte, reply func([]byte) error) {
 		if err := r.onRemoteProcess(data, reply); err != nil {
 			glog.Error("集群通信: 处理集群消息失败", zap.Error(err))
@@ -76,6 +77,7 @@ func (r *Cluster) listen() error {
 // onRemoteProcess 处理集群消息
 func (r *Cluster) onRemoteProcess(data []byte, reply func([]byte) error) error {
 	node := iface.GetNode()
+	system := node.System()
 
 	message := &iface.Message{}
 	node.Unmarshal(data, message)
@@ -85,10 +87,10 @@ func (r *Cluster) onRemoteProcess(data []byte, reply func([]byte) error) error {
 	msg := &iface.ActorMessage{Message: message}
 
 	if msg.GetAsync() {
-		return node.Send(msg)
+		return system.Send(msg)
 	}
 
-	bin, w := node.Call(msg)
+	bin, w := system.Call(msg)
 
 	response := &iface.Response{
 		Data:  bin,
@@ -133,6 +135,7 @@ func (r *Cluster) Send(rpcMessage *iface.ActorMessage) (err error) {
 }
 
 func (r *Cluster) Call(rpcMessage *iface.ActorMessage) (bin []byte, err error) {
+	node := iface.GetNode()
 
 	if err = rpcMessage.Validate(); err != nil {
 		return
@@ -145,7 +148,7 @@ func (r *Cluster) Call(rpcMessage *iface.ActorMessage) (bin []byte, err error) {
 		return
 	}
 
-	data := iface.GetNode().Marshal(rpcMessage.Message)
+	data := node.Marshal(rpcMessage.Message)
 	subject := r.makeTopic(toNodeId)
 
 	rspData, w := r.messageQue.Request(subject, data, lib.NowDelay(rpcMessage.Deadline, 0))
@@ -155,13 +158,13 @@ func (r *Cluster) Call(rpcMessage *iface.ActorMessage) (bin []byte, err error) {
 	}
 
 	response := &iface.Response{}
-	iface.GetNode().Unmarshal(rspData, response)
+	node.Unmarshal(rspData, response)
 
 	bin, err = response.Data, errors.New(response.Error)
 	return
 }
 
-func (r *Cluster) UpdateNode() error {
+func (r *Cluster) UpdateMember() error {
 	return r.discovery.Add(iface.GetNode().Info())
 }
 

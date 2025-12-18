@@ -48,12 +48,6 @@ type (
 		CallPanicHook(entry zapcore.Entry)
 		Marshal(request interface{}) []byte
 		Unmarshal(data []byte, reply interface{})
-		Update() error
-		Select(name string, strategy RouteStrategy) *Pid
-		CastPid(to interface{}) *Pid
-
-		Send(message *ActorMessage) (err error)
-		Call(message *ActorMessage) (data []byte, err error)
 	}
 )
 

@@ -55,7 +55,7 @@ func (p *Process) Input(message interface{}) error {
 	if err := p.checkShutdown(); err != nil {
 		return err
 	}
-	// 验证消息合法性
+
 	if err := p.validateMessage(message); err != nil {
 		return err
 	}
@@ -67,8 +67,7 @@ func (p *Process) Shutdown() error {
 	if !p.shutdown.CompareAndSwap(false, true) {
 		return nil // 已经在退出中
 	}
-	// 设置退出标志后，使用 pushTaskAndWait 推送退出任务
-	// pushTaskAndWait 直接调用 mailbox.PostMessage，绕过 checkShutdown 检查，确保退出任务能够执行
+
 	msg := iface.NewTaskMessage(func(ctx iface.IContext) error {
 		p.ctx.exit()
 		return nil

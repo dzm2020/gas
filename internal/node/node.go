@@ -188,45 +188,6 @@ func (n *Node) CallPanicHook(entry zapcore.Entry) {
 	n.panicHook(entry)
 }
 
-func (n *Node) Update() error {
-	return n.Cluster().UpdateNode()
-}
-
-func (n *Node) Call(message *iface.ActorMessage) ([]byte, error) {
-	if message.GetTo().IsLocal() {
-		return n.System().Call(message)
-	} else {
-		return n.Cluster().Call(message)
-	}
-}
-
-func (n *Node) Send(message *iface.ActorMessage) error {
-	if message.GetTo().IsLocal() {
-		return n.System().Send(message)
-	} else {
-		return n.Cluster().Send(message)
-	}
-}
-
-func (n *Node) Select(name string, strategy iface.RouteStrategy) *iface.Pid {
-	if process := n.System().GetProcessByName(name); process != nil {
-		return process.Context().ID()
-	}
-	return n.Cluster().Select(name, strategy)
-}
-
-func (n *Node) CastPid(to interface{}) *iface.Pid {
-	var pid *iface.Pid
-	switch toValue := to.(type) {
-	case string:
-		return n.Select(toValue, iface.RouteRandom)
-	case *iface.Pid:
-		return pid
-	default:
-		return nil
-	}
-}
-
 // Shutdown 优雅关闭节点，关闭所有组件
 func (n *Node) shutdown(ctx context.Context) error {
 	defer glog.Info("节点停止运行完成")

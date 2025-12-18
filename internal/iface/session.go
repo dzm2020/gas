@@ -51,11 +51,15 @@ func (a *WrapSession) ResponseCode(code int64) error {
 }
 
 func (a *WrapSession) Forward(to interface{}, method string) error {
-	toPid := GetNode().CastPid(to)
+	node := GetNode()
+	system := node.System()
+
+	toPid := system.GenPid(to, RouteRandom)
 	message := convertor.DeepClone(a.ctx.Message())
 	message.To = toPid
 	message.Method = method
-	return GetNode().Send(message)
+
+	return system.Send(message)
 }
 
 func (a *WrapSession) Push(msgId uint16, request interface{}) error {
@@ -71,7 +75,11 @@ func (a *WrapSession) send(message *ActorMessage) error {
 	if a.GetAgent() == a.ctx.ID() {
 		return a.ctx.InvokerMessage(message)
 	}
-	return GetNode().Send(message)
+
+	node := GetNode()
+	system := node.System()
+
+	return system.Send(message)
 }
 
 func (a *WrapSession) Close() error {
