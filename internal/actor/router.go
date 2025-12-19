@@ -17,7 +17,6 @@ import (
 var (
 	ErrMessageHandlerNotFound     = errors.New("actor: 消息处理器未找到")
 	ErrHandlerReturnType          = errors.New("actor: 处理器返回类型必须是 error")
-	ErrActorIsNil                 = errors.New("actor: actor 为空")
 	ErrUnknownHandlerType         = errors.New("actor: 未知的处理器类型")
 	ErrAsyncHandlerThirdParameter = errors.New("actor: 异步处理器第三个参数 (request) 必须是指针或 []byte")
 	ErrSyncHandlerFourParameter   = errors.New("actor: 同步处理器第四个参数 (response) 必须是指针")
@@ -67,10 +66,6 @@ var (
 
 // AutoRegister 自动扫描并注册 actor 的所有导出方法
 func (r *Router) AutoRegister(actor iface.IActor) {
-	if actor == nil {
-		glog.Error("自动注册失败: actorContext 为空")
-		return
-	}
 	r.scanAndRegisterActor(actor)
 }
 
@@ -94,12 +89,15 @@ func (r *Router) scanAndRegisterActor(actor interface{}) {
 		}
 		// 创建路由条目
 		entry, err := r.createMethodEntry(method, methodType)
-		if err == nil {
-			r.mu.Lock()
-			r.methodRoutes[method.Name] = entry
-			r.mu.Unlock()
-			glog.Debug("自动注册路由", zap.String("method", method.Name))
+		if err != nil {
+			glog.Warn("路由注册失败", zap.String("method", method.Name), zap.Error(err))
+			continue
 		}
+
+		r.mu.Lock()
+		r.methodRoutes[method.Name] = entry
+		r.mu.Unlock()
+		glog.Debug("自动注册路由", zap.String("method", method.Name))
 	}
 }
 
@@ -268,9 +266,6 @@ func (r *Router) HasRoute(methodName string) bool {
 // buildCallArgs 构建调用参数
 func (r *Router) buildCallArgs(ctx iface.IContext, entry routerEntry, session iface.ISession, data []byte) ([]reflect.Value, error) {
 	actor := ctx.Actor()
-	if actor == nil {
-		return nil, ErrActorIsNil
-	}
 
 	callArgs := []reflect.Value{reflect.ValueOf(actor), reflect.ValueOf(ctx)}
 
