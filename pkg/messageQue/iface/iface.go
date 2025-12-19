@@ -12,7 +12,7 @@ type IMessageQue interface {
 	// Publish 向指定主题发布消息（无回复）
 	Publish(subject string, data []byte) error
 	// Subscribe 订阅主题，接收消息（非阻塞，通过回调处理）
-	Subscribe(subject string, handler MsgHandler) (ISubscription, error)
+	Subscribe(subject string, subscriber ISubscriber) (ISubscription, error)
 	// Request 发送请求并等待回复（同步 RPC 模式）
 	Request(subject string, data []byte, timeout time.Duration) ([]byte, error)
 	// Shutdown 关闭集群连接
@@ -26,3 +26,8 @@ type ISubscription interface {
 
 // MsgHandler 消息处理函数类型
 type MsgHandler func(request []byte, response func([]byte) error)
+
+type ISubscriber interface {
+	HandlerSyncMessage(request []byte) []byte
+	HandlerAsyncMessage(request []byte) error
+}

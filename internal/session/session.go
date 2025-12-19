@@ -12,16 +12,13 @@ const (
 	CloseClientConnectionMethod = "CloseClientConnection"
 )
 
-func NewWithPid(pid *iface.Pid, entityId int64) *Session {
+func New() *Session {
 	return &Session{
-		Session: &iface.Session{
-			Agent:    pid,
-			EntityId: entityId,
-		},
+		Session: &iface.Session{},
 	}
 }
 
-func New(session *iface.Session) *Session {
+func NewWithSession(session *iface.Session) *Session {
 	return &Session{
 		Session: session,
 	}
@@ -30,6 +27,13 @@ func New(session *iface.Session) *Session {
 type Session struct {
 	*iface.Session
 	ctx iface.IContext
+}
+
+func (a *Session) SetPid(pid *iface.Pid) {
+	a.Agent = pid
+}
+func (a *Session) SetEntity(entityId int64) {
+	a.EntityId = entityId
 }
 
 func (a *Session) SetContext(ctx iface.IContext) {

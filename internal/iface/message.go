@@ -117,6 +117,16 @@ func (p *Pid) IsGlobalName() bool {
 	return lib.IsFirstLetterUppercase(p.GetName())
 }
 
+func NewResponse(data []byte, err error) *Response {
+	response := &Response{
+		Data: data,
+	}
+	if err != nil {
+		response.ErrMsg = err.Error()
+	}
+	return response
+}
+
 func (r *Response) GetError() error {
 	if r.ErrMsg == "" {
 		return nil

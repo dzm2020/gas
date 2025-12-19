@@ -2,19 +2,15 @@ package gate
 
 import (
 	"context"
-	"errors"
 	"gas/internal/gate/codec"
 	"gas/internal/gate/protocol"
 	"gas/internal/iface"
 	"gas/internal/session"
+	"gas/pkg/glog"
 	"gas/pkg/network"
 
 	"github.com/duke-git/lancet/v2/convertor"
-)
-
-var (
-	ErrNoBindConnection   = errors.New("no bind connection")
-	ErrInvalidMessageType = errors.New("gate: invalid message type")
+	"go.uber.org/zap"
 )
 
 type Gate struct {
@@ -26,86 +22,81 @@ type Gate struct {
 	server  network.IServer
 }
 
-func (g *Gate) Start(ctx context.Context) error {
-	var err error
-	g.server, err = network.NewServer(g.Address, append(g.Options, network.WithHandler(g), network.WithCodec(codec.New()))...)
+func (g *Gate) Start(ctx context.Context) (err error) {
+	options := append(g.Options, network.WithHandler(g), network.WithCodec(codec.New()))
+	g.server, err = network.NewServer(g.Address, options...)
 	if err != nil {
-		return err
+		glog.Error("网关:服务器启动失败", zap.Error(err))
+		return
 	}
-	if err = g.server.Start(); err != nil {
-		return err
-	}
-	return nil
+	return g.server.Start()
 }
 
-func (g *Gate) OnConnect(entity network.IConnection) (err error) {
+func (g *Gate) getSession(entity network.IConnection) *session.Session {
+	s, ok := entity.Context().(*session.Session)
+	if !ok || s == nil {
+		//  创建agent
+		system := g.node.System()
+		pid := system.Spawn(g.Factory())
+		//  绑定
+		s = session.New()
+		s.SetEntity(entity.ID())
+		s.SetPid(pid)
+
+		entity.SetContext(s)
+
+		glog.Debug("网关:创建session", zap.Int64("entityId", entity.ID()), zap.Any("pid", pid))
+	}
+	return convertor.DeepClone(s)
+}
+
+func (g *Gate) OnConnect(entity network.IConnection) error {
+	s := g.getSession(entity)
 	system := g.node.System()
 
-	pid := system.Spawn(g.Factory())
+	message := g.makeActorMsg(s, "OnNetworkOpen", nil)
 
-	s := session.NewWithPid(pid, entity.ID())
-
-	entity.SetContext(s)
-
-	ss := convertor.DeepClone(s)
-
-	return system.SubmitTask(s.GetAgent(), func(ctx iface.IContext) error {
-		agent, _ := ctx.Actor().(IAgent)
-		ss.SetContext(ctx)
-		return agent.OnNetworkOpen(ctx, ss)
-	})
+	return system.Send(message)
 }
 
-func (g *Gate) OnMessage(entity network.IConnection, msg interface{}) error {
-	s, _ := entity.Context().(*session.Session)
-	if s == nil {
-		return ErrNoBindConnection
-	}
+func (g *Gate) OnMessage(entity network.IConnection, clientMsg interface{}) error {
+	system := g.node.System()
+	s := g.getSession(entity)
 
-	ss := convertor.DeepClone(s)
+	msg, _ := clientMsg.(*protocol.Message)
 
-	//  将网关消息转为内容消息
-	clientMessage, ok := msg.(*protocol.Message)
-	if !ok {
-		return ErrInvalidMessageType
-	}
+	g.formatSession(s, msg)
 
-	actorMsg := g.convertMessage(ss, clientMessage)
+	message := g.makeActorMsg(s, "OnNetworkClose", msg.Data)
 
-	return g.node.System().Send(actorMsg)
+	return system.Send(message)
 }
 
 func (g *Gate) OnClose(entity network.IConnection, wrong error) error {
-	s, _ := entity.Context().(*session.Session)
-	if s == nil {
-		return ErrNoBindConnection
-	}
-
-	node := g.node
+	s := g.getSession(entity)
 	system := g.node.System()
 
-	ss := convertor.DeepClone(s)
-	return g.node.System().SubmitTask(ss.GetAgent(), func(ctx iface.IContext) error {
-		agent := ctx.Actor().(IAgent)
-		ss.SetContext(ctx)
-		return agent.OnNetworkClose(ctx, s)
-	})
+	message := g.makeActorMsg(s, "OnNetworkMessage", nil)
+
+	return system.Send(message)
 }
 
-func (g *Gate) convertMessage(s *session.Session, msg *protocol.Message) *iface.ActorMessage {
-	agent := s.GetAgent()
-	message := iface.NewActorMessage(agent, agent, "OnNetworkMessage", msg.Data)
-	message.Session = &iface.Session{
-		Cmd:   uint32(msg.Cmd),
-		Act:   uint32(msg.Act),
-		Index: msg.Index,
-	}
+func (g *Gate) makeActorMsg(session *session.Session, method string, data []byte) *iface.ActorMessage {
+	message := iface.NewActorMessage(session.GetAgent(), session.GetAgent(), method, data)
+	message.Session = session.Session
 	return message
 }
 
+func (g *Gate) formatSession(s *session.Session, msg *protocol.Message) {
+	s.Cmd = uint32(msg.Cmd)
+	s.Act = uint32(msg.Act)
+	s.Index = msg.Index
+	return
+}
+
 func (g *Gate) Stop(ctx context.Context) error {
-	if g.server != nil {
-		_ = g.server.Stop()
+	if g.server == nil {
+		return nil
 	}
-	return nil
+	return g.server.Stop()
 }

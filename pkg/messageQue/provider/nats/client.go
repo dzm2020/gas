@@ -69,17 +69,19 @@ func (n *Client) Publish(subject string, data []byte) error {
 }
 
 // Subscribe 实现 Cluster 接口的 Subscribe 方法
-func (n *Client) Subscribe(subject string, handler iface.MsgHandler) (iface.ISubscription, error) {
+func (n *Client) Subscribe(subject string, subscriber iface.ISubscriber) (iface.ISubscription, error) {
 	sub, err := n.conn.Subscribe(subject, func(m *nats.Msg) {
-		// 包装回复函数：通过 m.Respond 发送回复
-		replyFunc := func(replyData []byte) error {
-
-			return m.Respond(replyData)
+		isAsync := m.Reply == ""
+		if isAsync {
+			if err := subscriber.HandlerAsyncMessage(m.Data); err != nil {
+				glog.Error("NATS处理消息失败", zap.String("subject", subject), zap.Error(err))
+			}
+		} else {
+			bytes := subscriber.HandlerSyncMessage(m.Data)
+			if err := m.Respond(bytes); err != nil {
+				glog.Error("NATS回复消息失败", zap.String("subject", subject), zap.Error(err))
+			}
 		}
-		if m.Reply == "" {
-			replyFunc = nil // 无回复主题时忽略
-		}
-		handler(m.Data, replyFunc)
 	})
 	if err != nil {
 		glog.Error("NATS订阅主题失败", zap.String("subject", subject), zap.Error(err))

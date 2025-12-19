@@ -238,7 +238,7 @@ func (s *System) Send(message *iface.ActorMessage) error {
 	return cluster.Send(message)
 }
 
-// localCall 本地同步调用
+// localCall 本地同步调用  todo chan返回
 func (s *System) localCall(message *iface.ActorMessage) (data []byte, err error) {
 	waiter := lib.NewChanWaiter(message.GetDeadline())
 	message.SetResponse(func(bin []byte, e error) {

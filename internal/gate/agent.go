@@ -12,13 +12,15 @@ var (
 	ErrNotFoundEntity = errors.New("entity not found")
 )
 
-type Factory func() iface.IActor
+type Factory func() IAgent
 
 type IAgent interface {
 	iface.IActor
 	OnNetworkOpen(ctx iface.IContext, s *session.Session) error
 	OnNetworkMessage(ctx iface.IContext, s *session.Session, data []byte) error
 	OnNetworkClose(ctx iface.IContext, s *session.Session) error
+	PushMessage(ctx iface.IContext, s *session.Session, data []byte) error
+	Shutdown(ctx iface.IContext, s *session.Session) error
 }
 
 var _ IAgent = (*Agent)(nil)
@@ -36,7 +38,7 @@ func (agent *Agent) OnNetworkMessage(ctx iface.IContext, s *session.Session, dat
 func (agent *Agent) OnNetworkClose(ctx iface.IContext, s *session.Session) error {
 	return nil
 }
-func (agent *Agent) PushMessageToClient(ctx iface.IContext, s *session.Session, data []byte) error {
+func (agent *Agent) PushMessage(ctx iface.IContext, s *session.Session, data []byte) error {
 	entity := network.GetConnection(s.GetEntityId())
 	if entity == nil {
 		return ErrNotFoundEntity
@@ -47,7 +49,7 @@ func (agent *Agent) PushMessageToClient(ctx iface.IContext, s *session.Session, 
 	return entity.Send(msg)
 
 }
-func (agent *Agent) CloseClientConnection(ctx iface.IContext, s *session.Session, data []byte) error {
+func (agent *Agent) Shutdown(ctx iface.IContext, s *session.Session) error {
 	entity := network.GetConnection(s.GetEntityId())
 	if entity == nil {
 		return ErrNotFoundEntity

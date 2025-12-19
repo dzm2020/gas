@@ -168,6 +168,7 @@ func (r *Router) createMethodEntry(method reflect.Method, methodType reflect.Typ
 		if param1Type == typeOfSession {
 			// (actor, ctx, session, request) error - 客户端消息
 			entry.handlerType = handlerTypeClient
+			//  todo 可能只有一个session参数
 			requestType, isByte, err := parseRequestType(param2Type)
 			if err != nil {
 				return entry, err

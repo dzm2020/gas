@@ -3,8 +3,8 @@ package cluster
 import (
 	"context"
 	"gas/internal/iface"
-	discoveryFactory "gas/pkg/discovery"
-	messageQueFactory "gas/pkg/messageQue"
+	dis "gas/pkg/discovery"
+	mq "gas/pkg/messageQue"
 )
 
 type Component struct {
@@ -12,7 +12,9 @@ type Component struct {
 }
 
 func NewComponent() *Component {
-	c := &Component{}
+	c := &Component{
+		Cluster: &Cluster{},
+	}
 	return c
 }
 
@@ -20,29 +22,23 @@ func (r *Component) Name() string {
 	return "cluster"
 }
 
-func (r *Component) Start(ctx context.Context, node iface.INode) error {
+func (r *Component) Start(ctx context.Context, node iface.INode) (err error) {
 	config := node.GetConfig()
+	clusterConfig := config.Cluster
 	// 创建服务发现实例
-	discoveryInstance, err := discoveryFactory.NewFromConfig(*config.Remote.Discovery)
+	r.dis, err = dis.NewFromConfig(*clusterConfig.Discovery)
 	if err != nil {
-		return err
+		return
 	}
-
 	// 创建集群通信管理器
-	messageQueue, err := messageQueFactory.NewFromConfig(*config.Remote.MessageQueue)
+	r.mq, err = mq.NewFromConfig(*clusterConfig.MessageQueue)
 	if err != nil {
-		return err
+		return
 	}
-
-	r.Cluster = New(node, discoveryInstance, messageQueue, config.Remote.SubjectPrefix)
-
+	r.name = config.Cluster.Name
 	//  建立引用
 	node.SetCluster(r.Cluster)
-	//  注册节点并订阅
-	if err = r.Cluster.Start(ctx); err != nil {
-		return err
-	}
-	return nil
+	return r.Cluster.Start(ctx)
 }
 
 func (r *Component) Stop(ctx context.Context) error {

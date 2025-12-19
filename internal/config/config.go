@@ -16,17 +16,17 @@ type Node struct {
 	Tags    []string          `json:"tags"`    // 节点标签
 	Meta    map[string]string `json:"meta"`    // 节点元数据
 }
-type Remote struct {
-	SubjectPrefix string                   `json:"subject_prefix"`
-	Discovery     *discoveryConfig.Config  `json:"discovery"`
-	MessageQueue  *messageQueConfig.Config `json:"messageQueue"`
+type Cluster struct {
+	Name         string                   `json:"name"`
+	Discovery    *discoveryConfig.Config  `json:"discovery"`
+	MessageQueue *messageQueConfig.Config `json:"messageQueue"`
 }
 
 // Config 节点配置
 type Config struct {
-	Node   *Node        `json:"node"`
-	Logger *glog.Config `json:"logger"`
-	Remote *Remote      `json:"remote"`
+	Node    *Node        `json:"node"`
+	Logger  *glog.Config `json:"logger"`
+	Cluster *Cluster     `json:"cluster"`
 }
 
 func Load(profileFilePath string) (*Config, error) {
