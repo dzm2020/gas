@@ -149,13 +149,18 @@ func (a *actorContext) Unname() error {
 func (a *actorContext) AfterFunc(duration time.Duration, task iface.Task) *lib.Timer {
 	return lib.AfterFunc(duration, func() {
 		msg := iface.NewTaskMessage(task)
-		_ = a.process.PostMessage(msg)
+		if err := a.process.PostMessage(msg); err != nil {
+			glog.Error("提交定时器任务失败", zap.Error(err))
+		}
 	})
 }
 
 func (a *actorContext) exit() {
 	a.system.Remove(a.pid)
-	_ = a.actor.OnStop(a)
+	// OnStop 的错误不影响进程退出流程
+	if err := a.actor.OnStop(a); err != nil {
+		glog.Error("Actor OnStop 回调失败", zap.Any("pid", a.pid), zap.Error(err))
+	}
 }
 
 func (a *actorContext) Shutdown() error {

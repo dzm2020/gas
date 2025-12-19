@@ -2,13 +2,16 @@ package actor
 
 import (
 	"errors"
+	"fmt"
 	"gas/internal/iface"
 	discovery "gas/pkg/discovery/iface"
+	"gas/pkg/glog"
 	"gas/pkg/lib"
 	"sync/atomic"
 	"time"
 
 	"github.com/duke-git/lancet/v2/maputil"
+	"go.uber.org/zap"
 )
 
 var (
@@ -69,9 +72,12 @@ func (s *System) Spawn(actor iface.IActor, args ...interface{}) *iface.Pid {
 	mailBox.RegisterHandlers(ctx, NewDefaultDispatcher(DefaultDispatcherThroughput))
 	s.Add(pid, process)
 
-	_ = s.SubmitTask(pid, func(ctx iface.IContext) error {
+	// 提交初始化任务，如果失败则记录日志但不影响进程创建
+	if err := s.SubmitTask(pid, func(ctx iface.IContext) error {
 		return ctx.Actor().OnInit(ctx, args)
-	})
+	}); err != nil {
+		glog.Error("提交Actor初始化任务失败", zap.Any("pid", pid), zap.Error(err))
+	}
 
 	return pid
 }
@@ -84,7 +90,10 @@ func (s *System) Add(pid *iface.Pid, process iface.IProcess) {
 // Remove 从系统中移除进程
 func (s *System) Remove(pid *iface.Pid) {
 	s.processDict.Delete(pid.GetServiceId())
-	_ = s.Unname(pid)
+	// 尝试取消命名，失败不影响移除操作
+	if err := s.Unname(pid); err != nil {
+		glog.Debug("取消进程命名失败", zap.Any("pid", pid), zap.Error(err))
+	}
 }
 
 func (s *System) GetProcess(to *iface.Pid) iface.IProcess {
@@ -156,8 +165,14 @@ func (s *System) Named(name string, pid *iface.Pid) error {
 
 func (s *System) clusterNamed(name string) error {
 	cluster := s.node.Cluster()
+	if cluster == nil {
+		return fmt.Errorf("集群组件未初始化")
+	}
 	s.node.AddTag(name)
-	return cluster.UpdateMember()
+	if err := cluster.UpdateMember(); err != nil {
+		return fmt.Errorf("更新集群成员信息失败 (name=%s): %w", name, err)
+	}
+	return nil
 }
 
 // HasName 检查名字是否已注册
@@ -184,8 +199,14 @@ func (s *System) Unname(pid *iface.Pid) error {
 
 func (s *System) clusterUnname(name string) error {
 	cluster := s.node.Cluster()
+	if cluster == nil {
+		return fmt.Errorf("集群组件未初始化")
+	}
 	s.node.RemoteTag(name)
-	return cluster.UpdateMember()
+	if err := cluster.UpdateMember(); err != nil {
+		return fmt.Errorf("更新集群成员信息失败 (name=%s): %w", name, err)
+	}
+	return nil
 }
 
 // ==================== 消息发送 ====================
@@ -198,22 +219,31 @@ func (s *System) isLocalMessage(message *iface.ActorMessage) bool {
 func (s *System) Send(message *iface.ActorMessage) error {
 	if s.isLocalMessage(message) {
 		return s.localSend(message)
-	} else {
-		node := s.node
-		cluster := node.Cluster()
-		return cluster.Send(message)
 	}
+	cluster := s.node.Cluster()
+	if cluster == nil {
+		return fmt.Errorf("集群组件未初始化，无法发送远程消息")
+	}
+	if err := cluster.Send(message); err != nil {
+		return fmt.Errorf("发送远程消息失败: %w", err)
+	}
+	return nil
 }
 
 // Call 同步调用 Actor，等待响应
 func (s *System) Call(message *iface.ActorMessage) ([]byte, error) {
 	if s.isLocalMessage(message) {
 		return s.localCall(message)
-	} else {
-		node := s.node
-		cluster := node.Cluster()
-		return cluster.Call(message)
 	}
+	cluster := s.node.Cluster()
+	if cluster == nil {
+		return nil, fmt.Errorf("集群组件未初始化，无法调用远程消息")
+	}
+	data, err := cluster.Call(message)
+	if err != nil {
+		return nil, fmt.Errorf("调用远程消息失败: %w", err)
+	}
+	return data, nil
 }
 
 // localCall 本地同步调用
@@ -273,9 +303,12 @@ func (s *System) sendToProcess(to *iface.Pid, msg iface.IMessage) error {
 	}
 	process := s.GetProcess(to)
 	if process == nil {
-		return ErrProcessNotFound
+		return fmt.Errorf("%w: pid=%v", ErrProcessNotFound, to)
 	}
-	return process.PostMessage(msg)
+	if err := process.PostMessage(msg); err != nil {
+		return fmt.Errorf("发送消息到进程失败 (pid=%v): %w", to, err)
+	}
+	return nil
 }
 
 func (s *System) Select(name string, strategy discovery.RouteStrategy) *iface.Pid {
@@ -304,6 +337,11 @@ func (s *System) checkShuttingDown() error {
 }
 
 // Shutdown 优雅关闭 Actor 系统
+// 关闭流程：
+// 1. 标记系统为关闭状态，拒绝新的消息和进程创建
+// 2. 遍历所有进程，向每个进程发送关闭任务
+// 3. 每个进程通过 mailbox 处理关闭任务，确保在消息处理完成后才退出
+// 注意：此方法不会等待所有进程完全退出，进程会在处理完 mailbox 中的消息后自动退出
 func (s *System) Shutdown() error {
 	// 标记为关闭状态，拒绝新的消息和进程创建
 	if !s.shuttingDown.CompareAndSwap(false, true) {
@@ -311,8 +349,16 @@ func (s *System) Shutdown() error {
 	}
 
 	processes := s.GetAllProcesses()
+	var lastErr error
 	for _, process := range processes {
-		_ = process.Shutdown()
+		// 向进程发送关闭任务，进程会在处理完 mailbox 中的消息后执行退出
+		if err := process.Shutdown(); err != nil {
+			glog.Error("关闭进程失败", zap.Error(err))
+			lastErr = err
+		}
+	}
+	if lastErr != nil {
+		return fmt.Errorf("关闭进程时发生错误: %w", lastErr)
 	}
 	return nil
 }

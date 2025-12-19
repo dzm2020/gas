@@ -2,6 +2,7 @@ package actor
 
 import (
 	"errors"
+	"fmt"
 	"gas/internal/iface"
 	"gas/internal/session"
 	"gas/pkg/glog"
@@ -14,12 +15,12 @@ import (
 
 // 路由相关错误
 var (
-	ErrMessageHandlerNotFound     = errors.New("actor message handler not found")
-	ErrHandlerReturnType          = errors.New("actor: handler return type must be error")
-	ErrActorIsNil                 = errors.New("actor: actor is nil")
-	ErrUnknownHandlerType         = errors.New("actor: unknown handler type")
-	ErrAsyncHandlerThirdParameter = errors.New("actor: async handler third parameter (request) must be pointer or []byte")
-	ErrSyncHandlerFourParameter   = errors.New("actor: sync handler fourth parameter (response) must be pointer")
+	ErrMessageHandlerNotFound     = errors.New("actor: 消息处理器未找到")
+	ErrHandlerReturnType          = errors.New("actor: 处理器返回类型必须是 error")
+	ErrActorIsNil                 = errors.New("actor: actor 为空")
+	ErrUnknownHandlerType         = errors.New("actor: 未知的处理器类型")
+	ErrAsyncHandlerThirdParameter = errors.New("actor: 异步处理器第三个参数 (request) 必须是指针或 []byte")
+	ErrSyncHandlerFourParameter   = errors.New("actor: 同步处理器第四个参数 (response) 必须是指针")
 )
 
 var actorInterfaceMethods = map[string]bool{
@@ -142,62 +143,83 @@ func (r *Router) createMethodEntry(method reflect.Method, methodType reflect.Typ
 
 	switch numIn {
 	case 2:
-		// 检查第二个参数类型
-		param1Type := methodType.In(2)
-		if param1Type == typeOfSession {
-			// (actor, ctx, session *session.Session) error - 仅会话消息
-			entry.handlerType = handlerTypeSessionOnly
-		} else {
-			// (actor, ctx, request) error - 异步消息
-			entry.handlerType = handlerTypeAsync
-			requestType, isByte, err := parseRequestType(param1Type)
-			if err != nil {
-				return entry, err
-			}
-			entry.requestType = requestType
-			entry.isByteRequest = isByte
+		// 2个参数: (actor, ctx, param1) error
+		if err := r.parseTwoParamEntry(&entry, methodType); err != nil {
+			return entry, err
 		}
-
 	case 3:
-		// 检查第二个参数类型
-		param1Type := methodType.In(2)
-		param2Type := methodType.In(3)
-
-		if param1Type == typeOfSession {
-			// (actor, ctx, session *session.Session, request) error - 会话消息
-			entry.handlerType = handlerTypeSession
-			requestType, isByte, err := parseRequestType(param2Type)
-			if err != nil {
-				return entry, err
-			}
-			entry.requestType = requestType
-			entry.isByteRequest = isByte
-		} else {
-			// (actor, ctx, request, response) error - 同步消息
-			entry.handlerType = handlerTypeSync
-			requestType, isByte, err := parseRequestType(param1Type)
-			if err != nil {
-				return entry, err
-			}
-			entry.requestType = requestType
-			entry.isByteRequest = isByte
-
-			if param2Type.Kind() != reflect.Pointer {
-				return entry, ErrSyncHandlerFourParameter
-			}
-			entry.responseType = param2Type
+		// 3个参数: (actor, ctx, param1, param2) error
+		if err := r.parseThreeParamEntry(&entry, methodType); err != nil {
+			return entry, err
 		}
-
 	default:
-		return entry, ErrUnknownHandlerType
+		return entry, fmt.Errorf("%w: 参数数量=%d", ErrUnknownHandlerType, numIn)
 	}
 
-	// 检查返回值
+	// 检查返回值：必须返回 error
 	if methodType.NumOut() != 1 || !methodType.Out(0).Implements(typeOfError) {
 		return entry, ErrHandlerReturnType
 	}
 
 	return entry, nil
+}
+
+// parseTwoParamEntry 解析2个参数的方法签名
+// 可能的签名:
+//   - (actor, ctx, session *session.Session) error - 仅会话消息
+//   - (actor, ctx, request) error - 异步消息
+func (r *Router) parseTwoParamEntry(entry *routerEntry, methodType reflect.Type) error {
+	param1Type := methodType.In(2)
+	if param1Type == typeOfSession {
+		// (actor, ctx, session *session.Session) error - 仅会话消息
+		entry.handlerType = handlerTypeSessionOnly
+	} else {
+		// (actor, ctx, request) error - 异步消息
+		entry.handlerType = handlerTypeAsync
+		requestType, isByte, err := parseRequestType(param1Type)
+		if err != nil {
+			return fmt.Errorf("解析异步消息请求类型失败: %w", err)
+		}
+		entry.requestType = requestType
+		entry.isByteRequest = isByte
+	}
+	return nil
+}
+
+// parseThreeParamEntry 解析3个参数的方法签名
+// 可能的签名:
+//   - (actor, ctx, session *session.Session, request) error - 会话消息
+//   - (actor, ctx, request, response) error - 同步消息
+func (r *Router) parseThreeParamEntry(entry *routerEntry, methodType reflect.Type) error {
+	param1Type := methodType.In(2)
+	param2Type := methodType.In(3)
+
+	if param1Type == typeOfSession {
+		// (actor, ctx, session *session.Session, request) error - 会话消息
+		entry.handlerType = handlerTypeSession
+		requestType, isByte, err := parseRequestType(param2Type)
+		if err != nil {
+			return fmt.Errorf("解析会话消息请求类型失败: %w", err)
+		}
+		entry.requestType = requestType
+		entry.isByteRequest = isByte
+	} else {
+		// (actor, ctx, request, response) error - 同步消息
+		entry.handlerType = handlerTypeSync
+		requestType, isByte, err := parseRequestType(param1Type)
+		if err != nil {
+			return fmt.Errorf("解析同步消息请求类型失败: %w", err)
+		}
+		entry.requestType = requestType
+		entry.isByteRequest = isByte
+
+		// 验证响应类型必须是指针
+		if param2Type.Kind() != reflect.Pointer {
+			return fmt.Errorf("%w: 响应类型=%v", ErrSyncHandlerFourParameter, param2Type)
+		}
+		entry.responseType = param2Type
+	}
+	return nil
 }
 
 // Handle 基于方法名处理消息，从 message.Data 反序列化参数
@@ -207,7 +229,7 @@ func (r *Router) Handle(ctx iface.IContext, methodName string, session iface.ISe
 	r.mu.RUnlock()
 
 	if !ok {
-		return nil, ErrMessageHandlerNotFound
+		return nil, fmt.Errorf("%w: method=%s", ErrMessageHandlerNotFound, methodName)
 	}
 
 	switch entry.handlerType {
@@ -261,7 +283,7 @@ func (r *Router) buildCallArgs(ctx iface.IContext, entry routerEntry, session if
 	if entry.handlerType != handlerTypeSessionOnly {
 		requestValue, err := r.createRequestValue(entry.requestType, entry.isByteRequest, data, ctx)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("构建请求参数失败: %w", err)
 		}
 		callArgs = append(callArgs, requestValue)
 	}
@@ -294,7 +316,7 @@ func (r *Router) handleSyncMessage(ctx iface.IContext, methodName string, data [
 	responseValue := callArgs[len(callArgs)-1]
 	responseData, err := ctx.Node().Marshal(responseValue.Interface())
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("序列化响应失败: %w", err)
 	}
 
 	return responseData, nil
@@ -338,7 +360,7 @@ func (r *Router) createRequestValue(requestType reflect.Type, isByteRequest bool
 	requestValue := reflect.New(requestType.Elem())
 
 	if err := ctx.Node().Unmarshal(data, requestValue.Interface()); err != nil {
-		return reflect.Value{}, err
+		return reflect.Value{}, fmt.Errorf("反序列化请求参数失败 (type=%v): %w", requestType, err)
 	}
 	return requestValue, nil
 }

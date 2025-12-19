@@ -43,11 +43,17 @@ func (p *Process) PostMessage(message iface.IMessage) error {
 	return p.mailbox.PostMessage(message)
 }
 
+// Shutdown 优雅关闭进程
+// 通过发送退出任务到 mailbox 来确保在消息处理完成后才退出
+// 使用 CAS 操作确保只执行一次关闭操作
 func (p *Process) Shutdown() error {
+	// 尝试将 shutdown 状态从 false 切换到 true
+	// 如果失败说明已经在关闭中，直接返回
 	if !p.shutdown.CompareAndSwap(false, true) {
 		return nil // 已经在退出中
 	}
 
+	// 创建一个退出任务，通过 mailbox 发送，确保在消息处理完成后才执行退出
 	msg := iface.NewTaskMessage(func(ctx iface.IContext) error {
 		p.ctx.exit()
 		return nil
