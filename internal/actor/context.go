@@ -4,7 +4,6 @@ package actor
 import (
 	"gas/internal/iface"
 	"gas/internal/session"
-	discovery "gas/pkg/discovery/iface"
 	"gas/pkg/glog"
 	"gas/pkg/lib"
 	"time"
@@ -89,15 +88,13 @@ func (a *actorContext) execHandler(msg *iface.Message) ([]byte, error) {
 }
 
 func (a *actorContext) Send(pid *iface.Pid, methodName string, request interface{}) (err error) {
-	toPid := a.system.Convert(pid, discovery.RouteRandom)
-
 	var data []byte
 	data, err = a.node.Marshal(request)
 	if err != nil {
 		return
 	}
 
-	message := iface.NewActorMessage(a.pid, toPid, methodName, data)
+	message := iface.NewActorMessage(a.pid, pid, methodName, data)
 	message.Async = true
 	return a.system.Send(message)
 }

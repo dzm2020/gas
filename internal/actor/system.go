@@ -2,11 +2,11 @@ package actor
 
 import (
 	"errors"
-	"fmt"
 	"gas/internal/iface"
 	discovery "gas/pkg/discovery/iface"
 	"gas/pkg/glog"
 	"gas/pkg/lib"
+	"gas/pkg/lib/xerror"
 	"sync/atomic"
 	"time"
 
@@ -166,11 +166,11 @@ func (s *System) Named(name string, pid *iface.Pid) error {
 func (s *System) clusterNamed(name string) error {
 	cluster := s.node.Cluster()
 	if cluster == nil {
-		return fmt.Errorf("集群组件未初始化")
+		return xerror.Wrap(errors.New("集群组件未初始化"), "")
 	}
 	s.node.AddTag(name)
 	if err := cluster.UpdateMember(); err != nil {
-		return fmt.Errorf("更新集群成员信息失败 (name=%s): %w", name, err)
+		return xerror.Wrapf(err, "更新集群成员信息失败 (name=%s)", name)
 	}
 	return nil
 }
@@ -200,11 +200,11 @@ func (s *System) Unname(pid *iface.Pid) error {
 func (s *System) clusterUnname(name string) error {
 	cluster := s.node.Cluster()
 	if cluster == nil {
-		return fmt.Errorf("集群组件未初始化")
+		return xerror.Wrap(errors.New("集群组件未初始化"), "")
 	}
 	s.node.RemoteTag(name)
 	if err := cluster.UpdateMember(); err != nil {
-		return fmt.Errorf("更新集群成员信息失败 (name=%s): %w", name, err)
+		return xerror.Wrapf(err, "更新集群成员信息失败 (name=%s)", name)
 	}
 	return nil
 }
@@ -222,10 +222,10 @@ func (s *System) Send(message *iface.ActorMessage) error {
 	}
 	cluster := s.node.Cluster()
 	if cluster == nil {
-		return fmt.Errorf("集群组件未初始化，无法发送远程消息")
+		return xerror.Wrap(errors.New("集群组件未初始化，无法发送远程消息"), "")
 	}
 	if err := cluster.Send(message); err != nil {
-		return fmt.Errorf("发送远程消息失败: %w", err)
+		return xerror.Wrap(err, "发送远程消息失败")
 	}
 	return nil
 }
@@ -237,11 +237,11 @@ func (s *System) Call(message *iface.ActorMessage) ([]byte, error) {
 	}
 	cluster := s.node.Cluster()
 	if cluster == nil {
-		return nil, fmt.Errorf("集群组件未初始化，无法调用远程消息")
+		return nil, xerror.Wrap(errors.New("集群组件未初始化，无法调用远程消息"), "")
 	}
 	data, err := cluster.Call(message)
 	if err != nil {
-		return nil, fmt.Errorf("调用远程消息失败: %w", err)
+		return nil, xerror.Wrap(err, "调用远程消息失败")
 	}
 	return data, nil
 }
@@ -303,10 +303,10 @@ func (s *System) sendToProcess(to *iface.Pid, msg iface.IMessage) error {
 	}
 	process := s.GetProcess(to)
 	if process == nil {
-		return fmt.Errorf("%w: pid=%v", ErrProcessNotFound, to)
+		return xerror.Wrapf(ErrProcessNotFound, "pid=%v", to)
 	}
 	if err := process.PostMessage(msg); err != nil {
-		return fmt.Errorf("发送消息到进程失败 (pid=%v): %w", to, err)
+		return xerror.Wrapf(err, "发送消息到进程失败 (pid=%v)", to)
 	}
 	return nil
 }
@@ -358,7 +358,7 @@ func (s *System) Shutdown() error {
 		}
 	}
 	if lastErr != nil {
-		return fmt.Errorf("关闭进程时发生错误: %w", lastErr)
+		return xerror.Wrap(lastErr, "关闭进程时发生错误")
 	}
 	return nil
 }

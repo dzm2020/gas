@@ -33,7 +33,7 @@ func (w *ChanWaiter[T]) Wait() (t T, e error) {
 	}
 }
 
-func (w *ChanWaiter[T]) Done(rsp interface{}, err error) {
+func (w *ChanWaiter[T]) Done(rsp T, err error) {
 	if err != nil {
 		w.doneErr(err)
 		return

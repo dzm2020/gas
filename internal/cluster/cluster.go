@@ -8,6 +8,7 @@ import (
 	discovery "gas/pkg/discovery/iface"
 	"gas/pkg/glog"
 	"gas/pkg/lib"
+	"gas/pkg/lib/xerror"
 	messageQue "gas/pkg/messageQue/iface"
 	"time"
 
@@ -41,19 +42,19 @@ func (r *Cluster) PushTaskAndWait(pid *iface.Pid, timeout time.Duration, task if
 func (r *Cluster) Start(ctx context.Context) error {
 	// 启动消息队列组件
 	if err := r.mq.Run(ctx); err != nil {
-		return fmt.Errorf("启动消息队列失败: %w", err)
+		return xerror.Wrap(err, "启动消息队列失败")
 	}
 	// 启动服务发现组件
 	if err := r.dis.Run(ctx); err != nil {
-		return fmt.Errorf("启动服务发现失败: %w", err)
+		return xerror.Wrap(err, "启动服务发现失败")
 	}
 	// 注册节点到服务发现
 	if err := r.dis.Add(r.node.Info()); err != nil {
-		return fmt.Errorf("注册节点失败: %w", err)
+		return xerror.Wrap(err, "注册节点失败")
 	}
 	// 订阅消息队列
 	if err := r.subscribe(); err != nil {
-		return fmt.Errorf("订阅消息队列失败: %w", err)
+		return xerror.Wrap(err, "订阅消息队列失败")
 	}
 	return nil
 }
@@ -67,7 +68,7 @@ func (r *Cluster) subscribe() error {
 	subject := r.makeSubject(nodeId)
 	_, err := r.mq.Subscribe(subject, r)
 	if err != nil {
-		return fmt.Errorf("订阅消息队列失败 (subject=%s, nodeId=%d): %w", subject, nodeId, err)
+		return xerror.Wrapf(err, "订阅消息队列失败 (subject=%s, nodeId=%d)", subject, nodeId)
 	}
 	return nil
 }
@@ -75,12 +76,12 @@ func (r *Cluster) subscribe() error {
 func (r *Cluster) HandlerAsyncMessage(data []byte) error {
 	message := &iface.Message{}
 	if err := r.node.Unmarshal(data, message); err != nil {
-		return fmt.Errorf("反序列化异步消息失败: %w", err)
+		return xerror.Wrap(err, "反序列化异步消息失败")
 	}
 	msg := &iface.ActorMessage{Message: message}
 	system := r.node.System()
 	if err := system.Send(msg); err != nil {
-		return fmt.Errorf("发送异步消息失败: %w", err)
+		return xerror.Wrap(err, "发送异步消息失败")
 	}
 	return nil
 }
@@ -97,14 +98,14 @@ func (r *Cluster) HandlerSyncMessage(request []byte) (rspBytes []byte) {
 	}()
 	message := &iface.Message{}
 	if err = r.node.Unmarshal(request, message); err != nil {
-		err = fmt.Errorf("反序列化同步消息失败: %w", err)
+		err = xerror.Wrap(err, "反序列化同步消息失败")
 		return
 	}
 	msg := &iface.ActorMessage{Message: message}
 	system := r.node.System()
 	bytes, err = system.Call(msg)
 	if err != nil {
-		err = fmt.Errorf("调用同步消息失败: %w", err)
+		err = xerror.Wrap(err, "调用同步消息失败")
 	}
 	return
 }
@@ -112,66 +113,66 @@ func (r *Cluster) HandlerSyncMessage(request []byte) (rspBytes []byte) {
 // Send 发送消息到集群节点
 func (r *Cluster) Send(msg *iface.ActorMessage) (err error) {
 	if err = msg.Validate(); err != nil {
-		return fmt.Errorf("消息验证失败: %w", err)
+		return xerror.Wrap(err, "消息验证失败")
 	}
 
 	toNodeId := msg.To.GetNodeId()
 
 	if m := r.dis.GetById(toNodeId); m == nil {
-		return fmt.Errorf("%w: nodeId=%d", ErrNotFoundMember, toNodeId)
+		return xerror.Wrapf(ErrNotFoundMember, "nodeId=%d", toNodeId)
 	}
 
 	bytes, mErr := r.node.Marshal(msg)
 	if mErr != nil {
-		return fmt.Errorf("序列化消息失败: %w", mErr)
+		return xerror.Wrap(mErr, "序列化消息失败")
 	}
 
 	subject := r.makeSubject(toNodeId)
 	if err = r.mq.Publish(subject, bytes); err != nil {
-		return fmt.Errorf("发布消息到队列失败 (subject=%s): %w", subject, err)
+		return xerror.Wrapf(err, "发布消息到队列失败 (subject=%s)", subject)
 	}
 	return nil
 }
 
 func (r *Cluster) Call(msg *iface.ActorMessage) (bin []byte, err error) {
 	if err = msg.Validate(); err != nil {
-		return nil, fmt.Errorf("消息验证失败: %w", err)
+		return nil, xerror.Wrap(err, "消息验证失败")
 	}
 
 	toNodeId := msg.To.GetNodeId()
 
 	if m := r.dis.GetById(toNodeId); m == nil {
-		return nil, fmt.Errorf("%w: nodeId=%d", ErrNotFoundMember, toNodeId)
+		return nil, xerror.Wrapf(ErrNotFoundMember, "nodeId=%d", toNodeId)
 	}
 
 	data, marshalErr := r.node.Marshal(msg.Message)
 	if marshalErr != nil {
-		return nil, fmt.Errorf("序列化消息失败: %w", marshalErr)
+		return nil, xerror.Wrap(marshalErr, "序列化消息失败")
 	}
 
 	subject := r.makeSubject(toNodeId)
 	timeout := lib.NowDelay(msg.GetDeadline(), 0)
 	bytes, requestErr := r.mq.Request(subject, data, timeout)
 	if requestErr != nil {
-		return nil, fmt.Errorf("请求消息队列失败 (subject=%s, timeout=%v): %w", subject, timeout, requestErr)
+		return nil, xerror.Wrapf(requestErr, "请求消息队列失败 (subject=%s, timeout=%v)", subject, timeout)
 	}
 
 	response := &iface.Response{}
 	if err = r.node.Unmarshal(bytes, response); err != nil {
-		return nil, fmt.Errorf("反序列化响应失败: %w", err)
+		return nil, xerror.Wrap(err, "反序列化响应失败")
 	}
 
 	bin = response.GetData()
 	err = response.GetError()
 	if err != nil {
-		err = fmt.Errorf("远程调用返回错误: %w", err)
+		err = xerror.Wrap(err, "远程调用返回错误")
 	}
 	return bin, err
 }
 
 func (r *Cluster) UpdateMember() error {
 	if err := r.dis.Add(r.node.Info()); err != nil {
-		return fmt.Errorf("更新成员信息失败: %w", err)
+		return xerror.Wrap(err, "更新成员信息失败")
 	}
 	return nil
 }
@@ -231,10 +232,10 @@ func (r *Cluster) Broadcast(tag string, message *iface.ActorMessage) {
 // Shutdown 关闭所有订阅
 func (r *Cluster) Shutdown(ctx context.Context) error {
 	if err := r.dis.Shutdown(ctx); err != nil {
-		return fmt.Errorf("关闭服务发现失败: %w", err)
+		return xerror.Wrap(err, "关闭服务发现失败")
 	}
 	if err := r.mq.Shutdown(ctx); err != nil {
-		return fmt.Errorf("关闭消息队列失败: %w", err)
+		return xerror.Wrap(err, "关闭消息队列失败")
 	}
 	return nil
 }

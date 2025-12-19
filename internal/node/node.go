@@ -8,6 +8,7 @@ import (
 	"gas/internal/iface"
 	"gas/pkg/glog"
 	"gas/pkg/lib"
+	"gas/pkg/lib/xerror"
 	"os"
 	"os/signal"
 	"runtime/debug"
@@ -117,7 +118,7 @@ func (n *Node) GetConfig() *config.Config {
 }
 
 func (n *Node) Startup(comps ...iface.IComponent) error {
-	defer lib.PrintCoreDump()
+	defer xerror.PrintCoreDump()
 	// 创建节点信息
 	n.Member = &discovery.Member{
 		Id:      n.config.Node.Id,

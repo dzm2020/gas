@@ -30,7 +30,6 @@ type IdWorker struct {
 
 var iw *IdWorker
 
-// NewIdWorker Func: Generate NewIdWorker with Given workerid
 func Init(workerId int64) {
 	iw = new(IdWorker)
 	iw.maxWorkerId = getMaxWorkerId()
@@ -83,7 +82,7 @@ func NextId() (ts int64, err error) {
 	}
 
 	if ts < iw.lastTimeStamp {
-		err = errors.New("Clock moved backwards, Refuse gen id")
+		err = errors.New("clock moved backwards, Refuse gen id")
 		return 0, err
 	}
 	iw.lastTimeStamp = ts

@@ -1,8 +1,8 @@
 package session
 
 import (
-	"fmt"
 	"gas/internal/iface"
+	"gas/pkg/lib/xerror"
 
 	"github.com/duke-git/lancet/v2/convertor"
 )
@@ -44,7 +44,7 @@ func (a *Session) Response(request interface{}) error {
 	node := a.ctx.Node()
 	bin, err := node.Marshal(request)
 	if err != nil {
-		return fmt.Errorf("marshal request failed: %w", err)
+		return xerror.Wrap(err, "marshal request failed")
 	}
 	message := iface.NewActorMessage(a.ctx.ID(), a.GetAgent(), PushMessageToClientMethod, bin)
 	message.Session = convertor.DeepClone(a.Session)
@@ -62,7 +62,7 @@ func (a *Session) Push(cmd, act uint16, request interface{}) error {
 	node := a.ctx.Node()
 	bin, err := node.Marshal(request)
 	if err != nil {
-		return fmt.Errorf("marshal request failed: %w", err)
+		return xerror.Wrap(err, "marshal request failed")
 	}
 	message := iface.NewActorMessage(a.ctx.ID(), a.GetAgent(), PushMessageToClientMethod, bin)
 	message.Session = convertor.DeepClone(a.Session)
