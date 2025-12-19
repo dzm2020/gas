@@ -54,7 +54,7 @@ func (g *Gate) OnConnect(entity network.IConnection) error {
 	s := g.getSession(entity)
 	system := g.node.System()
 
-	message := g.makeActorMsg(s, "OnNetworkOpen", nil)
+	message := g.makeActorMessage(s, "OnNetworkOpen", nil)
 
 	return system.Send(message)
 }
@@ -67,7 +67,7 @@ func (g *Gate) OnMessage(entity network.IConnection, clientMsg interface{}) erro
 
 	g.formatSession(s, msg)
 
-	message := g.makeActorMsg(s, "OnNetworkClose", msg.Data)
+	message := g.makeActorMessage(s, "OnNetworkClose", msg.Data)
 
 	return system.Send(message)
 }
@@ -76,12 +76,12 @@ func (g *Gate) OnClose(entity network.IConnection, wrong error) error {
 	s := g.getSession(entity)
 	system := g.node.System()
 
-	message := g.makeActorMsg(s, "OnNetworkMessage", nil)
+	message := g.makeActorMessage(s, "OnNetworkMessage", nil)
 
 	return system.Send(message)
 }
 
-func (g *Gate) makeActorMsg(session *session.Session, method string, data []byte) *iface.ActorMessage {
+func (g *Gate) makeActorMessage(session *session.Session, method string, data []byte) *iface.ActorMessage {
 	message := iface.NewActorMessage(session.GetAgent(), session.GetAgent(), method, data)
 	message.Session = session.Session
 	return message

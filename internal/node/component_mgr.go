@@ -14,13 +14,13 @@ import (
 )
 
 var (
-	ErrComponentCannotBeNil                = errors.New("component cannot be nil")
-	ErrComponentNameCannotBeEmpty          = errors.New("component name cannot be empty")
-	ErrCannotRegisterComponentAfterStarted = errors.New("cannot register component after started component")
-	ErrComponentAlreadyRegistered          = errors.New("component already registered")
-	ErrManagerAlreadyStarted               = errors.New("manager already started")
-	ErrManagerStoppedCannotRestart         = errors.New("manager already stopped")
-	ErrFailedToStartComponent              = errors.New("failed to start component")
+	ErrComponentCannotBeNil                = errors.New("组件不能为空")
+	ErrComponentNameCannotBeEmpty          = errors.New("组件名字不能空")
+	ErrCannotRegisterComponentAfterStarted = errors.New("组件启动后无法注册组件")
+	ErrComponentAlreadyRegistered          = errors.New("组件已注册")
+	ErrManagerAlreadyStarted               = errors.New("管理器已启动")
+	ErrManagerStoppedCannotRestart         = errors.New("管理器已停止，无法重启")
+	ErrFailedToStartComponent              = errors.New("启动组件失败")
 )
 
 // ComponentManager 生命周期管理器
@@ -130,7 +130,7 @@ func (cm *ComponentManager) Start(ctx context.Context, node iface.INode) error {
 		if err := component.Start(ctx, node); err != nil {
 			glog.Error("组件: 启动组件失败", zap.String("component", component.Name()), zap.Error(err))
 			// 停止已启动的组件（逆序）
-			_ = cm.stopComponents(ctx, started, true)
+			_ = cm.stopComponents(ctx, started)
 			return ErrFailedToStartComponent
 		}
 
@@ -171,40 +171,27 @@ func (cm *ComponentManager) Stop(ctx context.Context) error {
 		}
 
 		glog.Info("组件: 正在停止组件", zap.Int("count", len(components)))
-		err = cm.stopComponents(ctx, components, false)
+		err = cm.stopComponents(ctx, components)
 	})
 
 	return err
 }
 
 // stopComponents 停止组件列表（组件列表应该已经是逆序的）
-func (cm *ComponentManager) stopComponents(ctx context.Context, components []iface.IComponent, isRollback bool) error {
+func (cm *ComponentManager) stopComponents(ctx context.Context, components []iface.IComponent) error {
 	var lastErr error
-	stopType := "正在停止"
-	if isRollback {
-		stopType = "正在回滚"
-	}
-
-	// 按顺序停止（组件列表已经是逆序的）
 	for _, component := range components {
 		if component == nil {
 			continue
 		}
-		glog.Info("组件: 停止组件", zap.String("action", stopType), zap.String("component", component.Name()))
-
+		glog.Info("组件: 停止组件", zap.String("component", component.Name()))
 		if err := component.Stop(ctx); err != nil {
 			glog.Error("组件: 停止组件失败", zap.String("component", component.Name()), zap.Error(err))
 			lastErr = err
-			// 继续停止其他组件，不因单个组件失败而中断
-		} else {
-			glog.Info("组件: 组件停止成功", zap.String("component", component.Name()))
+			continue
 		}
+		glog.Info("组件: 组件停止成功", zap.String("component", component.Name()))
 	}
-
-	if !isRollback {
-		glog.Info("组件: 所有组件已停止")
-	}
-
 	return lastErr
 }
 

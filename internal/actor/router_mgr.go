@@ -9,6 +9,12 @@ import (
 	"go.uber.org/zap"
 )
 
+var (
+	globalRouterManager = &routerManager{
+		routers: make(map[reflect.Type]iface.IRouter),
+	}
+)
+
 // routerManager 全局 router 管理器，按 actor 类型缓存 router
 type routerManager struct {
 	mu      sync.RWMutex

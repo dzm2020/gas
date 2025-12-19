@@ -17,7 +17,7 @@ type Factory func() IAgent
 type IAgent interface {
 	iface.IActor
 	OnNetworkOpen(ctx iface.IContext, s *session.Session) error
-	OnNetworkMessage(ctx iface.IContext, s *session.Session, data []byte) error
+	OnNetworkMessage(ctx iface.IContext, s *session.Session) error
 	OnNetworkClose(ctx iface.IContext, s *session.Session) error
 	PushMessage(ctx iface.IContext, s *session.Session, data []byte) error
 	Shutdown(ctx iface.IContext, s *session.Session) error
@@ -32,7 +32,7 @@ type Agent struct {
 func (agent *Agent) OnNetworkOpen(ctx iface.IContext, s *session.Session) error {
 	return nil
 }
-func (agent *Agent) OnNetworkMessage(ctx iface.IContext, s *session.Session, data []byte) error {
+func (agent *Agent) OnNetworkMessage(ctx iface.IContext, s *session.Session) error {
 	return nil
 }
 func (agent *Agent) OnNetworkClose(ctx iface.IContext, s *session.Session) error {

@@ -15,7 +15,7 @@ type (
 
 	IProcess interface {
 		Context() IContext
-		Input(message interface{}) error
+		PostMessage(message IMessage) error
 		Shutdown() error
 	}
 
@@ -24,29 +24,30 @@ type (
 		Add(pid *Pid, process IProcess)
 		Remove(pid *Pid)
 		Named(name string, pid *Pid) error
-		Unname(pid *Pid)
+		Unname(pid *Pid) error
 		HasName(name string) bool
-		GetProcess(to interface{}) IProcess
+		GetProcess(pid *Pid) IProcess
 		GetProcessById(id uint64) IProcess
 		GetProcessByName(name string) IProcess
 		GetAllProcesses() []IProcess
-		SubmitTask(to interface{}, task Task) (err error)
-		SubmitTaskAndWait(to interface{}, task Task, timeout time.Duration) (err error)
+		SubmitTask(pid *Pid, task Task) (err error)
+		SubmitTaskAndWait(pid *Pid, task Task, timeout time.Duration) (err error)
 		Send(message *ActorMessage) (err error)
 		Call(message *ActorMessage) (data []byte, err error)
-		GenPid(to interface{}, strategy discovery.RouteStrategy) *Pid
-		Shutdown(timeout time.Duration) error
+		Shutdown() error
+		Select(name string, strategy discovery.RouteStrategy) *Pid
 	}
 
 	IContext interface {
 		IMessageInvoker
 		ID() *Pid
 		Named(name string) error
-		Unname()
+		Unname() error
 		Actor() IActor
-		Send(to interface{}, methodName string, request interface{}) error
-		Call(to interface{}, methodName string, request interface{}, reply interface{}) error
-		Forward(to interface{}, method string) error
+		SetCallTimeout(timeout time.Duration)
+		Send(to *Pid, methodName string, request interface{}) error
+		Call(to *Pid, methodName string, request interface{}, reply interface{}) error
+		Forward(to *Pid, method string) error
 		AfterFunc(duration time.Duration, task Task) *lib.Timer
 		Message() *ActorMessage
 		Process() IProcess

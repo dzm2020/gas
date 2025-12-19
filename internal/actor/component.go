@@ -3,7 +3,6 @@ package actor
 import (
 	"context"
 	"gas/internal/iface"
-	"time"
 )
 
 // NewComponent 创建 actor 组件
@@ -27,5 +26,5 @@ func (c *Component) Start(ctx context.Context, node iface.INode) error {
 
 func (c *Component) Stop(ctx context.Context) error {
 	c.node.SetSystem(nil)
-	return c.System.Shutdown(10 * time.Second)
+	return c.System.Shutdown()
 }

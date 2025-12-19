@@ -17,12 +17,12 @@ var (
 
 // 编译时检查，确保所有消息类型都实现了 IMessageValidator 接口
 var (
-	_ IMessageValidator = (*ActorMessage)(nil)
-	_ IMessageValidator = (*TaskMessage)(nil)
+	_ IMessage = (*ActorMessage)(nil)
+	_ IMessage = (*TaskMessage)(nil)
 )
 
 type (
-	IMessageValidator interface {
+	IMessage interface {
 		Validate() error
 	}
 	TaskMessage struct {

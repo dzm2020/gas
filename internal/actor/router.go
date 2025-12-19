@@ -3,6 +3,7 @@ package actor
 import (
 	"errors"
 	"gas/internal/iface"
+	"gas/internal/session"
 	"gas/pkg/glog"
 	"reflect"
 	"sync"
@@ -15,10 +16,8 @@ import (
 var (
 	ErrMessageHandlerNotFound     = errors.New("actor message handler not found")
 	ErrHandlerReturnType          = errors.New("actor: handler return type must be error")
-	ErrSessionIsNil               = errors.New("actor: session is nil")
 	ErrActorIsNil                 = errors.New("actor: actor is nil")
 	ErrUnknownHandlerType         = errors.New("actor: unknown handler type")
-	ErrUnsupportedParameterCount  = errors.New("actor: unsupported parameter count")
 	ErrAsyncHandlerThirdParameter = errors.New("actor: async handler third parameter (request) must be pointer or []byte")
 	ErrSyncHandlerFourParameter   = errors.New("actor: sync handler fourth parameter (response) must be pointer")
 )
@@ -37,9 +36,10 @@ type Router struct {
 type handlerType int
 
 const (
-	handlerTypeClient handlerType = iota // 客户端消息: (实际接收者, ctx, session, request) error
-	handlerTypeSync                      // 同步消息: (实际接收者, ctx, request, response) error
-	handlerTypeAsync                     // 异步消息: (实际接收者, ctx, request) error
+	handlerTypeSync        handlerType = iota // 同步消息: (实际接收者, ctx, request, response) error
+	handlerTypeAsync                          // 异步消息: (实际接收者, ctx, request) error
+	handlerTypeSession                        // 会话消息: (实际接收者, ctx, session *session.Session, request) error
+	handlerTypeSessionOnly                    // 会话消息: (实际接收者, ctx, session *session.Session) error
 )
 
 type routerEntry struct {
@@ -57,14 +57,11 @@ func NewRouter() iface.IRouter {
 }
 
 var (
-	globalRouterManager = &routerManager{
-		routers: make(map[reflect.Type]iface.IRouter),
-	}
-
+	typeOfActor        = reflect.TypeOf((*iface.IActor)(nil)).Elem()
 	typeOfActorContext = reflect.TypeOf((*iface.IContext)(nil)).Elem()
 	typeOfError        = reflect.TypeOf((*error)(nil)).Elem()
-	typeOfSession      = reflect.TypeOf((*iface.ISession)(nil)).Elem()
 	typeOfByteArray    = reflect.TypeOf(([]byte)(nil))
+	typeOfSession      = reflect.TypeOf((*session.Session)(nil))
 )
 
 // AutoRegister 自动扫描并注册 actor 的所有导出方法
@@ -79,51 +76,49 @@ func (r *Router) AutoRegister(actor iface.IActor) {
 // scanAndRegisterActor 扫描并注册 actor 的导出方法
 func (r *Router) scanAndRegisterActor(actor interface{}) {
 	actorType := reflect.TypeOf(actor)
-
 	for i := 0; i < actorType.NumMethod(); i++ {
 		method := actorType.Method(i)
 		// 只处理导出的方法（首字母大写）
 		if !unicode.IsUpper(rune(method.Name[0])) {
 			continue
 		}
-
 		// 过滤掉 IActor 接口的默认方法
 		if actorInterfaceMethods[method.Name] {
 			continue
 		}
-
 		methodType := method.Type
-
-		// 检查返回值：必须返回 error
-		if methodType.NumOut() != 1 || !methodType.Out(0).Implements(typeOfError) {
+		// 检查方法签名是否符合要求
+		if !r.isValidMethodSignature(methodType) {
 			continue
 		}
-
-		// 直接注册方法值，在 Handle 时直接调用
-		// 检查方法签名是否符合要求
-		if r.isValidMethodSignature(methodType) {
-			// 创建路由条目
-			entry, err := r.createMethodEntry(method, methodType)
-			if err == nil {
-				r.mu.Lock()
-				r.methodRoutes[method.Name] = entry
-				r.mu.Unlock()
-				glog.Debug("自动注册路由", zap.String("method", method.Name))
-			}
+		// 创建路由条目
+		entry, err := r.createMethodEntry(method, methodType)
+		if err == nil {
+			r.mu.Lock()
+			r.methodRoutes[method.Name] = entry
+			r.mu.Unlock()
+			glog.Debug("自动注册路由", zap.String("method", method.Name))
 		}
 	}
 }
 
-// isValidMethodSignature 检查方法签名是否有效
-// 方法签名应该是: func (a *Actor) MethodName(ctx IContext, ...) error
-// 至少需要 2 个参数（接收者 + ctx），最多 4 个参数（接收者 + ctx + 2个实际参数）
 func (r *Router) isValidMethodSignature(methodType reflect.Type) bool {
 	numIn := methodType.NumIn() - 1 // 减去接收者
 	if numIn < 2 || numIn > 3 {
 		return false
 	}
+	if !methodType.In(0).Implements(typeOfActor) {
+		return false
+	}
 	// 第一个实际参数必须是 IContext
-	return methodType.In(1) == typeOfActorContext
+	if methodType.In(1) != typeOfActorContext {
+		return false
+	}
+	// 检查返回值：必须返回 error
+	if methodType.NumOut() != 1 || !methodType.Out(0).Implements(typeOfError) {
+		return false
+	}
+	return true
 }
 
 // parseRequestType 解析请求类型
@@ -147,28 +142,30 @@ func (r *Router) createMethodEntry(method reflect.Method, methodType reflect.Typ
 
 	switch numIn {
 	case 2:
-		// (actor, ctx, request) error - 异步消息
+		// 检查第二个参数类型
 		param1Type := methodType.In(2)
 		if param1Type == typeOfSession {
-			return entry, ErrUnsupportedParameterCount
+			// (actor, ctx, session *session.Session) error - 仅会话消息
+			entry.handlerType = handlerTypeSessionOnly
+		} else {
+			// (actor, ctx, request) error - 异步消息
+			entry.handlerType = handlerTypeAsync
+			requestType, isByte, err := parseRequestType(param1Type)
+			if err != nil {
+				return entry, err
+			}
+			entry.requestType = requestType
+			entry.isByteRequest = isByte
 		}
-		entry.handlerType = handlerTypeAsync
-		requestType, isByte, err := parseRequestType(param1Type)
-		if err != nil {
-			return entry, err
-		}
-		entry.requestType = requestType
-		entry.isByteRequest = isByte
 
 	case 3:
-		// (actor, ctx, param1, param2) error
+		// 检查第二个参数类型
 		param1Type := methodType.In(2)
 		param2Type := methodType.In(3)
 
 		if param1Type == typeOfSession {
-			// (actor, ctx, session, request) error - 客户端消息
-			entry.handlerType = handlerTypeClient
-			//  todo 可能只有一个session参数
+			// (actor, ctx, session *session.Session, request) error - 会话消息
+			entry.handlerType = handlerTypeSession
 			requestType, isByte, err := parseRequestType(param2Type)
 			if err != nil {
 				return entry, err
@@ -214,12 +211,14 @@ func (r *Router) Handle(ctx iface.IContext, methodName string, session iface.ISe
 	}
 
 	switch entry.handlerType {
-	case handlerTypeClient:
-		return r.handleClientMessage(ctx, methodName, session, data, entry)
 	case handlerTypeSync:
 		return r.handleSyncMessage(ctx, methodName, data, entry)
 	case handlerTypeAsync:
 		return r.handleAsyncMessage(ctx, methodName, data, entry)
+	case handlerTypeSession:
+		return r.handleSessionMessage(ctx, methodName, session, data, entry)
+	case handlerTypeSessionOnly:
+		return r.handleSessionOnlyMessage(ctx, methodName, session, entry)
 	default:
 		return nil, ErrUnknownHandlerType
 	}
@@ -253,20 +252,19 @@ func (r *Router) buildCallArgs(ctx iface.IContext, entry routerEntry, session if
 
 	callArgs := []reflect.Value{reflect.ValueOf(actor), reflect.ValueOf(ctx)}
 
-	// 客户端消息需要 session
-	if entry.handlerType == handlerTypeClient {
-		if session == nil {
-			return nil, ErrSessionIsNil
-		}
+	// 会话消息需要 session 参数
+	if entry.handlerType == handlerTypeSession || entry.handlerType == handlerTypeSessionOnly {
 		callArgs = append(callArgs, reflect.ValueOf(session))
 	}
 
-	// 反序列化请求参数
-	requestValue, err := r.createRequestValue(entry.requestType, entry.isByteRequest, data, ctx)
-	if err != nil {
-		return nil, err
+	// 反序列化请求参数（仅当需要request时）
+	if entry.handlerType != handlerTypeSessionOnly {
+		requestValue, err := r.createRequestValue(entry.requestType, entry.isByteRequest, data, ctx)
+		if err != nil {
+			return nil, err
+		}
+		callArgs = append(callArgs, requestValue)
 	}
-	callArgs = append(callArgs, requestValue)
 
 	// 同步消息需要 response
 	if entry.handlerType == handlerTypeSync {
@@ -275,15 +273,6 @@ func (r *Router) buildCallArgs(ctx iface.IContext, entry routerEntry, session if
 	}
 
 	return callArgs, nil
-}
-
-// handleClientMessage 处理客户端消息
-func (r *Router) handleClientMessage(ctx iface.IContext, methodName string, session iface.ISession, data []byte, entry routerEntry) ([]byte, error) {
-	callArgs, err := r.buildCallArgs(ctx, entry, session, data)
-	if err != nil {
-		return nil, err
-	}
-	return r.callHandler(entry.handler, callArgs)
 }
 
 // handleSyncMessage 处理同步消息
@@ -314,6 +303,24 @@ func (r *Router) handleSyncMessage(ctx iface.IContext, methodName string, data [
 // handleAsyncMessage 处理异步消息
 func (r *Router) handleAsyncMessage(ctx iface.IContext, methodName string, data []byte, entry routerEntry) ([]byte, error) {
 	callArgs, err := r.buildCallArgs(ctx, entry, nil, data)
+	if err != nil {
+		return nil, err
+	}
+	return r.callHandler(entry.handler, callArgs)
+}
+
+// handleSessionMessage 处理会话消息
+func (r *Router) handleSessionMessage(ctx iface.IContext, methodName string, session iface.ISession, data []byte, entry routerEntry) ([]byte, error) {
+	callArgs, err := r.buildCallArgs(ctx, entry, session, data)
+	if err != nil {
+		return nil, err
+	}
+	return r.callHandler(entry.handler, callArgs)
+}
+
+// handleSessionOnlyMessage 处理仅会话消息（无request参数）
+func (r *Router) handleSessionOnlyMessage(ctx iface.IContext, methodName string, session iface.ISession, entry routerEntry) ([]byte, error) {
+	callArgs, err := r.buildCallArgs(ctx, entry, session, nil)
 	if err != nil {
 		return nil, err
 	}
