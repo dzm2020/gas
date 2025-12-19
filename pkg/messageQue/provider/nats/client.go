@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"gas/pkg/lib/glog"
+	"gas/pkg/glog"
 	"gas/pkg/messageQue"
 	"gas/pkg/messageQue/iface"
 	"strings"

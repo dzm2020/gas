@@ -1,6 +1,7 @@
 package iface
 
 import (
+	discovery "gas/pkg/discovery/iface"
 	"gas/pkg/lib"
 	"time"
 )
@@ -33,7 +34,7 @@ type (
 		SubmitTaskAndWait(to interface{}, task Task, timeout time.Duration) (err error)
 		Send(message *ActorMessage) (err error)
 		Call(message *ActorMessage) (data []byte, err error)
-		GenPid(to interface{}, strategy RouteStrategy) *Pid
+		GenPid(to interface{}, strategy discovery.RouteStrategy) *Pid
 		Shutdown(timeout time.Duration) error
 	}
 
@@ -50,6 +51,7 @@ type (
 		Message() *ActorMessage
 		Process() IProcess
 		Shutdown() error
+		Node() INode // 获取节点引用，用于序列化等操作
 	}
 	IActor interface {
 		OnInit(ctx IContext, params []interface{}) error
@@ -61,6 +63,14 @@ type (
 		Handle(ctx IContext, methodName string, session ISession, data []byte) ([]byte, error)
 		HasRoute(methodName string) bool
 		AutoRegister(actor IActor)
+	}
+
+	ISession interface {
+		SetContext(ctx IContext)
+		Response(request interface{}) error
+		ResponseCode(code int64) error
+		Push(cmd, act uint16, request interface{}) error
+		Close() error
 	}
 )
 

@@ -1,7 +1,7 @@
 package actor
 
 import (
-	"gas/internal/errs"
+	"errors"
 	"gas/internal/iface"
 	discovery "gas/pkg/discovery/iface"
 	"gas/pkg/lib"
@@ -11,17 +11,51 @@ import (
 	"github.com/duke-git/lancet/v2/maputil"
 )
 
+var (
+	// ErrProcessExiting 进程正在退出
+	ErrProcessExiting = errors.New("process is exiting")
+	// ErrProcessNotFound 进程未找到
+	ErrProcessNotFound = errors.New("process not found")
+	// ErrTaskIsNil 任务为空
+	ErrTaskIsNil = errors.New("task is nil")
+	// ErrMessageIsNil 消息为空
+	ErrMessageIsNil = errors.New("message is nil")
+	// ErrSystemShuttingDown 系统正在关闭
+	ErrSystemShuttingDown = errors.New("system is shutting down")
+
+	ErrNameCannotBeEmpty = errors.New("name cannot be empty")
+
+	ErrNameChangeNotAllowed = errors.New("name change not allowed")
+
+	ErrNameAlreadyRegistered = errors.New("name already registered")
+)
+
+// ProcessIdentifier 进程标识符类型约束
+// 支持 string（名字）或 *iface.Pid
+type ProcessIdentifier interface {
+	string | *iface.Pid
+}
+
+const (
+	// DefaultDispatcherThroughput 默认调度器吞吐量
+	DefaultDispatcherThroughput = 1024
+	// DefaultShutdownTimeout 默认关闭超时时间
+	DefaultShutdownTimeout = 30 * time.Second
+)
+
 // System 管理本地 Actor 进程系统
 type System struct {
 	uniqId       atomic.Uint64
 	processDict  *maputil.ConcurrentMap[uint64, iface.IProcess] // ID到进程的映射
 	nameDict     *maputil.ConcurrentMap[string, *iface.Pid]     // 名字到进程ID的映射
 	shuttingDown atomic.Bool
+	node         iface.INode
 }
 
 // NewSystem 创建新的 Actor 系统实例
-func NewSystem() *System {
+func NewSystem(node iface.INode) *System {
 	return &System{
+		node:        node,
 		uniqId:      atomic.Uint64{},
 		processDict: maputil.NewConcurrentMap[uint64, iface.IProcess](10),
 		nameDict:    maputil.NewConcurrentMap[string, *iface.Pid](10),
@@ -32,7 +66,7 @@ func NewSystem() *System {
 
 // Spawn 创建新的 Actor 进程
 func (s *System) Spawn(actor iface.IActor, args ...interface{}) *iface.Pid {
-	node := iface.GetNode()
+	node := s.node
 	pid := iface.NewPid(node.GetID(), s.uniqId.Add(1))
 
 	ctx := &actorContext{
@@ -40,13 +74,15 @@ func (s *System) Spawn(actor iface.IActor, args ...interface{}) *iface.Pid {
 		pid:     pid,
 		actor:   actor,
 		router:  GetRouterForActor(actor),
+		node:    node, // 注入 node 引用
+		system:  s,    // 注入 system 引用
 	}
 
 	mailBox := NewMailbox()
 	process := NewProcess(ctx, mailBox)
 	ctx.process = process
 
-	mailBox.RegisterHandlers(ctx, NewDefaultDispatcher(1024))
+	mailBox.RegisterHandlers(ctx, NewDefaultDispatcher(DefaultDispatcherThroughput))
 	s.Add(pid, process)
 
 	_ = s.SubmitTask(pid, func(ctx iface.IContext) error {
@@ -71,6 +107,7 @@ func (s *System) Remove(pid *iface.Pid) {
 }
 
 // GetProcess 根据标识符获取进程，支持 string 名字或 *iface.Pid
+// 为了保持接口兼容性，保留 interface{} 参数
 func (s *System) GetProcess(to interface{}) iface.IProcess {
 	if to == nil {
 		return nil
@@ -124,28 +161,31 @@ func (s *System) GetAllProcesses() []iface.IProcess {
 // Named 为进程注册名字
 func (s *System) Named(name string, pid *iface.Pid) error {
 	if len(name) == 0 {
-		return errs.ErrNameCannotBeEmpty()
+		return ErrNameCannotBeEmpty
 	}
-	// 检查：如果进程已经有名字，不允许修改
+
 	if pid.GetName() != "" {
-		return errs.ErrNameChangeNotAllowed()
+		return ErrNameChangeNotAllowed
 	}
-	// 检查：名字是否已被其他进程注册
+
 	if s.HasName(name) {
-		return errs.ErrNameAlreadyRegistered(name)
+		return ErrNameAlreadyRegistered
 	}
-	// 注册名字：更新 pid 的名称
+
 	pid.Name = name
-	// 在本地注册新名称
 	s.nameDict.Set(name, pid)
-	// 全局名字注册
-	node := iface.GetNode()
-	cluster := node.Cluster()
-	if pid.IsGlobalName() {
-		node.AddTag(name)
-		_ = cluster.UpdateMember()
+
+	if !pid.IsGlobalName() {
+		return nil
 	}
-	return nil
+
+	return s.clusterNamed(name)
+}
+
+func (s *System) clusterNamed(name string) error {
+	cluster := s.node.Cluster()
+	s.node.AddTag(name)
+	return cluster.UpdateMember()
 }
 
 // HasName 检查名字是否已注册
@@ -163,32 +203,37 @@ func (s *System) Unname(pid *iface.Pid) {
 	name := pid.GetName()
 	s.nameDict.Delete(name)
 
-	if pid.IsGlobalName() {
-		node := iface.GetNode()
-		cluster := node.Cluster()
-		node.RemoteTag(name)
-		_ = cluster.UpdateMember()
+	if !pid.IsGlobalName() {
+		return
 	}
+
+	_ = s.clusterNamed(name)
+}
+
+func (s *System) clusterUnname(name string) {
+	cluster := s.node.Cluster()
+	s.node.RemoteTag(name)
+	_ = cluster.UpdateMember()
 }
 
 // ==================== 消息发送 ====================
 
 // Call 同步调用 Actor，等待响应
 func (s *System) Call(message *iface.ActorMessage) ([]byte, error) {
-	if message.GetTo().IsLocal() {
+	if message.GetTo().GetNodeId() == s.node.GetID() {
 		return s.localCall(message)
 	}
-	node := iface.GetNode()
+	node := s.node
 	cluster := node.Cluster()
 	return cluster.Call(message)
 }
 
 // Send 异步发送消息给 Actor
 func (s *System) Send(message *iface.ActorMessage) error {
-	if message.GetTo().IsLocal() {
+	if message.GetTo().GetNodeId() == s.node.GetID() {
 		return s.localSend(message)
 	}
-	node := iface.GetNode()
+	node := s.node
 	cluster := node.Cluster()
 	return cluster.Send(message)
 }
@@ -230,23 +275,40 @@ func (s *System) SubmitTaskAndWait(to interface{}, task iface.Task, timeout time
 	deadline := time.Now().Add(timeout).Unix()
 	waiter := lib.NewChanWaiter(deadline)
 
-	var err error
+	// 使用通道传递错误，避免闭包中的竞态条件
+	errCh := make(chan error, 1)
 	syncTask := func(ctx iface.IContext) error {
+		var taskErr error
 		if task != nil {
-			err = task(ctx)
+			taskErr = task(ctx)
+		}
+		// 非阻塞发送错误
+		select {
+		case errCh <- taskErr:
+		default:
 		}
 		waiter.Done()
-		return err
+		return taskErr
 	}
 
 	msg := iface.NewTaskMessage(syncTask)
-	if err = s.sendToProcess(to, msg); err != nil {
+	if err := s.sendToProcess(to, msg); err != nil {
 		waiter.Done()
 		return err
 	}
 
-	err = waiter.Wait()
-	return err
+	// 等待任务完成或超时
+	if err := waiter.Wait(); err != nil {
+		return err
+	}
+
+	// 获取任务执行错误
+	select {
+	case err := <-errCh:
+		return err
+	default:
+		return nil
+	}
 }
 
 // ==================== 辅助方法 ====================
@@ -261,7 +323,7 @@ func (s *System) GenPid(to interface{}, strategy discovery.RouteStrategy) *iface
 	// 选择远程
 	switch v := to.(type) {
 	case string:
-		node := iface.GetNode()
+		node := s.node
 		cluster := node.Cluster()
 		nodeId := cluster.Select(v, strategy)
 		return iface.NewPidWithName(v, nodeId)
@@ -277,7 +339,7 @@ func (s *System) sendToProcess(to, msg interface{}) error {
 
 	process := s.GetProcess(to)
 	if process == nil {
-		return errs.ErrProcessNotFound
+		return ErrProcessNotFound
 	}
 	return process.Input(msg)
 }
@@ -285,7 +347,7 @@ func (s *System) sendToProcess(to, msg interface{}) error {
 // checkShuttingDown 检查系统是否正在关闭
 func (s *System) checkShuttingDown() error {
 	if s.shuttingDown.Load() {
-		return errs.ErrSystemShuttingDown
+		return ErrSystemShuttingDown
 	}
 	return nil
 }

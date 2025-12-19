@@ -3,8 +3,8 @@ package consul
 import (
 	"context"
 	"gas/pkg/discovery/iface"
+	"gas/pkg/glog"
 	"gas/pkg/lib"
-	"gas/pkg/lib/glog"
 	"time"
 
 	"github.com/duke-git/lancet/v2/convertor"

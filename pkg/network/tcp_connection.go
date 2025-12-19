@@ -2,8 +2,8 @@ package network
 
 import (
 	"context"
+	"gas/pkg/glog"
 	"gas/pkg/lib"
-	"gas/pkg/lib/glog"
 	"net"
 	"time"
 

@@ -1,7 +1,6 @@
 package actor
 
 import (
-	"gas/internal/errs"
 	"gas/internal/iface"
 	"sync/atomic"
 )
@@ -32,7 +31,7 @@ func (p *Process) Context() iface.IContext {
 // checkShutdown 检查进程是否正在退出
 func (p *Process) checkShutdown() error {
 	if p.shutdown.Load() {
-		return errs.ErrProcessExiting
+		return ErrProcessExiting
 	}
 	return nil
 }
@@ -40,12 +39,12 @@ func (p *Process) checkShutdown() error {
 // validateMessage 验证消息是否合法
 func (p *Process) validateMessage(message interface{}) error {
 	if message == nil {
-		return errs.ErrMessageIsNil
+		return ErrMessageIsNil
 	}
 	// 使用 IMessageValidator 接口验证消息
 	if validator, ok := message.(iface.IMessageValidator); ok {
 		if err := validator.Validate(); err != nil {
-			return errs.ErrInvalidMessage(err)
+			return err
 		}
 	}
 	return nil

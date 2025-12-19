@@ -2,8 +2,8 @@ package actor
 
 import (
 	"gas/internal/iface"
+	"gas/pkg/glog"
 	"gas/pkg/lib"
-	"gas/pkg/lib/glog"
 	"runtime"
 	"sync/atomic"
 

@@ -3,8 +3,8 @@ package network
 import (
 	"context"
 	"fmt"
+	"gas/pkg/glog"
 	"gas/pkg/lib"
-	"gas/pkg/lib/glog"
 	"net"
 	"sync"
 	"sync/atomic"

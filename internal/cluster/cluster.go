@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"gas/internal/iface"
 	discovery "gas/pkg/discovery/iface"
+	"gas/pkg/glog"
 	"gas/pkg/lib"
-	"gas/pkg/lib/glog"
 	messageQue "gas/pkg/messageQue/iface"
 	"time"
 
@@ -16,29 +16,37 @@ import (
 	"golang.org/x/exp/slices"
 )
 
+var (
+	MethodNotImplemented = errors.New("cluster push task not yet implemented")
+	NotFoundMember       = errors.New("not found member")
+)
+
 var _ iface.ICluster = (*Cluster)(nil)
 
-func New(discovery discovery.IDiscovery, messageQue messageQue.IMessageQue, subjectPrefix string) *Cluster {
+// New 创建集群通信管理器
+func New(node iface.INode, discovery discovery.IDiscovery, messageQue messageQue.IMessageQue, subjectPrefix string) *Cluster {
 	return &Cluster{
-		discovery:         discovery,
-		messageQue:        messageQue,
-		nodeSubjectPrefix: subjectPrefix,
+		node:       node,
+		discovery:  discovery,
+		messageQue: messageQue,
+		prefix:     subjectPrefix,
 	}
 }
 
 // Cluster 集群通信管理器，负责处理跨节点的消息传递
 type Cluster struct {
-	discovery         discovery.IDiscovery
-	messageQue        messageQue.IMessageQue
-	nodeSubjectPrefix string
+	discovery  discovery.IDiscovery
+	messageQue messageQue.IMessageQue
+	prefix     string
+	node       iface.INode // 保存 node 引用，避免全局状态
 }
 
 func (r *Cluster) PushTask(pid *iface.Pid, f iface.Task) error {
-	return errors.New("cluster push task not yet implemented")
+	return MethodNotImplemented
 }
 
 func (r *Cluster) PushTaskAndWait(pid *iface.Pid, timeout time.Duration, task iface.Task) error {
-	return errors.New("cluster push task not yet implemented")
+	return MethodNotImplemented
 }
 
 func (r *Cluster) Start(ctx context.Context) error {
@@ -48,22 +56,21 @@ func (r *Cluster) Start(ctx context.Context) error {
 	if err := r.discovery.Run(ctx); err != nil {
 		return err
 	}
-	if err := r.discovery.Add(iface.GetNode().Info()); err != nil {
+	if err := r.discovery.Add(r.node.Info()); err != nil {
 		return err
 	}
-	if err := r.listen(); err != nil {
+	if err := r.init(); err != nil {
 		return err
 	}
 	return nil
 }
 
 func (r *Cluster) makeTopic(nodeId uint64) string {
-	return fmt.Sprintf("%s%d", r.nodeSubjectPrefix, nodeId)
+	return fmt.Sprintf("%s%d", r.prefix, nodeId)
 }
 
-func (r *Cluster) listen() error {
-	node := iface.GetNode()
-	nodeId := node.GetID()
+func (r *Cluster) init() error {
+	nodeId := r.node.GetID()
 	handler := func(data []byte, reply func([]byte) error) {
 		if err := r.onRemoteProcess(data, reply); err != nil {
 			glog.Error("集群通信: 处理集群消息失败", zap.Error(err))
@@ -76,11 +83,13 @@ func (r *Cluster) listen() error {
 
 // onRemoteProcess 处理集群消息
 func (r *Cluster) onRemoteProcess(data []byte, reply func([]byte) error) error {
-	node := iface.GetNode()
-	system := node.System()
+	system := r.node.System()
 
 	message := &iface.Message{}
-	node.Unmarshal(data, message)
+	if err := r.node.Unmarshal(data, message); err != nil {
+		_ = r.response(reply, err, nil)
+		return err
+	}
 
 	glog.Debug("集群通信: 处理集群消息", zap.Any("message", message))
 
@@ -90,105 +99,115 @@ func (r *Cluster) onRemoteProcess(data []byte, reply func([]byte) error) error {
 		return system.Send(msg)
 	}
 
-	bin, w := system.Call(msg)
-
-	response := &iface.Response{
-		Data:  bin,
-		Error: w.Error(),
+	bin, err := system.Call(msg)
+	if err != nil {
+		_ = r.response(reply, err, nil)
+		return err
 	}
-	if reply != nil {
-		return reply(node.Marshal(response))
-	}
-
-	return nil
+	return r.response(reply, err, bin)
 }
 
-// sendError 发送错误响应
-func (r *Cluster) sendError(reply func([]byte) error, err error) {
+func (r *Cluster) response(reply func([]byte) error, err error, data []byte) error {
 	if reply == nil {
-		return
+		return nil
 	}
-	glog.Error("集群通信: 发送错误响应", zap.Error(err))
-	errorResponse := iface.NewErrorResponse(err)
-	if w := reply(iface.GetNode().Marshal(errorResponse)); w != nil {
-		glog.Error("集群通信: 回复消息", zap.Error(w))
+
+	response := &iface.Response{
+		Data: data,
 	}
+	if err != nil {
+		response.ErrMsg = err.Error()
+	}
+
+	bytes, marshalErr := r.node.Marshal(response)
+	if marshalErr != nil {
+		return marshalErr
+	}
+
+	return reply(bytes)
 }
 
 // Send 发送消息到集群节点
-func (r *Cluster) Send(rpcMessage *iface.ActorMessage) (err error) {
-	if err = rpcMessage.Validate(); err != nil {
+func (r *Cluster) Send(msg *iface.ActorMessage) (err error) {
+	if err = msg.Validate(); err != nil {
 		return
 	}
 
-	toNodeId := rpcMessage.To.GetNodeId()
+	toNodeId := msg.To.GetNodeId()
 
 	if m := r.discovery.GetById(toNodeId); m == nil {
-		err = errors.New("not found member")
+		err = NotFoundMember
 		return
 	}
 
-	data := iface.GetNode().Marshal(rpcMessage)
+	data, mErr := r.node.Marshal(msg)
+	if mErr != nil {
+		return mErr
+	}
 	subject := r.makeTopic(toNodeId)
 
 	return r.messageQue.Publish(subject, data)
 }
 
-func (r *Cluster) Call(rpcMessage *iface.ActorMessage) (bin []byte, err error) {
-	node := iface.GetNode()
-
-	if err = rpcMessage.Validate(); err != nil {
+func (r *Cluster) Call(msg *iface.ActorMessage) (bin []byte, err error) {
+	if err = msg.Validate(); err != nil {
 		return
 	}
 
-	toNodeId := rpcMessage.To.GetNodeId()
+	toNodeId := msg.To.GetNodeId()
 
 	if m := r.discovery.GetById(toNodeId); m == nil {
-		err = errors.New("not found member")
+		err = NotFoundMember
 		return
 	}
 
-	data := node.Marshal(rpcMessage.Message)
-	subject := r.makeTopic(toNodeId)
-
-	bytes, w := r.messageQue.Request(subject, data, lib.NowDelay(rpcMessage.Deadline, 0))
+	data, w := r.node.Marshal(msg.Message)
 	if w != nil {
 		err = w
 		return
 	}
 
-	response := &iface.Response{}
-	node.Unmarshal(bytes, response)
+	subject := r.makeTopic(toNodeId)
+	bytes, w := r.messageQue.Request(subject, data, lib.NowDelay(msg.GetDeadline(), 0))
+	if w != nil {
+		w = err
+		return
+	}
 
-	bin, err = response.Data, errors.New(response.Error)
+	response := &iface.Response{}
+	if err = r.node.Unmarshal(bytes, response); err != nil {
+		return
+	}
+
+	bin = response.GetData()
+	err = response.GetError()
 	return
 }
 
 func (r *Cluster) UpdateMember() error {
-	return r.discovery.Add(iface.GetNode().Info())
+	return r.discovery.Add(r.node.Info())
 }
 
 func (r *Cluster) Select(service string, strategy discovery.RouteStrategy) uint64 {
 	if strategy == nil {
 		strategy = discovery.RouteRandom
 	}
-
 	// 通过服务发现获取节点列表
 	members := r.discovery.GetAll()
 	if len(members) == 0 {
 		return 0
 	}
 
-	var filteredMembers []*discovery.Member
+	var selected []*discovery.Member
 	for _, node := range members {
 		if !slices.Contains(node.Tags, service) {
 			continue
 		}
-		filteredMembers = append(filteredMembers, node)
+		selected = append(selected, node)
 	}
 
 	// 使用路由策略选择节点
-	selectedNode := strategy(filteredMembers)
+	selectedNode := strategy(selected)
 	if selectedNode == nil {
 		return 0
 	}
@@ -202,19 +221,17 @@ func (r *Cluster) Broadcast(service string, message *iface.ActorMessage) {
 	if len(members) == 0 {
 		return
 	}
-	// 向所有节点发送消息
 	for _, member := range members {
 		if !slices.Contains(member.Tags, service) {
 			continue
 		}
-
-		rpcMessage := convertor.DeepClone(message)
-		rpcMessage.To = &iface.Pid{
+		msg := convertor.DeepClone(message)
+		msg.To = &iface.Pid{
 			NodeId: member.GetID(),
 			Name:   service,
 		}
 		// 发送消息
-		if err := r.Send(rpcMessage); err != nil {
+		if err := r.Send(msg); err != nil {
 			glog.Error("集群通信: 广播消息到节点失败", zap.Uint64("nodeId", member.GetID()), zap.String("kind", service), zap.Error(err))
 		}
 	}

@@ -1,14 +1,26 @@
 package actor
 
 import (
-	"gas/internal/errs"
+	"errors"
 	"gas/internal/iface"
-	"gas/pkg/lib/glog"
+	"gas/pkg/glog"
 	"reflect"
 	"sync"
 	"unicode"
 
 	"go.uber.org/zap"
+)
+
+// 路由相关错误
+var (
+	ErrMessageHandlerNotFound     = errors.New("actor message handler not found")
+	ErrHandlerReturnType          = errors.New("actor: handler return type must be error")
+	ErrSessionIsNil               = errors.New("actor: session is nil")
+	ErrActorIsNil                 = errors.New("actor: actor is nil")
+	ErrUnknownHandlerType         = errors.New("actor: unknown handler type")
+	ErrUnsupportedParameterCount  = errors.New("actor: unsupported parameter count")
+	ErrAsyncHandlerThirdParameter = errors.New("actor: async handler third parameter (request) must be pointer or []byte")
+	ErrSyncHandlerFourParameter   = errors.New("actor: sync handler fourth parameter (response) must be pointer")
 )
 
 var actorInterfaceMethods = map[string]bool{
@@ -122,7 +134,7 @@ func parseRequestType(requestType reflect.Type) (reflect.Type, bool, error) {
 	if requestType.Kind() == reflect.Pointer {
 		return requestType, false, nil
 	}
-	return nil, false, errs.ErrAsyncHandlerThirdParameter(requestType.String())
+	return nil, false, ErrAsyncHandlerThirdParameter
 }
 
 // createMethodEntry 为 actor 的方法创建路由条目
@@ -138,7 +150,7 @@ func (r *Router) createMethodEntry(method reflect.Method, methodType reflect.Typ
 		// (actor, ctx, request) error - 异步消息
 		param1Type := methodType.In(2)
 		if param1Type == typeOfSession {
-			return entry, errs.ErrUnsupportedParameterCount(numIn)
+			return entry, ErrUnsupportedParameterCount
 		}
 		entry.handlerType = handlerTypeAsync
 		requestType, isByte, err := parseRequestType(param1Type)
@@ -158,7 +170,7 @@ func (r *Router) createMethodEntry(method reflect.Method, methodType reflect.Typ
 			entry.handlerType = handlerTypeClient
 			requestType, isByte, err := parseRequestType(param2Type)
 			if err != nil {
-				return entry, errs.ErrClientHandlerFourthParameter(param2Type.String())
+				return entry, err
 			}
 			entry.requestType = requestType
 			entry.isByteRequest = isByte
@@ -167,24 +179,24 @@ func (r *Router) createMethodEntry(method reflect.Method, methodType reflect.Typ
 			entry.handlerType = handlerTypeSync
 			requestType, isByte, err := parseRequestType(param1Type)
 			if err != nil {
-				return entry, errs.ErrSyncHandlerThirdParameter(param1Type.String())
+				return entry, err
 			}
 			entry.requestType = requestType
 			entry.isByteRequest = isByte
 
 			if param2Type.Kind() != reflect.Pointer {
-				return entry, errs.ErrSyncHandlerFourthParameter(param2Type.String())
+				return entry, ErrSyncHandlerFourParameter
 			}
 			entry.responseType = param2Type
 		}
 
 	default:
-		return entry, errs.ErrUnsupportedParameterCount(numIn)
+		return entry, ErrUnknownHandlerType
 	}
 
 	// 检查返回值
 	if methodType.NumOut() != 1 || !methodType.Out(0).Implements(typeOfError) {
-		return entry, errs.ErrHandlerReturnType()
+		return entry, ErrHandlerReturnType
 	}
 
 	return entry, nil
@@ -197,7 +209,7 @@ func (r *Router) Handle(ctx iface.IContext, methodName string, session iface.ISe
 	r.mu.RUnlock()
 
 	if !ok {
-		return nil, errs.ErrMessageHandlerNotFound
+		return nil, ErrMessageHandlerNotFound
 	}
 
 	switch entry.handlerType {
@@ -208,7 +220,7 @@ func (r *Router) Handle(ctx iface.IContext, methodName string, session iface.ISe
 	case handlerTypeAsync:
 		return r.handleAsyncMessage(ctx, methodName, data, entry)
 	default:
-		return nil, errs.ErrUnknownHandlerType(0)
+		return nil, ErrUnknownHandlerType
 	}
 }
 
@@ -235,7 +247,7 @@ func (r *Router) HasRoute(methodName string) bool {
 func (r *Router) buildCallArgs(ctx iface.IContext, entry routerEntry, session iface.ISession, data []byte) ([]reflect.Value, error) {
 	actor := ctx.Actor()
 	if actor == nil {
-		return nil, errs.ErrActorIsNil()
+		return nil, ErrActorIsNil
 	}
 
 	callArgs := []reflect.Value{reflect.ValueOf(actor), reflect.ValueOf(ctx)}
@@ -243,7 +255,7 @@ func (r *Router) buildCallArgs(ctx iface.IContext, entry routerEntry, session if
 	// 客户端消息需要 session
 	if entry.handlerType == handlerTypeClient {
 		if session == nil {
-			return nil, errs.ErrSessionIsNil(0)
+			return nil, ErrSessionIsNil
 		}
 		callArgs = append(callArgs, reflect.ValueOf(session))
 	}
@@ -251,7 +263,7 @@ func (r *Router) buildCallArgs(ctx iface.IContext, entry routerEntry, session if
 	// 反序列化请求参数
 	requestValue, err := r.createRequestValue(entry.requestType, entry.isByteRequest, data, ctx)
 	if err != nil {
-		return nil, errs.ErrUnmarshalRequest(0, err)
+		return nil, err
 	}
 	callArgs = append(callArgs, requestValue)
 
@@ -290,7 +302,10 @@ func (r *Router) handleSyncMessage(ctx iface.IContext, methodName string, data [
 
 	// 序列化响应（response 是最后一个参数）
 	responseValue := callArgs[len(callArgs)-1]
-	responseData := iface.GetNode().Marshal(responseValue.Interface())
+	responseData, err := ctx.Node().Marshal(responseValue.Interface())
+	if err != nil {
+		return nil, err
+	}
 
 	return responseData, nil
 }
@@ -314,6 +329,8 @@ func (r *Router) createRequestValue(requestType reflect.Type, isByteRequest bool
 	// 其他类型（指针类型）需要反序列化
 	requestValue := reflect.New(requestType.Elem())
 
-	iface.GetNode().Unmarshal(data, requestValue.Interface())
+	if err := ctx.Node().Unmarshal(data, requestValue.Interface()); err != nil {
+		return reflect.Value{}, err
+	}
 	return requestValue, nil
 }

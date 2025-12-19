@@ -2,11 +2,12 @@ package node
 
 import (
 	"context"
+	"gas/internal/actor"
+	"gas/internal/cluster"
 	"gas/internal/config"
-	"gas/internal/errs"
 	"gas/internal/iface"
+	"gas/pkg/glog"
 	"gas/pkg/lib"
-	"gas/pkg/lib/glog"
 	"os"
 	"os/signal"
 	"runtime/debug"
@@ -83,46 +84,32 @@ func (n *Node) Serializer() lib.ISerializer {
 	return n.serializer
 }
 
-func (n *Node) Marshal(request interface{}) []byte {
-	// 处理 nil 情况
+func (n *Node) Marshal(request interface{}) ([]byte, error) {
 	if request == nil {
-		return []byte{}
+		return []byte{}, nil
 	}
 
-	// 如果已经是 []byte 类型，直接返回
 	if data, ok := request.([]byte); ok {
-		return data
+		return data, nil
 	}
 
-	// 使用序列化器序列化
-	if data, err := n.Serializer().Marshal(request); err != nil {
-		panic(err)
-	} else {
-		return data
-	}
+	return n.Serializer().Marshal(request)
 }
 
-func (n *Node) Unmarshal(data []byte, reply interface{}) {
-	// 如果数据为空，直接返回
+func (n *Node) Unmarshal(data []byte, reply interface{}) error {
 	if len(data) == 0 {
-		return
+		return nil
 	}
 
-	// 如果目标对象为空，直接返回
 	if reply == nil {
-		return
+		return nil
 	}
 
-	// 如果目标对象是指向 []byte 的指针，直接将数据赋值
 	if ptr, ok := reply.(*[]byte); ok {
 		*ptr = data
-		return
+		return nil
 	}
-
-	// 使用序列化器反序列化
-	if err := n.Serializer().Unmarshal(data, reply); err != nil {
-		panic(err)
-	}
+	return n.Serializer().Unmarshal(data, reply)
 }
 
 func (n *Node) GetConfig() *config.Config {
@@ -144,8 +131,8 @@ func (n *Node) Startup(comps ...iface.IComponent) error {
 	// 注册组件（注意顺序：glog 应该最先初始化，因为其他组件可能会使用日志）
 	components := []iface.IComponent{
 		NewLogComponent(),
-		NewActorComponent(),
-		NewRemoteComponent(),
+		actor.NewComponent(),
+		cluster.NewComponent(),
 	}
 
 	lib.SetPanicHandler(func(err interface{}) {
@@ -157,14 +144,14 @@ func (n *Node) Startup(comps ...iface.IComponent) error {
 
 	for _, comp := range components {
 		if err := n.ComponentManager.Register(comp); err != nil {
-			return errs.ErrRegisterComponentFailed(comp.Name(), err)
+			return err
 		}
 	}
 
 	// 启动所有组件
 	ctx := context.Background()
-	if err := n.ComponentManager.Start(ctx); err != nil {
-		return errs.ErrStartComponentFailed(err)
+	if err := n.ComponentManager.Start(ctx, n); err != nil {
+		return err
 	}
 
 	glog.Info("节点启动完成")
@@ -203,6 +190,9 @@ func (n *Node) shutdown(ctx context.Context) error {
 	n.actorSystem = nil
 	n.ComponentManager = nil
 
-	timeoutCtx, _ := context.WithTimeout(ctx, time.Second*30)
+	// 使用默认关闭超时时间
+	shutdownTimeout := 30 * time.Second
+	timeoutCtx, cancel := context.WithTimeout(ctx, shutdownTimeout)
+	defer cancel()
 	return lib.ShutdownGoroutines(timeoutCtx)
 }

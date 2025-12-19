@@ -1,6 +1,7 @@
 package session
 
 import (
+	"fmt"
 	"gas/internal/iface"
 
 	"github.com/duke-git/lancet/v2/convertor"
@@ -10,6 +11,15 @@ const (
 	PushMessageToClientMethod   = "PushMessageToClient"
 	CloseClientConnectionMethod = "CloseClientConnection"
 )
+
+func NewWithPid(pid *iface.Pid, entityId int64) *Session {
+	return &Session{
+		Session: &iface.Session{
+			Agent:    pid,
+			EntityId: entityId,
+		},
+	}
+}
 
 func New(session *iface.Session) *Session {
 	return &Session{
@@ -27,7 +37,11 @@ func (a *Session) SetContext(ctx iface.IContext) {
 }
 
 func (a *Session) Response(request interface{}) error {
-	bin := iface.GetNode().Marshal(request)
+	node := a.ctx.Node()
+	bin, err := node.Marshal(request)
+	if err != nil {
+		return fmt.Errorf("marshal request failed: %w", err)
+	}
 	message := iface.NewActorMessage(a.ctx.ID(), a.GetAgent(), PushMessageToClientMethod, bin)
 	message.Session = convertor.DeepClone(a.Session)
 	return a.send(message)
@@ -41,7 +55,11 @@ func (a *Session) ResponseCode(code int64) error {
 }
 
 func (a *Session) Push(cmd, act uint16, request interface{}) error {
-	bin := iface.GetNode().Marshal(request)
+	node := a.ctx.Node()
+	bin, err := node.Marshal(request)
+	if err != nil {
+		return fmt.Errorf("marshal request failed: %w", err)
+	}
 	message := iface.NewActorMessage(a.ctx.ID(), a.GetAgent(), PushMessageToClientMethod, bin)
 	message.Session = convertor.DeepClone(a.Session)
 	message.Session.Cmd = uint32(cmd)
@@ -54,7 +72,7 @@ func (a *Session) send(message *iface.ActorMessage) error {
 	if a.GetAgent() == a.ctx.ID() {
 		return a.ctx.InvokerMessage(message)
 	} else {
-		node := iface.GetNode()
+		node := a.ctx.Node()
 		system := node.System()
 		return system.Send(message)
 	}

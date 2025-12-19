@@ -2,13 +2,8 @@ package node
 
 import (
 	"context"
-	"gas/internal/actor"
-	"gas/internal/cluster"
 	"gas/internal/iface"
-	discoveryFactory "gas/pkg/discovery"
-	"gas/pkg/lib/glog"
-	messageQueFactory "gas/pkg/messageQue"
-	"time"
+	logger "gas/pkg/glog"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -26,96 +21,27 @@ func NewLogComponent() iface.IComponent {
 func (c *LogComponent) Name() string {
 	return "log"
 }
-func (c *LogComponent) Start(ctx context.Context) error {
+func (c *LogComponent) Start(ctx context.Context, node iface.INode) error {
 
-	cfg := iface.GetNode().GetConfig()
+	cfg := node.GetConfig()
 
 	// 使用节点配置中的 glog 配置初始化
-	if err := glog.InitFromConfig(cfg.Logger); err != nil {
+	if err := logger.InitFromConfig(cfg.Logger); err != nil {
 		return err
 	}
 	options := []zap.Option{
-		zap.Fields(zap.String("nodeKind", iface.GetNode().GetKind()), zap.Uint64("nodeId", iface.GetNode().GetID())),
+		zap.Fields(zap.String("nodeKind", node.GetKind()), zap.Uint64("nodeId", node.GetID())),
 		zap.Hooks(func(entry zapcore.Entry) error {
 			if entry.Level >= zap.DPanicLevel {
-				iface.GetNode().CallPanicHook(entry)
+				node.CallPanicHook(entry)
 			}
 			return nil
 		}),
 	}
-	glog.WithOptions(options...)
+	logger.WithOptions(options...)
 	return nil
 }
 func (c *LogComponent) Stop(ctx context.Context) error {
-	glog.Stop()
+	logger.Stop()
 	return nil
-}
-
-// RemoteComponent 集群通信组件
-type RemoteComponent struct {
-	iface.ICluster
-}
-
-// NewRemoteComponent 创建 remote 组件
-func NewRemoteComponent() *RemoteComponent {
-	c := &RemoteComponent{}
-	return c
-}
-
-func (r *RemoteComponent) Name() string {
-	return "cluster"
-}
-
-func (r *RemoteComponent) Start(ctx context.Context) error {
-	config := iface.GetNode().GetConfig()
-	// 创建服务发现实例
-	discoveryInstance, err := discoveryFactory.NewFromConfig(*config.Remote.Discovery)
-	if err != nil {
-		return err
-	}
-
-	// 创建集群通信管理器
-	messageQueue, err := messageQueFactory.NewFromConfig(*config.Remote.MessageQueue)
-	if err != nil {
-		return err
-	}
-
-	r.ICluster = cluster.New(discoveryInstance, messageQueue, config.Remote.SubjectPrefix)
-	//  建立引用
-	iface.GetNode().SetCluster(r.ICluster)
-	//  注册节点并订阅
-	if err = r.ICluster.Start(ctx); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (r *RemoteComponent) Stop(ctx context.Context) error {
-	iface.GetNode().SetCluster(nil)
-	return r.ICluster.Shutdown(ctx)
-}
-
-// ActorComponent actor 系统组件适配器
-type ActorComponent struct {
-	iface.ISystem
-}
-
-// NewActorComponent 创建 actor 组件
-func NewActorComponent() *ActorComponent {
-	return &ActorComponent{}
-}
-
-func (a *ActorComponent) Name() string {
-	return "actorSystem"
-}
-
-func (a *ActorComponent) Start(ctx context.Context) error {
-	a.ISystem = actor.NewSystem()
-	iface.GetNode().SetSystem(a.ISystem)
-	return nil
-}
-
-func (a *ActorComponent) Stop(ctx context.Context) error {
-	iface.GetNode().SetSystem(nil)
-	return a.ISystem.Shutdown(10 * time.Second)
 }

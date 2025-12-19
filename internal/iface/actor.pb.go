@@ -176,7 +176,7 @@ func (x *Message) GetDeadline() int64 {
 type Response struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Data          []byte                 `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
-	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
+	ErrMsg        string                 `protobuf:"bytes,2,opt,name=errMsg,proto3" json:"errMsg,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -218,9 +218,9 @@ func (x *Response) GetData() []byte {
 	return nil
 }
 
-func (x *Response) GetError() string {
+func (x *Response) GetErrMsg() string {
 	if x != nil {
-		return x.Error
+		return x.ErrMsg
 	}
 	return ""
 }
@@ -335,10 +335,10 @@ const file_actor_proto_rawDesc = "" +
 	"\x04data\x18\x04 \x01(\fR\x04data\x12\x14\n" +
 	"\x05async\x18\x05 \x01(\bR\x05async\x12(\n" +
 	"\asession\x18\x06 \x01(\v2\x0e.actor.SessionR\asession\x12\x1a\n" +
-	"\bdeadline\x18\a \x01(\x03R\bdeadline\"4\n" +
+	"\bdeadline\x18\a \x01(\x03R\bdeadline\"6\n" +
 	"\bResponse\x12\x12\n" +
-	"\x04data\x18\x01 \x01(\fR\x04data\x12\x14\n" +
-	"\x05error\x18\x02 \x01(\tR\x05error\"\xad\x01\n" +
+	"\x04data\x18\x01 \x01(\fR\x04data\x12\x16\n" +
+	"\x06errMsg\x18\x02 \x01(\tR\x06errMsg\"\xad\x01\n" +
 	"\aSession\x12 \n" +
 	"\x05agent\x18\x01 \x01(\v2\n" +
 	".actor.PidR\x05agent\x12\x1a\n" +

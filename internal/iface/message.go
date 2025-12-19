@@ -1,8 +1,18 @@
 package iface
 
 import (
-	"gas/internal/errs"
+	"errors"
+	"fmt"
 	"gas/pkg/lib"
+)
+
+var (
+	ErrMessageMethodIsNil   = fmt.Errorf("msg method is nil")
+	ErrTaskMessageIsNil     = errors.New("task message is nil")
+	ErrTaskIsNilInMsg       = errors.New("task is nil")
+	ErrMessageTargetIsNil   = errors.New("message target (To) is nil")
+	ErrMessageTargetInvalid = errors.New("message target (To) is invalid: both serviceId and name are empty")
+	ErrSyncMessageIsNil     = errors.New("sync message is nil")
 )
 
 // 编译时检查，确保所有消息类型都实现了 IMessageValidator 接口
@@ -17,15 +27,6 @@ type (
 	}
 	TaskMessage struct {
 		Task Task
-	}
-
-	ISession interface {
-		SetContext(ctx IContext)
-		Response(request interface{}) error
-		ResponseCode(code int64) error
-		Forward(to interface{}, method string) error
-		Push(cmd, act uint16, request interface{}) error
-		Close() error
 	}
 
 	ActorMessage struct {
@@ -45,10 +46,10 @@ func NewTaskMessage(task Task) *TaskMessage {
 // Validate 验证任务消息是否合法
 func (m *TaskMessage) Validate() error {
 	if m == nil {
-		return errs.ErrTaskMessageIsNil
+		return ErrTaskMessageIsNil
 	}
 	if m.Task == nil {
-		return errs.ErrTaskIsNilInMsg
+		return ErrTaskIsNilInMsg
 	}
 	return nil
 }
@@ -69,20 +70,20 @@ func NewActorMessage(from, to *Pid, methodName string, data []byte) *ActorMessag
 // Validate 验证同步消息是否合法
 func (m *ActorMessage) Validate() error {
 	if m == nil {
-		return errs.ErrSyncMessageIsNil
+		return ErrSyncMessageIsNil
 	}
 	// 验证目标进程
 	if m.GetTo() == nil {
-		return errs.ErrMessageTargetIsNil
+		return ErrMessageTargetIsNil
 	}
 
 	if m.GetMethod() == "" {
-		return errs.ErrMessageMethodIsNil
+		return ErrMessageMethodIsNil
 	}
 
 	// 验证目标进程 ID 是否有效
 	if m.GetTo().GetServiceId() == 0 && m.GetTo().GetName() == "" {
-		return errs.ErrMessageTargetInvalid
+		return ErrMessageTargetInvalid
 	}
 
 	return nil
@@ -99,15 +100,6 @@ func (m *ActorMessage) SetResponse(f ResponseFunc) {
 	m.response = f
 }
 
-// NewErrorResponse 创建错误响应消息
-// errMsg: 错误消息
-// 返回: 错误响应消息对象
-func NewErrorResponse(err error) *Response {
-	return &Response{
-		Error: err.Error(),
-	}
-}
-
 func NewPid(nodeId uint64, serviceId uint64) *Pid {
 	return &Pid{
 		NodeId:    nodeId,
@@ -121,10 +113,13 @@ func NewPidWithName(name string, nodeId uint64) *Pid {
 	}
 }
 
-func (p *Pid) IsLocal() bool {
-	return p.NodeId == GetNode().GetID()
-}
-
 func (p *Pid) IsGlobalName() bool {
 	return lib.IsFirstLetterUppercase(p.GetName())
+}
+
+func (r *Response) GetError() error {
+	if r.ErrMsg == "" {
+		return nil
+	}
+	return errors.New(r.GetErrMsg())
 }

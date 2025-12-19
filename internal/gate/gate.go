@@ -2,7 +2,7 @@ package gate
 
 import (
 	"context"
-	"gas/internal/errs"
+	"errors"
 	"gas/internal/gate/codec"
 	"gas/internal/gate/protocol"
 	"gas/internal/iface"
@@ -12,16 +12,18 @@ import (
 	"github.com/duke-git/lancet/v2/convertor"
 )
 
+var (
+	ErrNoBindConnection   = errors.New("no bind connection")
+	ErrInvalidMessageType = errors.New("gate: invalid message type")
+)
+
 type Gate struct {
 	network.EmptyHandler
+	node    iface.INode
 	Address string
 	Options []network.Option
 	Factory Factory
 	server  network.IServer
-}
-
-func (g *Gate) Name() string {
-	return "gate"
 }
 
 func (g *Gate) Start(ctx context.Context) error {
@@ -37,19 +39,11 @@ func (g *Gate) Start(ctx context.Context) error {
 }
 
 func (g *Gate) OnConnect(entity network.IConnection) (err error) {
-	node := iface.GetNode()
+	system := g.node.System()
 
-	system := node.System()
+	pid := system.Spawn(g.Factory())
 
-	actor := g.Factory()
-	pid := system.Spawn(actor)
-
-	s := &session.Session{
-		Session: &iface.Session{
-			Agent:    pid,
-			EntityId: entity.ID(),
-		},
-	}
+	s := session.NewWithPid(pid, entity.ID())
 
 	entity.SetContext(s)
 
@@ -65,7 +59,7 @@ func (g *Gate) OnConnect(entity network.IConnection) (err error) {
 func (g *Gate) OnMessage(entity network.IConnection, msg interface{}) error {
 	s, _ := entity.Context().(*session.Session)
 	if s == nil {
-		return errs.ErrNoBindConnection
+		return ErrNoBindConnection
 	}
 
 	ss := convertor.DeepClone(s)
@@ -73,28 +67,25 @@ func (g *Gate) OnMessage(entity network.IConnection, msg interface{}) error {
 	//  将网关消息转为内容消息
 	clientMessage, ok := msg.(*protocol.Message)
 	if !ok {
-		return errs.ErrInvalidMessageType
+		return ErrInvalidMessageType
 	}
-
-	node := iface.GetNode()
-	system := node.System()
 
 	actorMsg := g.convertMessage(ss, clientMessage)
 
-	return system.Send(actorMsg)
+	return g.node.System().Send(actorMsg)
 }
 
 func (g *Gate) OnClose(entity network.IConnection, wrong error) error {
 	s, _ := entity.Context().(*session.Session)
 	if s == nil {
-		return errs.ErrNoBindConnection
+		return ErrNoBindConnection
 	}
 
-	node := iface.GetNode()
-	system := node.System()
+	node := g.node
+	system := g.node.System()
 
 	ss := convertor.DeepClone(s)
-	return system.SubmitTask(ss.GetAgent(), func(ctx iface.IContext) error {
+	return g.node.System().SubmitTask(ss.GetAgent(), func(ctx iface.IContext) error {
 		agent := ctx.Actor().(IAgent)
 		ss.SetContext(ctx)
 		return agent.OnNetworkClose(ctx, s)

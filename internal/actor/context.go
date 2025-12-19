@@ -2,16 +2,19 @@
 package actor
 
 import (
-	"gas/internal/errs"
 	"gas/internal/iface"
 	"gas/internal/session"
+	discovery "gas/pkg/discovery/iface"
+	"gas/pkg/glog"
 	"gas/pkg/lib"
-	"gas/pkg/lib/glog"
 	"time"
 
 	"github.com/duke-git/lancet/v2/convertor"
 	"go.uber.org/zap"
 )
+
+// DefaultCallTimeout 默认调用超时时间
+const DefaultCallTimeout = 3 * time.Second
 
 type actorContext struct {
 	process iface.IProcess // 保存自己的 process 引用
@@ -19,10 +22,15 @@ type actorContext struct {
 	actor   iface.IActor
 	router  iface.IRouter
 	msg     *iface.ActorMessage
+	node    iface.INode
+	system  iface.ISystem
 }
 
 func (a *actorContext) ID() *iface.Pid {
 	return a.pid
+}
+func (a *actorContext) Node() iface.INode {
+	return a.node
 }
 
 func (a *actorContext) Process() iface.IProcess {
@@ -40,7 +48,7 @@ func (a *actorContext) Message() *iface.ActorMessage {
 }
 func (a *actorContext) InvokerMessage(msg interface{}) error {
 	if err := a.dispatch(msg); err != nil {
-		glog.Error("InvokerMessage", zap.Any("pid", a.ID()), zap.Error(err))
+		glog.Error("actor处理消息错误", zap.Any("pid", a.ID()), zap.Error(err))
 		return err
 	}
 	return nil
@@ -56,7 +64,8 @@ func (a *actorContext) dispatch(msg interface{}) error {
 	return a.actor.OnMessage(a, msg)
 }
 
-// handleMessage
+// handleMessage 处理 Actor 消息
+// 如果消息有对应的路由，则通过路由处理；否则调用 actor.OnMessage
 func (a *actorContext) handleMessage(m *iface.ActorMessage) error {
 	a.msg = m
 	methodName := m.Message.GetMethod()
@@ -80,55 +89,62 @@ func (a *actorContext) execHandler(msg *iface.Message) ([]byte, error) {
 }
 
 func (a *actorContext) Send(to interface{}, methodName string, request interface{}) error {
-	node := iface.GetNode()
-	system := node.System()
+	toPid := a.system.GenPid(to, discovery.RouteRandom)
 
-	toPid := system.GenPid(to, iface.RouteRandom)
-
-	message := iface.NewActorMessage(a.pid, toPid, methodName, node.Marshal(request))
+	data, err := a.node.Marshal(request)
+	if err != nil {
+		return err
+	}
+	message := iface.NewActorMessage(a.pid, toPid, methodName, data)
 	message.Async = true
-	return system.Send(message)
+	return a.system.Send(message)
 }
 
+// Call 同步调用 Actor，等待响应
 func (a *actorContext) Call(to interface{}, methodName string, request interface{}, reply interface{}) error {
-	node := iface.GetNode()
-	system := node.System()
+	return a.CallWithTimeout(to, methodName, request, reply, DefaultCallTimeout)
+}
 
-	toPid := system.GenPid(to, iface.RouteRandom)
+// CallWithTimeout 带超时的同步调用
+func (a *actorContext) CallWithTimeout(to interface{}, methodName string, request interface{}, reply interface{}, timeout time.Duration) error {
+	toPid := a.system.GenPid(to, discovery.RouteRandom)
 
-	message := iface.NewActorMessage(a.pid, toPid, methodName, node.Marshal(request))
-	message.Deadline = time.Now().Add(time.Second * 3).Unix()
+	data, err := a.node.Marshal(request)
+	if err != nil {
+		return err
+	}
+	message := iface.NewActorMessage(a.pid, toPid, methodName, data)
+	message.Deadline = time.Now().Add(timeout).Unix()
 	message.Async = false
 
-	data, err := system.Call(message)
-	node.Unmarshal(data, reply)
-	return err
+	responseData, err := a.system.Call(message)
+	if err != nil {
+		return err
+	}
+	if err := a.node.Unmarshal(responseData, reply); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (a *actorContext) Forward(to interface{}, method string) error {
-	node := iface.GetNode()
-	system := node.System()
 	if a.Message() == nil {
-		return errs.ErrMessageIsNil
+		return ErrMessageIsNil
 	}
-	toPid := system.GenPid(to, iface.RouteRandom)
+	toPid := a.system.GenPid(to, discovery.RouteRandom)
 	message := convertor.DeepClone(a.Message())
 	message.To = toPid
 	message.Method = method
 
-	return system.Send(message)
+	return a.system.Send(message)
 }
 
 func (a *actorContext) Named(name string) (err error) {
-	node := iface.GetNode()
-	system := node.System()
-	return system.Named(name, a.pid)
+	return a.system.Named(name, a.pid)
 }
 
 func (a *actorContext) Unname() {
-	node := iface.GetNode()
-	system := node.System()
-	system.Unname(a.pid)
+	a.system.Unname(a.pid)
 }
 
 // AfterFunc 注册一次性定时器
@@ -140,10 +156,7 @@ func (a *actorContext) AfterFunc(duration time.Duration, task iface.Task) *lib.T
 }
 
 func (a *actorContext) exit() {
-	node := iface.GetNode()
-	system := node.System()
-
-	system.Remove(a.pid)
+	a.system.Remove(a.pid)
 	_ = a.actor.OnStop(a)
 }
 

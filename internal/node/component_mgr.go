@@ -2,15 +2,25 @@ package node
 
 import (
 	"context"
-	"gas/internal/errs"
+	"errors"
 	"gas/internal/iface"
-	"gas/pkg/lib/glog"
+	"gas/pkg/glog"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/duke-git/lancet/v2/maputil"
 	"go.uber.org/zap"
+)
+
+var (
+	ErrComponentCannotBeNil                = errors.New("component cannot be nil")
+	ErrComponentNameCannotBeEmpty          = errors.New("component name cannot be empty")
+	ErrCannotRegisterComponentAfterStarted = errors.New("cannot register component after started component")
+	ErrComponentAlreadyRegistered          = errors.New("component already registered")
+	ErrManagerAlreadyStarted               = errors.New("manager already started")
+	ErrManagerStoppedCannotRestart         = errors.New("manager already stopped")
+	ErrFailedToStartComponent              = errors.New("failed to start component")
 )
 
 // ComponentManager 生命周期管理器
@@ -66,14 +76,14 @@ func (cm *ComponentManager) GetComponentNames() []string {
 // Register 注册组件，按注册顺序启动，按逆序停止
 func (cm *ComponentManager) Register(component iface.IComponent) error {
 	if cm.started.Load() {
-		return errs.ErrCannotRegisterComponentAfterStarted()
+		return ErrCannotRegisterComponentAfterStarted
 	}
 
 	if component == nil {
-		return errs.ErrComponentCannotBeNil()
+		return ErrComponentCannotBeNil
 	}
 	if component.Name() == "" {
-		return errs.ErrComponentNameCannotBeEmpty()
+		return ErrComponentNameCannotBeEmpty
 	}
 
 	cm.orderMu.Lock()
@@ -81,7 +91,7 @@ func (cm *ComponentManager) Register(component iface.IComponent) error {
 
 	// 检查是否已注册同名组件
 	if _, exists := cm.components.Get(component.Name()); exists {
-		return errs.ErrComponentAlreadyRegistered(component.Name())
+		return ErrComponentAlreadyRegistered
 	}
 
 	// 注册组件
@@ -92,12 +102,12 @@ func (cm *ComponentManager) Register(component iface.IComponent) error {
 }
 
 // Start 启动所有已注册的组件
-func (cm *ComponentManager) Start(ctx context.Context) error {
+func (cm *ComponentManager) Start(ctx context.Context, node iface.INode) error {
 	if cm.started.Load() {
-		return errs.ErrManagerAlreadyStarted()
+		return ErrManagerAlreadyStarted
 	}
 	if cm.stopped.Load() {
-		return errs.ErrManagerStoppedCannotRestart()
+		return ErrManagerStoppedCannotRestart
 	}
 
 	cm.orderMu.RLock()
@@ -117,11 +127,11 @@ func (cm *ComponentManager) Start(ctx context.Context) error {
 
 		glog.Info("组件: 正在启动组件", zap.String("component", component.Name()), zap.Int("current", i+1), zap.Int("total", count))
 
-		if err := component.Start(ctx); err != nil {
+		if err := component.Start(ctx, node); err != nil {
 			glog.Error("组件: 启动组件失败", zap.String("component", component.Name()), zap.Error(err))
 			// 停止已启动的组件（逆序）
 			_ = cm.stopComponents(ctx, started, true)
-			return errs.ErrFailedToStartComponent(component.Name(), err)
+			return ErrFailedToStartComponent
 		}
 
 		started = append(started, component)

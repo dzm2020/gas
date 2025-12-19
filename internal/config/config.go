@@ -1,10 +1,9 @@
 package config
 
 import (
-	"gas/internal/errs"
 	discoveryConfig "gas/pkg/discovery"
+	"gas/pkg/glog"
 	"gas/pkg/lib"
-	"gas/pkg/lib/glog"
 	messageQueConfig "gas/pkg/messageQue"
 	"os"
 )
@@ -33,11 +32,11 @@ type Config struct {
 func Load(profileFilePath string) (*Config, error) {
 	data, err := os.ReadFile(profileFilePath)
 	if err != nil {
-		return nil, errs.ErrReadConfigFileFailed(err)
+		return nil, err
 	}
 	var config = Default()
 	if err = lib.Json.Unmarshal(data, config); err != nil {
-		return nil, errs.ErrUnmarshalConfigFailed(err)
+		return nil, err
 	}
 	return config, nil
 }

@@ -9,19 +9,9 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-var currentNode INode
-
-func SetNode(node INode) {
-	currentNode = node
-}
-
-func GetNode() INode {
-	return currentNode
-}
-
 type (
 	IComponent interface {
-		Start(ctx context.Context) error
+		Start(ctx context.Context, node INode) error
 		Stop(ctx context.Context) error
 		Name() string
 	}
@@ -36,23 +26,22 @@ type (
 	INode interface {
 		IComponentManager
 		discovery.IMember
+		lib.ISerializer
 		Info() *discovery.Member
 		SetSerializer(ser lib.ISerializer)
+		SetPanicHook(panicHook func(entry zapcore.Entry))
+		CallPanicHook(entry zapcore.Entry)
 		System() ISystem
 		SetSystem(system ISystem)
 		Cluster() ICluster
 		SetCluster(ICluster)
 		GetConfig() *config.Config
 		Startup(comps ...IComponent) error
-		SetPanicHook(panicHook func(entry zapcore.Entry))
-		CallPanicHook(entry zapcore.Entry)
-		Marshal(request interface{}) []byte
-		Unmarshal(data []byte, reply interface{})
+	}
+
+	BaseComponent struct {
 	}
 )
-
-type BaseComponent struct {
-}
 
 func (*BaseComponent) Start(ctx context.Context) error {
 	return nil
