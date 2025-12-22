@@ -138,7 +138,8 @@ func (r *Cluster) Call(msg *iface.ActorMessage) (bin []byte, err error) {
 	toNodeId := msg.To.GetNodeId()
 
 	if m := r.dis.GetById(toNodeId); m == nil {
-		return nil, xerror.Wrapf(ErrNotFoundMember, "nodeId=%d", toNodeId)
+		err = xerror.Wrapf(ErrNotFoundMember, "nodeId=%d", toNodeId)
+		return
 	}
 
 	data, marshalErr := r.node.Marshal(msg.Message)
@@ -150,7 +151,8 @@ func (r *Cluster) Call(msg *iface.ActorMessage) (bin []byte, err error) {
 	timeout := lib.NowDelay(msg.GetDeadline(), 0)
 	bytes, requestErr := r.mq.Request(subject, data, timeout)
 	if requestErr != nil {
-		return nil, xerror.Wrapf(requestErr, "请求消息队列失败 (subject=%s, timeout=%v)", subject, timeout)
+		err = xerror.Wrapf(requestErr, "请求消息队列失败 (subject=%s, timeout=%v)", subject, timeout)
+		return
 	}
 
 	response := &iface.Response{}

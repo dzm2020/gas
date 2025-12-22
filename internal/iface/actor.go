@@ -51,6 +51,7 @@ type (
 		AfterFunc(duration time.Duration, task Task) *lib.Timer
 		Message() *ActorMessage
 		Process() IProcess
+		System() ISystem
 		Shutdown() error
 		Node() INode // 获取节点引用，用于序列化等操作
 	}

@@ -7,8 +7,8 @@ import (
 )
 
 const (
-	PushMessageToClientMethod   = "PushMessageToClient"
-	CloseClientConnectionMethod = "CloseClientConnection"
+	PushMessageToClientMethod   = "PushMessage"
+	CloseClientConnectionMethod = "Shutdown"
 )
 
 func New() *Session {

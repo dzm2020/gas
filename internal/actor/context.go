@@ -34,7 +34,9 @@ func (a *actorContext) ID() *iface.Pid {
 func (a *actorContext) Node() iface.INode {
 	return a.node
 }
-
+func (a *actorContext) System() iface.ISystem {
+	return a.system
+}
 func (a *actorContext) Process() iface.IProcess {
 	return a.process
 }
@@ -46,14 +48,6 @@ func (a *actorContext) Message() *iface.ActorMessage {
 	return a.msg
 }
 func (a *actorContext) InvokerMessage(msg interface{}) error {
-	if err := a.dispatch(msg); err != nil {
-		glog.Error("actor处理消息错误", zap.Any("pid", a.ID()), zap.Error(err))
-		return err
-	}
-	return nil
-}
-
-func (a *actorContext) dispatch(msg interface{}) error {
 	switch m := msg.(type) {
 	case *iface.TaskMessage:
 		return m.Task(a)
@@ -77,6 +71,8 @@ func (a *actorContext) handleMessage(m *iface.ActorMessage) error {
 	err := a.actor.OnMessage(a, m.Message)
 	m.Response(nil, err)
 	a.msg = nil
+
+	glog.Warn("actor没有找到消息路由,执行默认方法", zap.Any("pid", a.ID()), zap.String("method", methodName))
 	return err
 }
 

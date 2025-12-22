@@ -23,6 +23,7 @@ func (r *Component) Name() string {
 }
 
 func (r *Component) Start(ctx context.Context, node iface.INode) (err error) {
+	r.node = node
 	config := node.GetConfig()
 	clusterConfig := config.Cluster
 	// 创建服务发现实例

@@ -21,7 +21,7 @@ type Factory func() IAgent
 type IAgent interface {
 	iface.IActor
 	OnConnectionOpen(ctx iface.IContext, s *session.Session) error
-	OnConnectionMessage(ctx iface.IContext, s *session.Session) error
+	OnConnectionMessage(ctx iface.IContext, s *session.Session, data []byte) error
 	OnConnectionClose(ctx iface.IContext, s *session.Session) error
 	PushMessage(ctx iface.IContext, s *session.Session, data []byte) error
 	Shutdown(ctx iface.IContext, s *session.Session) error
@@ -36,7 +36,7 @@ type Agent struct {
 func (agent *Agent) OnConnectionOpen(ctx iface.IContext, s *session.Session) error {
 	return nil
 }
-func (agent *Agent) OnConnectionMessage(ctx iface.IContext, s *session.Session) error {
+func (agent *Agent) OnConnectionMessage(ctx iface.IContext, s *session.Session, data []byte) error {
 	return nil
 }
 func (agent *Agent) OnConnectionClose(ctx iface.IContext, s *session.Session) error {
