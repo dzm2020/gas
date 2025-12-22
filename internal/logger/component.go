@@ -6,7 +6,6 @@ import (
 	logger "gas/pkg/glog"
 	"gas/pkg/lib/component"
 
-	"github.com/duke-git/lancet/v2/convertor"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -41,7 +40,7 @@ func (c *Component) Name() string {
 }
 
 func (c *Component) Start(ctx context.Context, node iface.INode) error {
-	config := convertor.DeepClone(defaultConfig())
+	config := defaultConfig()
 	if err := node.GetConfig(c.Name(), config); err != nil {
 		return err
 	}

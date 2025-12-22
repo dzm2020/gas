@@ -29,12 +29,13 @@ import (
 // New 创建节点实例
 func New(path string) *Node {
 	node := &Node{
+		Member:     new(discovery.Member),
 		serializer: lib.Json,
 		IManager:   component.NewComponentsMgr[iface.INode](),
 		path:       path,
 		viper:      viper.New(),
 	}
-
+	node.viper.SetConfigType("yaml")
 	node.viper.SetConfigFile(path)
 	return node
 }
@@ -122,11 +123,20 @@ func (n *Node) init() {
 
 func (n *Node) Startup(comps ...component.IComponent[iface.INode]) error {
 	defer xerror.PrintCoreDump()
+	var err error
+	//  读取配置内容
+	err = n.viper.ReadInConfig() // 读取配置文件
+	if err != nil {
+		return err
+	}
+	if err = n.GetConfig("node", n.Member); err != nil {
+		return err
+	}
+
 	lib.SetPanicHandler(func(err interface{}) {
 		glog.Panic("panic", zap.Any("err", err), zap.String("stack", string(debug.Stack())))
 	})
 
-	var err error
 	// 注册组件（注意顺序：glog 应该最先初始化，因为其他组件可能会使用日志）
 	components := []component.IComponent[iface.INode]{
 		logger.NewComponent(),
@@ -141,25 +151,13 @@ func (n *Node) Startup(comps ...component.IComponent[iface.INode]) error {
 			return err
 		}
 	}
-	//  初始化组件
-	if err = n.IManager.Init(n); err != nil {
-		return err
-	}
-	//  读取配置内容
-	err = n.viper.ReadInConfig() // 读取配置文件
-	if err != nil {
-		return err
-	}
-	if err = n.GetConfig("node", n); err != nil {
-		return err
-	}
 
 	//  启动组件
 	if err = n.IManager.Start(context.Background(), n); err != nil {
 		return err
 	}
 
-	glog.Info("节点启动完成")
+	glog.Info("节点启动完成", zap.String("path", n.path), zap.Strings("component", n.IManager.GetComponentNames()))
 
 	// 阻塞等待进程终止信号
 	sigChan := make(chan os.Signal, 1)

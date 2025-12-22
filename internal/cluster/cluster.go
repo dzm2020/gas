@@ -60,7 +60,7 @@ func (r *Cluster) Start(ctx context.Context) error {
 }
 
 func (r *Cluster) makeSubject(nodeId uint64) string {
-	return fmt.Sprintf("%s%d", r.name, nodeId)
+	return fmt.Sprintf("%s.%d", r.name, nodeId)
 }
 
 func (r *Cluster) subscribe() error {

@@ -6,8 +6,6 @@ import (
 	dis "gas/pkg/discovery"
 	"gas/pkg/lib/component"
 	mq "gas/pkg/messageQue"
-
-	"github.com/duke-git/lancet/v2/convertor"
 )
 
 type Config struct {
@@ -48,22 +46,25 @@ func (r *Component) Name() string {
 }
 
 func (r *Component) Start(ctx context.Context, node iface.INode) (err error) {
+	config := defaultConfig()
+
+	r.name = config.Name
 	r.node = node
-	clusterConfig := convertor.DeepClone(defaultConfig())
-	if err = node.GetConfig(r.Name(), clusterConfig); err != nil {
+
+	if err = node.GetConfig(r.Name(), config); err != nil {
 		return err
 	}
 	// 创建服务发现实例
-	r.dis, err = dis.NewFromConfig(*clusterConfig.Discovery)
+	r.dis, err = dis.NewFromConfig(*config.Discovery)
 	if err != nil {
 		return
 	}
 	// 创建集群通信管理器
-	r.mq, err = mq.NewFromConfig(*clusterConfig.MessageQueue)
+	r.mq, err = mq.NewFromConfig(*config.MessageQueue)
 	if err != nil {
 		return
 	}
-	r.name = clusterConfig.Name
+
 	//  建立引用
 	node.SetCluster(r.Cluster)
 	return r.Cluster.Start(ctx)

@@ -19,14 +19,6 @@ func NewComponent() *Component {
 	return c
 }
 
-// NewComponentFromConfig 从配置创建网关组件
-func NewComponentFromConfig() *Component {
-	c := &Component{
-		Gate: &Gate{},
-	}
-	return c
-}
-
 func (r *Component) Name() string {
 	return "gate"
 }
