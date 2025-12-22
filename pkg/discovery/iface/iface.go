@@ -50,11 +50,12 @@ func (m *MemberList) UpdateTopology(old *MemberList) *Topology {
 }
 
 type Member struct {
-	Id            uint64
-	Kind, Address string
-	Port          int
-	Tags          []string
-	Meta          map[string]string
+	Id      uint64            `json:"id" yaml:"id"`           // 节点ID
+	Kind    string            `json:"kind" yaml:"kind"`       // 节点类型
+	Address string            `json:"address" yaml:"address"` // 节点地址
+	Port    int               `json:"port" yaml:"port"`       // 节点端口
+	Tags    []string          `json:"tags" yaml:"tags"`       // 节点标签
+	Meta    map[string]string `json:"meta" yaml:"meta"`       // 节点元数据
 }
 
 func (b *Member) GetKind() string {

@@ -1,10 +1,9 @@
 package iface
 
 import (
-	"context"
-	"gas/internal/config"
 	discovery "gas/pkg/discovery/iface"
 	"gas/pkg/lib"
+	"gas/pkg/lib/component"
 
 	"go.uber.org/zap/zapcore"
 )
@@ -24,25 +23,10 @@ type (
 		AddTag(tag string)
 	}
 
-	IComponent interface {
-		Start(ctx context.Context, node INode) error
-		Stop(ctx context.Context) error
-		Name() string
-	}
-
-	IComponentManager interface {
-		Start(ctx context.Context, node INode) error
-		ComponentCount() int
-		GetComponent(name string) IComponent
-		GetComponentNames() []string
-		Register(component IComponent) error
-		Stop(ctx context.Context) error
-	}
-
 	INode interface {
-		IComponentManager
 		IMember
 		lib.ISerializer
+		component.IManager[INode]
 		Info() *Member
 		SetSerializer(ser lib.ISerializer)
 		SetPanicHook(panicHook func(entry zapcore.Entry))
@@ -51,17 +35,8 @@ type (
 		SetSystem(system ISystem)
 		Cluster() ICluster
 		SetCluster(ICluster)
-		GetConfig() *config.Config
-		Startup(comps ...IComponent) error
-	}
-
-	BaseComponent struct {
+		Startup(comps ...component.IComponent[INode]) error
+		GetConfig(key string, cfg interface{}) error
+		SetDefaultConfig(key string, cfg interface{})
 	}
 )
-
-func (*BaseComponent) Start(ctx context.Context) error {
-	return nil
-}
-func (*BaseComponent) Stop(ctx context.Context) error {
-	return nil
-}

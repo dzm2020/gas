@@ -3,6 +3,7 @@ package actor
 import (
 	"context"
 	"gas/internal/iface"
+	"gas/pkg/lib/component"
 )
 
 // NewComponent 创建 actor 组件
@@ -11,11 +12,12 @@ func NewComponent() *Component {
 }
 
 type Component struct {
+	component.BaseComponent[iface.INode]
 	*System
 }
 
 func (c *Component) Name() string {
-	return "actorSystem"
+	return "system"
 }
 
 func (c *Component) Start(ctx context.Context, node iface.INode) error {

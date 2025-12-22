@@ -3,9 +3,11 @@ package gate
 import (
 	"context"
 	"gas/internal/iface"
+	"gas/pkg/lib/component"
 )
 
 type Component struct {
+	component.BaseComponent[iface.INode]
 	*Gate
 }
 
@@ -30,9 +32,13 @@ func (r *Component) Name() string {
 }
 
 func (r *Component) Start(ctx context.Context, node iface.INode) error {
-	c := node.GetConfig().Gate
-	r.Gate.Options = ToOptions(c)
-	r.Gate.Address = c.Address
+	config := defaultConfig()
+	if err := node.GetConfig(r.Name(), config); err != nil {
+		return err
+	}
+
+	r.Gate.Options = ToOptions(config)
+	r.Gate.Address = config.Address
 	r.Gate.node = node
 	return r.Gate.Start(ctx)
 }

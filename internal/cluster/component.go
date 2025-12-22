@@ -4,10 +4,35 @@ import (
 	"context"
 	"gas/internal/iface"
 	dis "gas/pkg/discovery"
+	"gas/pkg/lib/component"
 	mq "gas/pkg/messageQue"
+
+	"github.com/duke-git/lancet/v2/convertor"
 )
 
+type Config struct {
+	Name         string      `json:"name" yaml:"name"`
+	Discovery    *dis.Config `json:"discovery" yaml:"discovery"`
+	MessageQueue *mq.Config  `json:"messageQueue" yaml:"messageQueue"`
+}
+
+func defaultConfig() *Config {
+	return &Config{
+		Name: "",
+		Discovery: &dis.Config{
+			Type:   "consul",
+			Config: nil,
+		},
+
+		MessageQueue: &mq.Config{
+			Type:   "nats",
+			Config: nil,
+		},
+	}
+}
+
 type Component struct {
+	component.BaseComponent[iface.INode]
 	*Cluster
 }
 
@@ -24,8 +49,10 @@ func (r *Component) Name() string {
 
 func (r *Component) Start(ctx context.Context, node iface.INode) (err error) {
 	r.node = node
-	config := node.GetConfig()
-	clusterConfig := config.Cluster
+	clusterConfig := convertor.DeepClone(defaultConfig())
+	if err = node.GetConfig(r.Name(), clusterConfig); err != nil {
+		return err
+	}
 	// 创建服务发现实例
 	r.dis, err = dis.NewFromConfig(*clusterConfig.Discovery)
 	if err != nil {
@@ -36,7 +63,7 @@ func (r *Component) Start(ctx context.Context, node iface.INode) (err error) {
 	if err != nil {
 		return
 	}
-	r.name = config.Cluster.Name
+	r.name = clusterConfig.Name
 	//  建立引用
 	node.SetCluster(r.Cluster)
 	return r.Cluster.Start(ctx)
