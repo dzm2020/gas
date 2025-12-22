@@ -14,6 +14,7 @@ type (
 		Node    *Node        `json:"node"`
 		Logger  *glog.Config `json:"logger"`
 		Cluster *Cluster     `json:"cluster"`
+		Gate    *GateConfig  `json:"gate,omitempty"`
 	}
 
 	Node struct {
@@ -28,6 +29,19 @@ type (
 		Name         string                   `json:"name"`
 		Discovery    *discoveryConfig.Config  `json:"discovery"`
 		MessageQueue *messageQueConfig.Config `json:"messageQueue"`
+	}
+
+	GateConfig struct {
+		// Address 监听地址，格式: "tcp://127.0.0.1:9002" 或 "udp://127.0.0.1:9002"
+		Address string `json:"address"`
+		// KeepAlive 连接超时时间（秒），0表示不检测超时
+		KeepAlive int `json:"keepAlive,omitempty"`
+		// SendChanSize 发送队列缓冲大小
+		SendChanSize int `json:"sendChanSize,omitempty"`
+		// ReadBufSize 读缓冲区大小
+		ReadBufSize int `json:"readBufSize,omitempty"`
+		// MaxConn 最大连接数
+		MaxConn int `json:"maxConn,omitempty"`
 	}
 )
 
@@ -45,6 +59,7 @@ func Default() *Config {
 		Node:    defaultNode(),
 		Logger:  defaultLogger(),
 		Cluster: defaultCluster(),
+		Gate:    defaultGateConfig(),
 	}
 }
 
@@ -86,5 +101,16 @@ func defaultCluster() *Cluster {
 			Type:   "nats",
 			Config: nil,
 		},
+	}
+}
+
+// defaultGateConfig 生成默认网关配置
+func defaultGateConfig() *GateConfig {
+	return &GateConfig{
+		Address:      "tcp://127.0.0.1:9000",
+		KeepAlive:    5, // 5秒
+		SendChanSize: 1024,
+		ReadBufSize:  4096,
+		MaxConn:      10000,
 	}
 }
