@@ -22,6 +22,7 @@ var (
 	ErrNameCannotBeEmpty     = errors.New("名字不能为空")
 	ErrNameChangeNotAllowed  = errors.New("不允许重复命名")
 	ErrNameAlreadyRegistered = errors.New("名字已注册")
+	ErrClusterIsNil          = errors.New("集群组件未初始化")
 )
 
 const (
@@ -88,12 +89,10 @@ func (s *System) Add(pid *iface.Pid, process iface.IProcess) {
 }
 
 // Remove 从系统中移除进程
-func (s *System) Remove(pid *iface.Pid) {
+func (s *System) Remove(pid *iface.Pid) error {
 	s.processDict.Delete(pid.GetServiceId())
 	// 尝试取消命名，失败不影响移除操作
-	if err := s.Unname(pid); err != nil {
-		glog.Debug("取消进程命名失败", zap.Any("pid", pid), zap.Error(err))
-	}
+	return s.Unname(pid)
 }
 
 func (s *System) GetProcess(to *iface.Pid) iface.IProcess {
@@ -166,11 +165,11 @@ func (s *System) Named(name string, pid *iface.Pid) error {
 func (s *System) clusterNamed(name string) error {
 	cluster := s.node.Cluster()
 	if cluster == nil {
-		return xerror.Wrap(errors.New("集群组件未初始化"), "")
+		return ErrClusterIsNil
 	}
 	s.node.AddTag(name)
 	if err := cluster.UpdateMember(); err != nil {
-		return xerror.Wrapf(err, "更新集群成员信息失败 (name=%s)", name)
+		return err
 	}
 	return nil
 }
@@ -200,11 +199,11 @@ func (s *System) Unname(pid *iface.Pid) error {
 func (s *System) clusterUnname(name string) error {
 	cluster := s.node.Cluster()
 	if cluster == nil {
-		return xerror.Wrap(errors.New("集群组件未初始化"), "")
+		return ErrClusterIsNil
 	}
 	s.node.RemoteTag(name)
 	if err := cluster.UpdateMember(); err != nil {
-		return xerror.Wrapf(err, "更新集群成员信息失败 (name=%s)", name)
+		return err
 	}
 	return nil
 }
@@ -222,10 +221,10 @@ func (s *System) Send(message *iface.ActorMessage) error {
 	}
 	cluster := s.node.Cluster()
 	if cluster == nil {
-		return xerror.Wrap(errors.New("集群组件未初始化，无法发送远程消息"), "")
+		return ErrClusterIsNil
 	}
 	if err := cluster.Send(message); err != nil {
-		return xerror.Wrap(err, "发送远程消息失败")
+		return err
 	}
 	return nil
 }
@@ -237,11 +236,11 @@ func (s *System) Call(message *iface.ActorMessage) ([]byte, error) {
 	}
 	cluster := s.node.Cluster()
 	if cluster == nil {
-		return nil, xerror.Wrap(errors.New("集群组件未初始化，无法调用远程消息"), "")
+		return nil, ErrClusterIsNil
 	}
 	data, err := cluster.Call(message)
 	if err != nil {
-		return nil, xerror.Wrap(err, "调用远程消息失败")
+		return nil, err
 	}
 	return data, nil
 }

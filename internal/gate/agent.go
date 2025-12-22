@@ -5,7 +5,11 @@ import (
 	"gas/internal/gate/protocol"
 	"gas/internal/iface"
 	"gas/internal/session"
+	"gas/pkg/glog"
+	"gas/pkg/lib/xerror"
 	"gas/pkg/network"
+
+	"go.uber.org/zap"
 )
 
 var (
@@ -16,9 +20,9 @@ type Factory func() IAgent
 
 type IAgent interface {
 	iface.IActor
-	OnNetworkOpen(ctx iface.IContext, s *session.Session) error
-	OnNetworkMessage(ctx iface.IContext, s *session.Session) error
-	OnNetworkClose(ctx iface.IContext, s *session.Session) error
+	OnConnectionOpen(ctx iface.IContext, s *session.Session) error
+	OnConnectionMessage(ctx iface.IContext, s *session.Session) error
+	OnConnectionClose(ctx iface.IContext, s *session.Session) error
 	PushMessage(ctx iface.IContext, s *session.Session, data []byte) error
 	Shutdown(ctx iface.IContext, s *session.Session) error
 }
@@ -29,30 +33,35 @@ type Agent struct {
 	iface.Actor
 }
 
-func (agent *Agent) OnNetworkOpen(ctx iface.IContext, s *session.Session) error {
+func (agent *Agent) OnConnectionOpen(ctx iface.IContext, s *session.Session) error {
 	return nil
 }
-func (agent *Agent) OnNetworkMessage(ctx iface.IContext, s *session.Session) error {
+func (agent *Agent) OnConnectionMessage(ctx iface.IContext, s *session.Session) error {
 	return nil
 }
-func (agent *Agent) OnNetworkClose(ctx iface.IContext, s *session.Session) error {
+func (agent *Agent) OnConnectionClose(ctx iface.IContext, s *session.Session) error {
 	return nil
 }
 func (agent *Agent) PushMessage(ctx iface.IContext, s *session.Session, data []byte) error {
 	entity := network.GetConnection(s.GetEntityId())
 	if entity == nil {
-		return ErrNotFoundEntity
+		return xerror.Wrapf(ErrNotFoundEntity, "entity:%d", s.GetEntityId())
 	}
 	msg := protocol.New(uint8(s.Cmd), uint8(s.Act), data)
 	msg.Index = s.GetIndex()
 	msg.Error = uint16(s.GetCode())
+
+	glog.Debug("发送消息到客户端", zap.Int64("entityId", s.GetEntityId()), zap.Any("msg", msg))
+
 	return entity.Send(msg)
 
 }
 func (agent *Agent) Shutdown(ctx iface.IContext, s *session.Session) error {
+	glog.Info("关闭网络连接", zap.Int64("entityId", s.GetEntityId()))
+
 	entity := network.GetConnection(s.GetEntityId())
 	if entity == nil {
-		return ErrNotFoundEntity
+		return xerror.Wrapf(ErrNotFoundEntity, "entity:%d", s.GetEntityId())
 	}
 	return entity.Close(nil)
 }

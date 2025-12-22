@@ -10,6 +10,20 @@ import (
 )
 
 type (
+	Member = discovery.Member
+
+	IMember interface {
+		GetKind() string
+		GetID() uint64
+		GetAddress() string
+		GetPort() int
+		GetTags() []string
+		GetMeta() map[string]string
+		SetTags(tags []string)
+		RemoteTag(tag string)
+		AddTag(tag string)
+	}
+
 	IComponent interface {
 		Start(ctx context.Context, node INode) error
 		Stop(ctx context.Context) error
@@ -17,17 +31,19 @@ type (
 	}
 
 	IComponentManager interface {
+		Start(ctx context.Context, node INode) error
 		ComponentCount() int
 		GetComponent(name string) IComponent
 		GetComponentNames() []string
 		Register(component IComponent) error
+		Stop(ctx context.Context) error
 	}
 
 	INode interface {
 		IComponentManager
-		discovery.IMember
+		IMember
 		lib.ISerializer
-		Info() *discovery.Member
+		Info() *Member
 		SetSerializer(ser lib.ISerializer)
 		SetPanicHook(panicHook func(entry zapcore.Entry))
 		CallPanicHook(entry zapcore.Entry)

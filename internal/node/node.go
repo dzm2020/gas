@@ -4,6 +4,7 @@ import (
 	"context"
 	"gas/internal/actor"
 	"gas/internal/cluster"
+	"gas/internal/component"
 	"gas/internal/config"
 	"gas/internal/iface"
 	"gas/pkg/glog"
@@ -25,10 +26,7 @@ import (
 
 // New 创建节点实例
 func New(path string) *Node {
-	node := &Node{
-		serializer:       lib.Json,
-		ComponentManager: NewComponentsMgr(),
-	}
+	node := newNode()
 	c, err := config.Load(path)
 	if err != nil {
 		panic(err)
@@ -38,35 +36,39 @@ func New(path string) *Node {
 }
 
 func NewWithConfig(config *config.Config) *Node {
-	node := &Node{
-		config:           config,
-		serializer:       lib.Json,
-		ComponentManager: NewComponentsMgr(),
-	}
+	node := newNode()
+	node.config = config
 	return node
 }
 
+func newNode() *Node {
+	return &Node{
+		serializer:        lib.Json,
+		IComponentManager: component.NewComponentsMgr(),
+	}
+}
+
 type Node struct {
-	*discovery.Member
-	*ComponentManager
+	*iface.Member
+	iface.IComponentManager
 	config *config.Config
 
-	actorSystem iface.ISystem
-	cluster     iface.ICluster
+	system  iface.ISystem
+	cluster iface.ICluster
 
 	serializer lib.ISerializer
 
 	panicHook func(entry zapcore.Entry)
 }
 
-func (n *Node) Info() *discovery.Member {
+func (n *Node) Info() *iface.Member {
 	return n.Member
 }
 func (n *Node) SetSystem(system iface.ISystem) {
-	n.actorSystem = system
+	n.system = system
 }
 func (n *Node) System() iface.ISystem {
-	return n.actorSystem
+	return n.system
 }
 
 func (n *Node) SetCluster(cluster iface.ICluster) {
@@ -131,7 +133,7 @@ func (n *Node) Startup(comps ...iface.IComponent) error {
 
 	// 注册组件（注意顺序：glog 应该最先初始化，因为其他组件可能会使用日志）
 	components := []iface.IComponent{
-		NewLogComponent(),
+		component.NewLogComponent(),
 		actor.NewComponent(),
 		cluster.NewComponent(),
 	}
@@ -144,14 +146,14 @@ func (n *Node) Startup(comps ...iface.IComponent) error {
 	components = append(components, comps...)
 
 	for _, comp := range components {
-		if err := n.ComponentManager.Register(comp); err != nil {
+		if err := n.IComponentManager.Register(comp); err != nil {
 			return err
 		}
 	}
 
 	// 启动所有组件
 	ctx := context.Background()
-	if err := n.ComponentManager.Start(ctx, n); err != nil {
+	if err := n.IComponentManager.Start(ctx, n); err != nil {
 		return err
 	}
 
@@ -179,19 +181,10 @@ func (n *Node) CallPanicHook(entry zapcore.Entry) {
 // Shutdown 优雅关闭节点，关闭所有组件
 func (n *Node) shutdown(ctx context.Context) error {
 	defer glog.Info("节点停止运行完成")
-
 	glog.Info("节点开始停止运行")
-
-	// 停止所有组件(按逆序停止)
-	if err := n.ComponentManager.Stop(ctx); err != nil {
+	if err := n.IComponentManager.Stop(ctx); err != nil {
 		return err
 	}
-
-	n.cluster = nil
-	n.actorSystem = nil
-	n.ComponentManager = nil
-
-	// 使用默认关闭超时时间
 	shutdownTimeout := 30 * time.Second
 	timeoutCtx, cancel := context.WithTimeout(ctx, shutdownTimeout)
 	defer cancel()

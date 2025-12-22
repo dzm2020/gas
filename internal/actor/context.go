@@ -126,7 +126,6 @@ func (a *actorContext) Forward(to *iface.Pid, method string) error {
 	if a.Message() == nil {
 		return ErrMessageIsNil
 	}
-
 	message := convertor.DeepClone(a.Message())
 	message.To = to
 	message.Method = method

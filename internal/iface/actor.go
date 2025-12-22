@@ -22,7 +22,7 @@ type (
 	ISystem interface {
 		Spawn(actor IActor, args ...interface{}) *Pid
 		Add(pid *Pid, process IProcess)
-		Remove(pid *Pid)
+		Remove(pid *Pid) error
 		Named(name string, pid *Pid) error
 		Unname(pid *Pid) error
 		HasName(name string) bool
