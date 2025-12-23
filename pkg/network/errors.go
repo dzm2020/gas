@@ -43,6 +43,20 @@ var (
 	ErrTCPClientNotConnected = errors.New("tcp client not connected")
 )
 
+// WebSocket 相关错误
+var (
+	// ErrWebSocketConnectionClosed WebSocket连接已关闭
+	ErrWebSocketConnectionClosed = errors.New("websocket connection already closed")
+	// ErrWebSocketSendQueueFull WebSocket发送队列已满
+	ErrWebSocketSendQueueFull = errors.New("websocket send queue full")
+	// ErrWebSocketConnectionKeepAlive WebSocket连接超时
+	ErrWebSocketConnectionKeepAlive = errors.New("websocket connection keepAlive")
+	// ErrWebSocketServerAlreadyRunning WebSocket服务器已在运行
+	ErrWebSocketServerAlreadyRunning = errors.New("websocket server already running")
+	// ErrWebSocketServerNotRunning WebSocket服务器未运行
+	ErrWebSocketServerNotRunning = errors.New("websocket server not running")
+)
+
 // ErrUnsupportedProtocol 不支持的协议错误
 func ErrUnsupportedProtocol(proto string) error {
 	return fmt.Errorf("proto: %s is not support", proto)

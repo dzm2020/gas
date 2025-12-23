@@ -41,8 +41,5 @@ func ToOptions(c *Config) []network.Option {
 	if c.ReadBufSize > 0 {
 		options = append(options, network.WithReadBufSize(c.ReadBufSize))
 	}
-	if c.MaxConn > 0 {
-		options = append(options, network.WithMaxConn(c.MaxConn))
-	}
 	return options
 }

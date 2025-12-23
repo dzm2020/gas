@@ -28,6 +28,5 @@ type ISubscription interface {
 type MsgHandler func(request []byte, response func([]byte) error)
 
 type ISubscriber interface {
-	HandlerSyncMessage(request []byte) []byte
-	HandlerAsyncMessage(request []byte) error
+	OnMessage(request []byte) ([]byte, error)
 }

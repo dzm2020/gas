@@ -19,7 +19,7 @@ func ParseProtoAddr(protoAddr string) (string, string, error) {
 	}
 	proto, addr := pair[0], pair[1]
 	switch proto {
-	case "tcp", "tcp4", "tcp6", "udp", "udp4", "udp6", "unix":
+	case "tcp", "tcp4", "tcp6", "udp", "udp4", "udp6", "unix", "ws", "wss":
 	default:
 		return "", "", errors.ErrUnsupportedProtocol
 	}

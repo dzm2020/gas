@@ -115,6 +115,8 @@ func NewServer(protoAddr string, option ...Option) (IServer, error) {
 		return NewTCPServer(proto, addr, option...), nil
 	case "udp", "udp4", "udp6":
 		return NewUDPServer(proto, addr, option...), nil
+	case "ws", "wss":
+		return NewWebSocketServer(addr, proto == "wss", option...), nil
 	default:
 		return nil, ErrUnsupportedProtocol(proto)
 	}

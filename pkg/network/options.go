@@ -11,7 +11,8 @@ type Options struct {
 	keepAlive    time.Duration // 连接超时时间（0表示不检测超时）
 	sendChanSize int           // 发送队列缓冲大小
 	readBufSize  int           // 读缓冲区大小
-	maxConn      int
+	tlsCertFile  string        // TLS 证书文件路径
+	tlsKeyFile   string        // TLS 私钥文件路径
 }
 
 func loadOptions(options ...Option) *Options {
@@ -19,7 +20,6 @@ func loadOptions(options ...Option) *Options {
 		sendChanSize: defaultSendChanBuf,
 		readBufSize:  defaultTCPReadBuf,
 		keepAlive:    defaultKeepAlive,
-		maxConn:      10000,
 	}
 	for _, option := range options {
 		option(opts)
@@ -71,12 +71,10 @@ func WithKeepAlive(keepAlive time.Duration) Option {
 	}
 }
 
-// WithMaxConn 设置最大连接数
-func WithMaxConn(maxConn int) Option {
+// WithTLS 设置 TLS 证书和私钥文件路径
+func WithTLS(certFile, keyFile string) Option {
 	return func(opts *Options) {
-		if maxConn <= 0 {
-			return
-		}
-		opts.maxConn = maxConn
+		opts.tlsCertFile = certFile
+		opts.tlsKeyFile = keyFile
 	}
 }

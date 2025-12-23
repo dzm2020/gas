@@ -73,12 +73,20 @@ func (r *Cluster) subscribe() error {
 	return nil
 }
 
-func (r *Cluster) HandlerAsyncMessage(data []byte) error {
+func (r *Cluster) OnMessage(data []byte) ([]byte, error) {
 	message := &iface.Message{}
 	if err := r.node.Unmarshal(data, message); err != nil {
-		return err
+		return nil, err
 	}
 	msg := &iface.ActorMessage{Message: message}
+	if msg.GetAsync() {
+		return nil, r.OnAsyncMessage(msg)
+	} else {
+		return r.OnSyncMessage(msg), nil
+	}
+}
+
+func (r *Cluster) OnAsyncMessage(msg *iface.ActorMessage) error {
 	system := r.node.System()
 	if err := system.Send(msg); err != nil {
 		return err
@@ -86,7 +94,7 @@ func (r *Cluster) HandlerAsyncMessage(data []byte) error {
 	return nil
 }
 
-func (r *Cluster) HandlerSyncMessage(request []byte) (rspBytes []byte) {
+func (r *Cluster) OnSyncMessage(msg *iface.ActorMessage) (rspBytes []byte) {
 	var bytes []byte
 	var err error
 	defer func() {
@@ -96,11 +104,6 @@ func (r *Cluster) HandlerSyncMessage(request []byte) (rspBytes []byte) {
 			glog.Error("序列化同步消息响应失败", zap.Error(err))
 		}
 	}()
-	message := &iface.Message{}
-	if err = r.node.Unmarshal(request, message); err != nil {
-		return
-	}
-	msg := &iface.ActorMessage{Message: message}
 	system := r.node.System()
 	bytes, err = system.Call(msg)
 	return
