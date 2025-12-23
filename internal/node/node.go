@@ -10,6 +10,7 @@ import (
 	"gas/pkg/glog"
 	"gas/pkg/lib"
 	"gas/pkg/lib/component"
+	"gas/pkg/lib/grs"
 	"gas/pkg/lib/xerror"
 	"os"
 	"os/signal"
@@ -35,24 +36,18 @@ func New(path string) *Node {
 		path:       path,
 		viper:      viper.New(),
 	}
-	node.viper.SetConfigType("yaml")
-	node.viper.SetConfigFile(path)
 	return node
 }
 
 type Node struct {
 	*iface.Member
 	component.IManager[iface.INode]
-	path string
-
-	system  iface.ISystem
-	cluster iface.ICluster
-
+	path       string
+	system     iface.ISystem
+	cluster    iface.ICluster
 	serializer lib.ISerializer
-
-	panicHook func(entry zapcore.Entry)
-
-	viper *viper.Viper
+	panicHook  func(entry zapcore.Entry)
+	viper      *viper.Viper
 }
 
 func (n *Node) Info() *iface.Member {
@@ -76,7 +71,9 @@ func (n *Node) Cluster() iface.ICluster {
 func (n *Node) SetSerializer(ser lib.ISerializer) {
 	n.serializer = ser
 }
-
+func (n *Node) SetPanicHook(hook func(entry zapcore.Entry)) {
+	n.panicHook = hook
+}
 func (n *Node) Serializer() lib.ISerializer {
 	return n.serializer
 }
@@ -113,48 +110,64 @@ func (n *Node) GetConfig(key string, cfg interface{}) error {
 	return n.viper.UnmarshalKey(key, cfg)
 }
 
-func (n *Node) SetDefaultConfig(key string, cfg interface{}) {
-	n.viper.SetDefault(key, cfg)
-}
+func (n *Node) initConfig() (err error) {
+	n.viper.SetConfigType("yaml")
+	n.viper.SetConfigFile(n.path)
 
-func (n *Node) init() {
-	n.SetDefaultConfig("node", new(discovery.Member))
-}
-
-func (n *Node) Startup(comps ...component.IComponent[iface.INode]) error {
-	defer xerror.PrintCoreDump()
-	var err error
 	//  读取配置内容
 	err = n.viper.ReadInConfig() // 读取配置文件
 	if err != nil {
-		return err
+		return
 	}
-	if err = n.GetConfig("node", n.Member); err != nil {
-		return err
+	//  读取include
+	includeFiles := n.viper.GetStringSlice("include")
+	for _, file := range includeFiles {
+		// 读取包含的配置文件
+		subViper := viper.New()
+		subViper.SetConfigFile(file)
+		if err = subViper.ReadInConfig(); err != nil {
+			return
+		}
+		// 合并到主配置
+		if err = n.viper.MergeConfigMap(subViper.AllSettings()); err != nil {
+			return
+		}
 	}
+	return
+}
 
-	lib.SetPanicHandler(func(err interface{}) {
+func (n *Node) Startup(comps ...component.IComponent[iface.INode]) (err error) {
+	defer xerror.PrintCoreDump()
+	grs.SetPanicHandler(func(err interface{}) {
 		glog.Panic("panic", zap.Any("err", err), zap.String("stack", string(debug.Stack())))
 	})
+	//  初始化配置文件
+	if err = n.initConfig(); err != nil {
+		return
+	}
 
-	// 注册组件（注意顺序：glog 应该最先初始化，因为其他组件可能会使用日志）
+	//  获取node配置
+	if err = n.GetConfig("node", n.Member); err != nil {
+		return
+	}
+
+	// 注册组件
 	components := []component.IComponent[iface.INode]{
-		logger.NewComponent(),
+		logger.NewComponent(n.panicHook),
 		actor.NewComponent(),
 		cluster.NewComponent(),
 	}
-
-	//  注册组件
 	components = append(components, comps...)
 	for _, comp := range components {
 		if err = n.IManager.Register(comp); err != nil {
-			return err
+			return
 		}
 	}
 
 	//  启动组件
 	if err = n.IManager.Start(context.Background(), n); err != nil {
-		return err
+		glog.Error("组件启动失败", zap.Error(err))
+		return
 	}
 
 	glog.Info("节点启动完成", zap.String("path", n.path), zap.Strings("component", n.IManager.GetComponentNames()))
@@ -164,29 +177,19 @@ func (n *Node) Startup(comps ...component.IComponent[iface.INode]) error {
 	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
 	<-sigChan
 
-	return n.shutdown(context.Background())
-}
-
-func (n *Node) SetPanicHook(panicHook func(entry zapcore.Entry)) {
-	n.panicHook = panicHook
-}
-
-func (n *Node) CallPanicHook(entry zapcore.Entry) {
-	if n.panicHook == nil {
-		return
-	}
-	n.panicHook(entry)
+	return n.shutdown()
 }
 
 // Shutdown 优雅关闭节点，关闭所有组件
-func (n *Node) shutdown(ctx context.Context) error {
+func (n *Node) shutdown() error {
 	defer glog.Info("节点停止运行完成")
 	glog.Info("节点开始停止运行")
-	if err := n.IManager.Stop(ctx); err != nil {
+	if err := n.IManager.Stop(context.Background()); err != nil {
+		glog.Error("组件停止失败", zap.Error(err))
 		return err
 	}
 	shutdownTimeout := 30 * time.Second
-	timeoutCtx, cancel := context.WithTimeout(ctx, shutdownTimeout)
+	timeoutCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
-	return lib.ShutdownGoroutines(timeoutCtx)
+	return grs.Shutdown(timeoutCtx)
 }

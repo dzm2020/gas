@@ -3,7 +3,7 @@ package network
 import (
 	"context"
 	"gas/pkg/glog"
-	"gas/pkg/lib"
+	"gas/pkg/lib/grs"
 	"net"
 
 	"go.uber.org/zap"
@@ -33,7 +33,7 @@ func newUDPConnection(conn *net.UDPConn, typ ConnectionType, remoteAddr *net.UDP
 		zap.String("remoteAddr", udpConn.RemoteAddr().String()))
 
 	AddConnection(udpConn)
-	lib.Go(func(ctx context.Context) {
+	grs.Go(func(ctx context.Context) {
 		udpConn.writeLoop(ctx)
 	})
 	return udpConn
@@ -102,7 +102,7 @@ func (c *UDPConnection) Close(err error) error {
 		return ErrUDPConnectionClosed
 	}
 
-	lib.Go(func(context.Context) {
+	grs.Go(func(context.Context) {
 		c.server.removeConnection(c.remoteAddr.String())
 		_ = c.baseConnection.Close(c, err)
 	})

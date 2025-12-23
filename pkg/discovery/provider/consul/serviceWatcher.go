@@ -4,7 +4,7 @@ import (
 	"context"
 	"gas/pkg/discovery/iface"
 	"gas/pkg/glog"
-	"gas/pkg/lib"
+	"gas/pkg/lib/grs"
 	"sync"
 	"time"
 
@@ -48,7 +48,7 @@ func newServiceWatcher(
 
 // Start 启动服务列表监听
 func (sw *serviceWatcher) Start() {
-	lib.Go(func(ctx context.Context) {
+	grs.Go(func(ctx context.Context) {
 		sw.watch(ctx)
 	})
 }

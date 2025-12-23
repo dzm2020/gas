@@ -4,7 +4,7 @@ import (
 	"context"
 	"gas/pkg/discovery/iface"
 	"gas/pkg/glog"
-	"gas/pkg/lib"
+	"gas/pkg/lib/grs"
 	"sync"
 	"time"
 
@@ -58,7 +58,7 @@ func (r *consulRegistrar) Add(node *iface.Member) error {
 		return nil
 	}
 
-	lib.Go(func(ctx context.Context) {
+	grs.Go(func(ctx context.Context) {
 		r.healthCheck(ctx, node.GetID(), ch)
 	})
 	glog.Info("Consul节点注册成功",

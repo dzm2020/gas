@@ -10,6 +10,10 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
+const (
+	ComponentName = "logger"
+)
+
 func defaultConfig() *logger.Config {
 	return &logger.Config{
 		Path:         "./logs/app.log",
@@ -28,15 +32,18 @@ func defaultConfig() *logger.Config {
 // Component glog 日志组件
 type Component struct {
 	component.BaseComponent[iface.INode]
+	PanicHook func(entry zapcore.Entry)
 }
 
 // NewComponent 创建 glog 组件
-func NewComponent() *Component {
-	return &Component{}
+func NewComponent(panicHook func(entry zapcore.Entry)) *Component {
+	return &Component{
+		PanicHook: panicHook,
+	}
 }
 
 func (c *Component) Name() string {
-	return "logger"
+	return ComponentName
 }
 
 func (c *Component) Start(ctx context.Context, node iface.INode) error {
@@ -52,7 +59,9 @@ func (c *Component) Start(ctx context.Context, node iface.INode) error {
 		zap.Fields(zap.String("nodeKind", node.GetKind()), zap.Uint64("nodeId", node.GetID())),
 		zap.Hooks(func(entry zapcore.Entry) error {
 			if entry.Level >= zap.DPanicLevel {
-				node.CallPanicHook(entry)
+				if c.PanicHook != nil {
+					c.PanicHook(entry)
+				}
 			}
 			return nil
 		}),

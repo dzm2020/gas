@@ -3,7 +3,7 @@ package consul
 import (
 	"context"
 	"gas/pkg/discovery/iface"
-	"gas/pkg/lib"
+	"gas/pkg/lib/grs"
 	"reflect"
 	"sync"
 )
@@ -74,7 +74,7 @@ func (m *serviceListenerManager) Notify(topology *iface.Topology) {
 
 	for _, listener := range listeners {
 		if listener != nil {
-			lib.Go(func(ctx context.Context) {
+			grs.Go(func(ctx context.Context) {
 				listener(topology)
 			})
 		}

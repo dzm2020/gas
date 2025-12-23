@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"gas/pkg/glog"
-	"gas/pkg/lib"
+	"gas/pkg/lib/grs"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -46,7 +46,7 @@ func (s *UDPServer) Start() error {
 		glog.Info("UDP服务器监听错误", zap.String("proto", s.proto), zap.String("addr", s.addr), zap.Error(err))
 		return err
 	}
-	lib.Go(func(ctx context.Context) {
+	grs.Go(func(ctx context.Context) {
 		s.readLoop(ctx)
 	})
 	glog.Info("UDP服务器监听", zap.String("proto", s.proto), zap.String("addr", s.addr))

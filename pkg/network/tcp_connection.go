@@ -4,6 +4,7 @@ import (
 	"context"
 	"gas/pkg/glog"
 	"gas/pkg/lib"
+	"gas/pkg/lib/grs"
 	"net"
 	"time"
 
@@ -29,11 +30,11 @@ func newTCPConnection(conn net.Conn, typ ConnectionType, options *Options) *TCPC
 	}
 	AddConnection(tcpConn)
 
-	lib.Go(func(ctx context.Context) {
+	grs.Go(func(ctx context.Context) {
 		tcpConn.readLoop(ctx)
 	})
 
-	lib.Go(func(ctx context.Context) {
+	grs.Go(func(ctx context.Context) {
 		tcpConn.writeLoop(ctx)
 	})
 
@@ -164,7 +165,7 @@ func (c *TCPConnection) Close(err error) error {
 		return ErrTCPConnectionClosed
 	}
 
-	lib.Go(func(ctx context.Context) {
+	grs.Go(func(ctx context.Context) {
 		_ = c.conn.Close()
 		_ = c.baseConnection.Close(c, err)
 	})

@@ -4,7 +4,7 @@ import (
 	"context"
 	"gas/pkg/discovery/iface"
 	"gas/pkg/glog"
-	"gas/pkg/lib"
+	"gas/pkg/lib/grs"
 	"time"
 
 	"github.com/duke-git/lancet/v2/convertor"
@@ -35,7 +35,7 @@ type consulWatcher struct {
 }
 
 func (w *consulWatcher) start() {
-	lib.Go(func(ctx context.Context) {
+	grs.Go(func(ctx context.Context) {
 		w.loop(ctx, w.kind)
 	})
 }

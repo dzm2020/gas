@@ -6,6 +6,10 @@ import (
 	"gas/pkg/lib/component"
 )
 
+const (
+	ComponentName = "system"
+)
+
 // NewComponent 创建 actor 组件
 func NewComponent() *Component {
 	return &Component{}
@@ -17,7 +21,7 @@ type Component struct {
 }
 
 func (c *Component) Name() string {
-	return "system"
+	return ComponentName
 }
 
 func (c *Component) Start(ctx context.Context, node iface.INode) error {

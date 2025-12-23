@@ -6,6 +6,10 @@ import (
 	"gas/pkg/lib/component"
 )
 
+const (
+	ComponentName = "gate"
+)
+
 type Component struct {
 	component.BaseComponent[iface.INode]
 	*Gate
@@ -20,7 +24,7 @@ func NewComponent() *Component {
 }
 
 func (r *Component) Name() string {
-	return "gate"
+	return ComponentName
 }
 
 func (r *Component) Start(ctx context.Context, node iface.INode) error {

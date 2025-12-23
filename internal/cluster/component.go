@@ -8,6 +8,10 @@ import (
 	mq "gas/pkg/messageQue"
 )
 
+const (
+	ComponentName = "cluster"
+)
+
 type Config struct {
 	Name         string      `json:"name" yaml:"name"`
 	Discovery    *dis.Config `json:"discovery" yaml:"discovery"`
@@ -42,18 +46,17 @@ func NewComponent() *Component {
 }
 
 func (r *Component) Name() string {
-	return "cluster"
+	return ComponentName
 }
 
 func (r *Component) Start(ctx context.Context, node iface.INode) (err error) {
-	config := defaultConfig()
-
-	r.name = config.Name
 	r.node = node
-
+	config := defaultConfig()
 	if err = node.GetConfig(r.Name(), config); err != nil {
 		return err
 	}
+
+	r.name = config.Name
 	// 创建服务发现实例
 	r.dis, err = dis.NewFromConfig(*config.Discovery)
 	if err != nil {

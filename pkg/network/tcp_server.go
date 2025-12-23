@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"gas/pkg/glog"
-	"gas/pkg/lib"
+	"gas/pkg/lib/grs"
 	"net"
 	"sync/atomic"
 
@@ -42,7 +42,7 @@ func (s *TCPServer) Start() error {
 
 	glog.Info("TCP服务器启动监听", zap.String("proto", s.proto), zap.String("addr", s.addr))
 
-	lib.Go(func(ctx context.Context) {
+	grs.Go(func(ctx context.Context) {
 		s.acceptLoop(ctx)
 	})
 	return nil

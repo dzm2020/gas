@@ -1,4 +1,4 @@
-package lib
+package grs
 
 import (
 	"context"
@@ -54,7 +54,7 @@ func SetPanicHandler(handler func(interface{})) {
 	panicHandler = handler
 }
 
-func ShutdownGoroutines(ctx context.Context) error {
+func Shutdown(ctx context.Context) error {
 	if !isShutdown.CompareAndSwap(false, true) {
 		return nil
 	}

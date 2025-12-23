@@ -26,7 +26,6 @@ func (g *Gate) Start(ctx context.Context) (err error) {
 	options := append(g.Options, network.WithHandler(g), network.WithCodec(codec.New()))
 	g.server, err = network.NewServer(g.Address, options...)
 	if err != nil {
-		glog.Error("网关:服务器启动失败", zap.Error(err))
 		return
 	}
 	return g.server.Start()

@@ -152,9 +152,7 @@ func (cm *Manager[T]) Start(ctx context.Context, t T) error {
 		}
 
 		if err := component.Start(ctx, t); err != nil {
-			// 停止已启动的组件（逆序）
-			_ = cm.stopComponents(ctx, started)
-			return ErrFailedToStartComponent
+			return cm.stopComponents(ctx, started)
 		}
 
 		started = append(started, component)
