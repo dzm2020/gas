@@ -71,6 +71,10 @@ func (c *Component) Start(ctx context.Context, node iface.INode) error {
 }
 
 func (c *Component) Stop(ctx context.Context) error {
-	logger.Stop()
+	if err := logger.Stop(); err != nil {
+		// Sync() 在标准输出/错误时会返回错误，这是 zap 的已知行为，可以忽略
+		// 但对于文件写入器，应该记录错误
+		return err
+	}
 	return nil
 }

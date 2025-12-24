@@ -1,6 +1,8 @@
 package glog
 
 import (
+	"strings"
+
 	"go.uber.org/zap/zapcore"
 )
 
@@ -46,9 +48,9 @@ func DefaultConfig() *Config {
 	}
 }
 
-// parseLevel 解析日志级别字符串为 zapcore.Level
+// parseLevel 解析日志级别字符串为 zapcore.Level（不区分大小写）
 func parseLevel(level string) zapcore.Level {
-	switch level {
+	switch strings.ToLower(level) {
 	case "debug":
 		return zapcore.DebugLevel
 	case "info":

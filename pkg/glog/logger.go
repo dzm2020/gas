@@ -1,6 +1,7 @@
 package glog
 
 import (
+	"fmt"
 	"os"
 	"sync/atomic"
 
@@ -22,7 +23,7 @@ func init() {
 // cfg: 配置对象，如果为 nil 则使用默认配置
 func Init(cfg *Config) {
 	if cfg == nil {
-		return
+		cfg = DefaultConfig()
 	}
 	atomicLevel = zap.NewAtomicLevelAt(parseLevel(cfg.Level))
 	encoderConfig := zapcore.EncoderConfig{
@@ -61,13 +62,21 @@ func Init(cfg *Config) {
 }
 
 // Stop 停止 logger，同步所有缓冲的日志
-func Stop() {
+func Stop() error {
+	var lastErr error
 	if l := getLogger(); l != nil {
-		_ = l.Sync()
+		if err := l.Sync(); err != nil {
+			lastErr = err
+		}
 	}
 	if sl := getSugaredLogger(); sl != nil {
-		_ = sl.Sync()
+		if err := sl.Sync(); err != nil {
+			if lastErr == nil {
+				lastErr = err
+			}
+		}
 	}
+	return lastErr
 }
 
 // SetLogLevel 设置日志级别
@@ -141,6 +150,9 @@ func Error(msg string, fields ...zap.Field) {
 func Panic(msg string, fields ...zap.Field) {
 	if l := getLogger(); l != nil {
 		l.Panic(msg, fields...)
+	} else {
+		// 如果 logger 未初始化，仍然触发 panic
+		panic(msg)
 	}
 }
 
@@ -148,6 +160,9 @@ func Panic(msg string, fields ...zap.Field) {
 func Fatal(msg string, fields ...zap.Field) {
 	if l := getLogger(); l != nil {
 		l.Fatal(msg, fields...)
+	} else {
+		// 如果 logger 未初始化，仍然退出程序
+		os.Exit(1)
 	}
 }
 
@@ -190,6 +205,9 @@ func DPanicf(template string, args ...interface{}) {
 func Panicf(template string, args ...interface{}) {
 	if sl := getSugaredLogger(); sl != nil {
 		sl.Panicf(template, args...)
+	} else {
+		// 如果 logger 未初始化，仍然触发 panic
+		panic(fmt.Sprintf(template, args...))
 	}
 }
 
@@ -197,5 +215,8 @@ func Panicf(template string, args ...interface{}) {
 func Fatalf(template string, args ...interface{}) {
 	if sl := getSugaredLogger(); sl != nil {
 		sl.Fatalf(template, args...)
+	} else {
+		// 如果 logger 未初始化，仍然退出程序
+		os.Exit(1)
 	}
 }

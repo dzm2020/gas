@@ -8,6 +8,9 @@ import (
 
 // newWriter 根据配置创建日志文件写入器
 func newWriter(filename string, fileConfig FileConfig) io.Writer {
+	if filename == "" {
+		filename = "./logs/app.log"
+	}
 	return &lumberjack.Logger{
 		Filename:   filename,
 		MaxSize:    fileConfig.MaxSize,
