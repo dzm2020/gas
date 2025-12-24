@@ -147,12 +147,14 @@ func (a *actorContext) AfterFunc(duration time.Duration, task iface.Task) *lib.T
 	})
 }
 
-func (a *actorContext) exit() {
-	a.system.Remove(a.pid)
-	// OnStop 的错误不影响进程退出流程
-	if err := a.actor.OnStop(a); err != nil {
-		glog.Error("Actor OnStop 回调失败", zap.Any("pid", a.pid), zap.Error(err))
+func (a *actorContext) exit() (err error) {
+	if err = a.actor.OnStop(a); err != nil {
+		return err
 	}
+	if err = a.system.Remove(a.pid); err != nil {
+		return
+	}
+	return
 }
 
 func (a *actorContext) Shutdown() error {

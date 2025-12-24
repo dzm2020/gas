@@ -36,6 +36,7 @@ func (r *Component) Start(ctx context.Context, node iface.INode) error {
 	r.Gate.Options = ToOptions(config)
 	r.Gate.Address = config.Address
 	r.Gate.node = node
+	r.Gate.maxConn = int64(config.MaxConn)
 	return r.Gate.Start(ctx)
 }
 

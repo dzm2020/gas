@@ -85,9 +85,11 @@ func (s *TCPServer) Stop() error {
 		return ErrTCPServerNotRunning
 	}
 
-	if s.listener != nil {
-		_ = s.listener.Close()
-	}
 	glog.Info("TCP服务器关闭", zap.String("proto", s.proto), zap.String("addr", s.addr))
+
+	if s.listener != nil {
+		return s.listener.Close()
+	}
+
 	return nil
 }

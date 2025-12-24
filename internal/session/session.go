@@ -31,6 +31,7 @@ type Session struct {
 func (a *Session) SetPid(pid *iface.Pid) {
 	a.Agent = pid
 }
+
 func (a *Session) SetEntity(entityId int64) {
 	a.EntityId = entityId
 }

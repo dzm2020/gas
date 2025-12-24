@@ -55,8 +55,7 @@ func (p *Process) Shutdown() error {
 
 	// 创建一个退出任务，通过 mailbox 发送，确保在消息处理完成后才执行退出
 	msg := iface.NewTaskMessage(func(ctx iface.IContext) error {
-		p.ctx.exit()
-		return nil
+		return p.ctx.exit()
 	})
 
 	return p.mailbox.PostMessage(msg)

@@ -63,22 +63,23 @@ func (r *Cluster) makeSubject(nodeId uint64) string {
 	return fmt.Sprintf("%s.%d", r.name, nodeId)
 }
 
-func (r *Cluster) subscribe() error {
+func (r *Cluster) localSubject() string {
 	nodeId := r.node.GetID()
-	subject := r.makeSubject(nodeId)
-	_, err := r.mq.Subscribe(subject, r)
-	if err != nil {
-		return xerror.Wrapf(err, "订阅消息队列失败 (subject=%s, nodeId=%d)", subject, nodeId)
-	}
-	return nil
+	return r.makeSubject(nodeId)
 }
 
-func (r *Cluster) OnMessage(data []byte) ([]byte, error) {
+func (r *Cluster) subscribe() (err error) {
+	_, err = r.mq.Subscribe(r.localSubject(), r)
+	return
+}
+
+func (r *Cluster) OnMessage(data []byte) (bytes []byte, err error) {
 	message := &iface.Message{}
-	if err := r.node.Unmarshal(data, message); err != nil {
-		return nil, err
+	if err = r.node.Unmarshal(data, message); err != nil {
+		return
 	}
 	msg := &iface.ActorMessage{Message: message}
+
 	if msg.GetAsync() {
 		return nil, r.OnAsyncMessage(msg)
 	} else {
@@ -170,10 +171,7 @@ func (r *Cluster) Call(msg *iface.ActorMessage) (bin []byte, err error) {
 }
 
 func (r *Cluster) UpdateMember() error {
-	if err := r.dis.Add(r.node.Info()); err != nil {
-		return err
-	}
-	return nil
+	return r.dis.Add(r.node.Info())
 }
 
 func (r *Cluster) Select(tag string, strategy discovery.RouteStrategy) uint64 {
@@ -231,10 +229,10 @@ func (r *Cluster) Broadcast(tag string, message *iface.ActorMessage) {
 // Shutdown 关闭所有订阅
 func (r *Cluster) Shutdown(ctx context.Context) error {
 	if err := r.dis.Shutdown(ctx); err != nil {
-		return xerror.Wrap(err, "关闭服务发现失败")
+		return err
 	}
 	if err := r.mq.Shutdown(ctx); err != nil {
-		return xerror.Wrap(err, "关闭消息队列失败")
+		return err
 	}
 	return nil
 }

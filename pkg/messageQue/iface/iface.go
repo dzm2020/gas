@@ -24,9 +24,6 @@ type ISubscription interface {
 	Unsubscribe() error
 }
 
-// MsgHandler 消息处理函数类型
-type MsgHandler func(request []byte, response func([]byte) error)
-
 type ISubscriber interface {
 	OnMessage(request []byte) ([]byte, error)
 }

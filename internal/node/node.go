@@ -6,7 +6,6 @@ import (
 	"gas/internal/cluster"
 	"gas/internal/iface"
 	"gas/internal/logger"
-	discovery "gas/pkg/discovery/iface"
 	"gas/pkg/glog"
 	"gas/pkg/lib"
 	"gas/pkg/lib/component"
@@ -30,7 +29,7 @@ import (
 // New 创建节点实例
 func New(path string) *Node {
 	node := &Node{
-		Member:     new(discovery.Member),
+		Member:     new(iface.Member),
 		serializer: lib.Json,
 		IManager:   component.NewComponentsMgr[iface.INode](),
 		path:       path,
@@ -111,10 +110,8 @@ func (n *Node) GetConfig(key string, cfg interface{}) error {
 }
 
 func (n *Node) initConfig() (err error) {
-	n.viper.SetConfigType("yaml")
-	n.viper.SetConfigFile(n.path)
-
 	//  读取配置内容
+	n.viper.SetConfigFile(n.path)
 	err = n.viper.ReadInConfig() // 读取配置文件
 	if err != nil {
 		return

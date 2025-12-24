@@ -10,20 +10,22 @@ import (
 
 const Topic = "topic1"
 
+type testSubscriber struct{}
+
+func (t *testSubscriber) OnMessage(request []byte) ([]byte, error) {
+	fmt.Println("Received message: ")
+	return request, nil
+}
+
 func TestMessageQue(t *testing.T) {
 
-	client := nats.New([]string{"127.0.0.1:4222"}, nil)
+	client := nats.New(nil)
 	err := client.Run(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	sub, err := client.Subscribe(Topic, func(data []byte, reply func([]byte) error) {
-		fmt.Println("Received message: ", string(data))
-		if reply != nil {
-			_ = reply(data)
-		}
-	})
+	sub, err := client.Subscribe(Topic, &testSubscriber{})
 	if err != nil {
 		t.Fatal(err)
 	}

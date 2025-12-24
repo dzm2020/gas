@@ -1,6 +1,7 @@
 package nats
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -23,6 +24,16 @@ type Config struct {
 	RetryOnFailedConnect bool     `json:"retryOnFailedConnect"` // 连接失败时重试
 }
 
+func (c *Config) Validate() error {
+	if len(c.Servers) == 0 {
+		return fmt.Errorf("servers cannot be empty")
+	}
+	if c.Username != "" && c.Password == "" {
+		return fmt.Errorf("password is required when username is set")
+	}
+	return nil
+}
+
 // defaultConfig 返回默认配置
 func defaultConfig() *Config {
 	return &Config{
@@ -38,8 +49,8 @@ func defaultConfig() *Config {
 	}
 }
 
-// buildNatsOptions 将 Config 转换为 nats.Option 列表
-func buildNatsOptions(cfg *Config) []nats.Option {
+// toOptions 将 Config 转换为 nats.Option 列表
+func toOptions(cfg *Config) []nats.Option {
 	var natsOpts []nats.Option
 
 	if cfg.Name != "" {

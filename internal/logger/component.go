@@ -32,13 +32,13 @@ func defaultConfig() *logger.Config {
 // Component glog 日志组件
 type Component struct {
 	component.BaseComponent[iface.INode]
-	PanicHook func(entry zapcore.Entry)
+	panicHook func(entry zapcore.Entry)
 }
 
 // NewComponent 创建 glog 组件
 func NewComponent(panicHook func(entry zapcore.Entry)) *Component {
 	return &Component{
-		PanicHook: panicHook,
+		panicHook: panicHook,
 	}
 }
 
@@ -59,8 +59,8 @@ func (c *Component) Start(ctx context.Context, node iface.INode) error {
 		zap.Fields(zap.String("nodeKind", node.GetKind()), zap.Uint64("nodeId", node.GetID())),
 		zap.Hooks(func(entry zapcore.Entry) error {
 			if entry.Level >= zap.DPanicLevel {
-				if c.PanicHook != nil {
-					c.PanicHook(entry)
+				if c.panicHook != nil {
+					c.panicHook(entry)
 				}
 			}
 			return nil

@@ -2,6 +2,7 @@ package gate
 
 import (
 	"context"
+	"errors"
 	"gas/internal/gate/codec"
 	"gas/internal/gate/protocol"
 	"gas/internal/iface"
@@ -10,6 +11,7 @@ import (
 	"gas/pkg/network"
 
 	"github.com/duke-git/lancet/v2/convertor"
+	"go.uber.org/atomic"
 	"go.uber.org/zap"
 )
 
@@ -20,6 +22,8 @@ type Gate struct {
 	Options []network.Option
 	Factory Factory
 	server  network.IServer
+	maxConn int64
+	count   atomic.Int64
 }
 
 func (g *Gate) Start(ctx context.Context) (err error) {
@@ -50,6 +54,11 @@ func (g *Gate) getSession(entity network.IConnection) *session.Session {
 }
 
 func (g *Gate) OnConnect(entity network.IConnection) error {
+	if g.count.Load() > g.maxConn {
+		return errors.New("too many connections")
+	}
+	g.count.Add(1)
+
 	s := g.getSession(entity)
 	system := g.node.System()
 
@@ -72,6 +81,8 @@ func (g *Gate) OnMessage(entity network.IConnection, clientMsg interface{}) erro
 }
 
 func (g *Gate) OnClose(entity network.IConnection, wrong error) error {
+	g.count.Add(-1)
+
 	s := g.getSession(entity)
 	system := g.node.System()
 

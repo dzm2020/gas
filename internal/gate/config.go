@@ -28,6 +28,10 @@ type Config struct {
 	ReadBufSize int `json:"readBufSize,omitempty" yaml:"readBufSize,omitempty"`
 	// MaxConn 最大连接数
 	MaxConn int `json:"maxConn,omitempty" yaml:"maxConn,omitempty"`
+	// TLS 证书文件路径
+	TlsCertFile string `json:"tlsCertFile,omitempty" yaml:"tlsCertFile,omitempty"`
+	// TLS 私钥文件路径
+	TlsKeyFile string `json:"tlsKeyFile,omitempty" yaml:"tlsKeyFile,omitempty"`
 }
 
 func ToOptions(c *Config) []network.Option {
@@ -40,6 +44,9 @@ func ToOptions(c *Config) []network.Option {
 	}
 	if c.ReadBufSize > 0 {
 		options = append(options, network.WithReadBufSize(c.ReadBufSize))
+	}
+	if len(c.TlsKeyFile) > 0 {
+		options = append(options, network.WithTLS(c.TlsCertFile, c.TlsKeyFile))
 	}
 	return options
 }

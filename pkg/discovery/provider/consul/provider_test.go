@@ -106,9 +106,9 @@ func TestProvider_Subscribe_Unsubscribe(t *testing.T) {
 		t.Fatalf("订阅失败: %v", err)
 	}
 
-	nodes := []*iface.Node{
-		{Id: 2001, Name: serviceName, Address: "127.0.0.1", Port: 9001},
-		{Id: 2002, Name: serviceName, Address: "127.0.0.1", Port: 9002},
+	nodes := []*iface.Member{
+		{Id: 2001, Kind: serviceName, Address: "127.0.0.1", Port: 9001},
+		{Id: 2002, Kind: serviceName, Address: "127.0.0.1", Port: 9002},
 	}
 	for _, node := range nodes {
 		if err := provider.Add(node); err != nil {
