@@ -91,6 +91,7 @@ func (sw *serviceWatcher) fetch(ctx context.Context) error {
 	sw.watchersMu.Lock()
 	defer sw.watchersMu.Unlock()
 
+	// 创建新的服务 watcher
 	for name := range services {
 		if name == "consul" {
 			continue
@@ -102,6 +103,16 @@ func (sw *serviceWatcher) fetch(ctx context.Context) error {
 				watcher.Add(sw.onNodeChange)
 			}
 			watcher.start()
+		}
+	}
+
+	// 清理已删除的服务 watcher
+	for name := range sw.watchers {
+		if _, exists := services[name]; !exists || name == "consul" {
+			// 服务已删除，清理 watcher
+			// watcher 会通过 stopCh 自动停止
+			delete(sw.watchers, name)
+			glog.Debug("Consul服务已删除，清理 watcher", zap.String("service", name))
 		}
 	}
 	return nil

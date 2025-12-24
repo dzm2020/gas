@@ -10,11 +10,11 @@ import (
 
 type IDiscovery interface {
 	Run(ctx context.Context) error
+	Register(member *Member) error
+	Deregister(memberId uint64) error
 	GetById(memberId uint64) *Member
 	GetByKind(kind string) []*Member
 	GetAll() []*Member
-	Add(member *Member) error
-	Remove(memberId uint64) error
 	Watch(kind string, handler ServiceChangeListener) error
 	Unwatch(kind string, handler ServiceChangeListener)
 	Shutdown(ctx context.Context) error
@@ -43,7 +43,7 @@ func (m *MemberList) UpdateTopology(old *MemberList) *Topology {
 	}
 	for id := range old.Dict {
 		if _, ok := m.Dict[id]; !ok {
-			topology.Left = append(topology.Left, m.Dict[id])
+			topology.Left = append(topology.Left, old.Dict[id])
 		}
 	}
 	return topology
@@ -86,7 +86,7 @@ func (b *Member) SetTags(tags []string) {
 	b.Tags = tags
 }
 
-func (b *Member) RemoteTag(tag string) {
+func (b *Member) RemoveTag(tag string) {
 	slices.DeleteFunc(b.Tags, func(s string) bool {
 		return s == tag
 	})

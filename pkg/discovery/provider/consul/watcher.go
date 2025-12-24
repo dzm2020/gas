@@ -75,7 +75,15 @@ func (w *consulWatcher) fetch(ctx context.Context, kind string, listener func(*i
 
 	nodeDict := make(map[uint64]*iface.Member, len(services))
 	for _, s := range services {
-		id, _ := convertor.ToInt(s.Service.ID)
+		id, err := convertor.ToInt(s.Service.ID)
+		if err != nil {
+			glog.Warn("Consul服务ID转换失败，跳过该服务", zap.String("serviceId", s.Service.ID), zap.String("kind", s.Service.Service), zap.Error(err))
+			continue
+		}
+		if id <= 0 {
+			glog.Warn("Consul服务ID无效，跳过该服务", zap.String("serviceId", s.Service.ID), zap.String("kind", s.Service.Service))
+			continue
+		}
 		nodeDict[uint64(id)] = &iface.Member{
 			Id:      uint64(id),
 			Kind:    s.Service.Service,

@@ -73,10 +73,11 @@ func (m *serviceListenerManager) Notify(topology *iface.Topology) {
 	m.mu.RUnlock()
 
 	for _, listener := range listeners {
-		if listener != nil {
-			grs.Go(func(ctx context.Context) {
-				listener(topology)
-			})
+		if listener == nil {
+			continue
 		}
+		grs.Go(func(ctx context.Context) {
+			listener(topology)
+		})
 	}
 }

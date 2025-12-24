@@ -1,162 +1,93 @@
 package consul
 
 import (
-	"context"
+	"errors"
 	"gas/pkg/discovery/iface"
-	"gas/pkg/glog"
-	"gas/pkg/lib/grs"
 	"sync"
-	"time"
 
-	"github.com/duke-git/lancet/v2/convertor"
 	"github.com/hashicorp/consul/api"
-	"go.uber.org/zap"
 )
 
-type consulRegistrar struct {
-	client   *api.Client
-	config   *Config
-	stopCh   <-chan struct{}
-	status   string
-	wg       sync.WaitGroup
-	healthMu sync.RWMutex
-	healthCh map[uint64]chan string
+var (
+	errMemberNotFound = errors.New("member not found")
+)
+
+type registrar struct {
+	client *api.Client
+	config *Config
+	mu     sync.RWMutex
+	dict   map[uint64]*serviceHealth
 }
 
-func newConsulRegistrar(client *api.Client, config *Config, stopCh <-chan struct{}) *consulRegistrar {
-	return &consulRegistrar{
-		client:   client,
-		config:   config,
-		stopCh:   stopCh,
-		healthCh: make(map[uint64]chan string),
-	}
-}
-
-func (r *consulRegistrar) Add(node *iface.Member) error {
-	check := &api.AgentServiceCheck{
-		TTL:                            r.config.HealthTTL.String(),
-		DeregisterCriticalServiceAfter: r.config.DeregisterInterval.String(),
-	}
-	registration := &api.AgentServiceRegistration{
-		ID:      convertor.ToString(node.GetID()),
-		Name:    node.GetKind(),
-		Address: node.GetAddress(),
-		Port:    node.GetPort(),
-		Tags:    node.GetTags(),
-		Meta:    node.GetMeta(),
-		Check:   check,
-	}
-	if err := r.client.Agent().ServiceRegister(registration); err != nil {
-		glog.Error("Consul注册节点失败", zap.Uint64("nodeId", node.GetID()),
-			zap.String("kind", node.GetKind()), zap.Error(err))
-		return err
-	}
-
-	ch := make(chan string, 1)
-	if !r.setHealthChan(node.GetID(), ch) {
-		glog.Debug("Consul节点已注册", zap.Uint64("nodeId", node.GetID()))
-		return nil
-	}
-
-	grs.Go(func(ctx context.Context) {
-		r.healthCheck(ctx, node.GetID(), ch)
-	})
-	glog.Info("Consul节点注册成功",
-		zap.Uint64("nodeId", node.GetID()),
-		zap.String("kind", node.GetKind()))
-	return nil
-}
-
-func (r *consulRegistrar) UpdateStatus(nodeID uint64, status string) {
-	ch := r.getHealthChan(nodeID)
-	if ch == nil {
-		return
-	}
-	select {
-	case ch <- status:
-	default:
-		glog.Warn("Consul更新节点状态失败，通道已满", zap.Uint64("nodeId", nodeID))
+func newConsulRegistrar(client *api.Client, config *Config) *registrar {
+	return &registrar{
+		client: client,
+		config: config,
+		dict:   make(map[uint64]*serviceHealth),
 	}
 }
 
-func (r *consulRegistrar) Remove(nodeID uint64) error {
-	if r.getHealthChan(nodeID) == nil {
-		return nil
+func (r *registrar) register(member *iface.Member) (err error) {
+	r.mu.Lock()
+	m, ok := r.dict[member.GetID()]
+	if !ok {
+		m = newServiceHealth(r.client, r.config, member)
+		r.dict[member.GetID()] = m
 	}
-	r.deleteHealthChan(nodeID)
-	if err := r.client.Agent().ServiceDeregister(convertor.ToString(nodeID)); err != nil {
-		glog.Error("Consul移除节点失败", zap.Uint64("nodeId", nodeID), zap.Error(err))
-		return err
-	}
-	glog.Info("Consul节点移除成功", zap.Uint64("nodeId", nodeID))
-	return nil
-}
+	r.mu.Unlock()
 
-func (r *consulRegistrar) healthCheck(ctx context.Context, nodeID uint64, ch <-chan string) {
-
-	interval := r.config.HealthTTL / 2
-	if interval <= 0 {
-		interval = time.Second
-	}
-	ticker := time.NewTicker(interval)
-	defer func() {
-		_ = r.Remove(nodeID)
-		ticker.Stop()
-	}()
-
-	r.status = "pass"
-
-	_ = r.updateTTL(nodeID, r.status)
-
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-r.stopCh:
-			return
-		case status, ok := <-ch:
-			if !ok {
-				return
-			}
-			r.status = status
-			if err := r.updateTTL(nodeID, status); err != nil {
-				glog.Error("Consul更新TTL失败", zap.Uint64("nodeId", nodeID), zap.Error(err))
-				return
-			}
-		case <-ticker.C:
-			if err := r.updateTTL(nodeID, r.status); err != nil {
-				glog.Error("Consul定时更新TTL失败", zap.Uint64("nodeId", nodeID), zap.Error(err))
-				return
-			}
+	if err = m.Register(); err != nil {
+		// 注册失败，从字典中移除，避免资源泄漏
+		r.mu.Lock()
+		if existing, exists := r.dict[member.GetID()]; exists && existing == m {
+			delete(r.dict, member.GetID())
 		}
+		r.mu.Unlock()
+		return err
 	}
+	return nil
 }
 
-func (r *consulRegistrar) updateTTL(nodeID uint64, status string) error {
-	return r.client.Agent().UpdateTTL("service:"+convertor.ToString(nodeID), "", status)
-}
-
-func (r *consulRegistrar) setHealthChan(nodeID uint64, ch chan string) bool {
-	r.healthMu.Lock()
-	defer r.healthMu.Unlock()
-	if _, ok := r.healthCh[nodeID]; ok {
-		return false
+func (r *registrar) updateStatus(memberId uint64, status string) error {
+	m := r.get(memberId)
+	if m == nil {
+		return errMemberNotFound
 	}
-	r.healthCh[nodeID] = ch
-	return true
+
+	return m.updateStatus(status)
 }
 
-func (r *consulRegistrar) getHealthChan(nodeID uint64) chan string {
-	r.healthMu.RLock()
-	defer r.healthMu.RUnlock()
-	return r.healthCh[nodeID]
+func (r *registrar) deregister(memberId uint64) error {
+	m := r.get(memberId)
+	if m == nil {
+		return nil
+	}
+
+	r.mu.Lock()
+	delete(r.dict, memberId)
+	r.mu.Unlock()
+
+	return m.deregister()
 }
 
-func (r *consulRegistrar) deleteHealthChan(nodeID uint64) {
-	r.healthMu.Lock()
-	defer r.healthMu.Unlock()
-	if ch, ok := r.healthCh[nodeID]; ok {
-		close(ch)
-		delete(r.healthCh, nodeID)
+func (r *registrar) get(memberId uint64) *serviceHealth {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	return r.dict[memberId]
+}
+
+// cleanup 清理所有注册的成员
+func (r *registrar) cleanup() {
+	r.mu.Lock()
+	members := make([]*serviceHealth, 0, len(r.dict))
+	for _, m := range r.dict {
+		members = append(members, m)
+	}
+	r.dict = make(map[uint64]*serviceHealth)
+	r.mu.Unlock()
+
+	// 在锁外执行清理，避免死锁
+	for _, m := range members {
+		_ = m.deregister()
 	}
 }

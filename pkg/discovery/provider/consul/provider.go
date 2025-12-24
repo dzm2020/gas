@@ -3,6 +3,7 @@ package consul
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"gas/pkg/discovery"
 	"gas/pkg/discovery/iface"
@@ -13,6 +14,8 @@ import (
 	"github.com/hashicorp/consul/api"
 	"go.uber.org/zap"
 )
+
+var errConsulNotInitialized = errors.New("provider not initialized, call Run() first")
 
 func init() {
 	_ = discovery.Register("consul", func(configData json.RawMessage) (iface.IDiscovery, error) {
@@ -29,6 +32,12 @@ func init() {
 var _ iface.IDiscovery = (*Provider)(nil)
 
 func New(config *Config) (*Provider, error) {
+	if config == nil {
+		config = defaultConfig()
+	}
+	if err := config.Validate(); err != nil {
+		return nil, fmt.Errorf("invalid consul config: %w", err)
+	}
 
 	stopCh := make(chan struct{})
 	provider := &Provider{
@@ -48,12 +57,10 @@ type Provider struct {
 	stopCh   chan struct{}
 
 	serviceWatcher *serviceWatcher
-
+	reg            *registrar
 	// 节点存储
 	memberMu sync.RWMutex
 	members  map[uint64]*iface.Member
-
-	*consulRegistrar
 }
 
 func (c *Provider) Run(ctx context.Context) error {
@@ -66,7 +73,7 @@ func (c *Provider) Run(ctx context.Context) error {
 	glog.Info("consul连接成功", zap.String("address", c.config.Address))
 
 	c.serviceWatcher = newServiceWatcher(client, c.config, c.stopCh, c.onNodeChange)
-	c.consulRegistrar = newConsulRegistrar(client, c.config, c.stopCh)
+	c.reg = newConsulRegistrar(client, c.config)
 	return nil
 }
 
@@ -84,6 +91,9 @@ func (c *Provider) connect() (*api.Client, error) {
 }
 
 func (c *Provider) Watch(kind string, listener iface.ServiceChangeListener) error {
+	if c.serviceWatcher == nil {
+		return errConsulNotInitialized
+	}
 	watcher := c.serviceWatcher.GetOrCreateWatcher(kind)
 	watcher.Add(listener)
 	glog.Info("consul监控", zap.String("kind", kind))
@@ -115,9 +125,10 @@ func (c *Provider) onNodeChange(topology *iface.Topology) {
 		}
 	}
 	for _, member := range topology.Left {
-		if member != nil {
-			delete(c.members, member.GetID())
+		if member == nil {
+			continue
 		}
+		delete(c.members, member.GetID())
 	}
 }
 
@@ -154,9 +165,28 @@ func (c *Provider) GetAll() []*iface.Member {
 	return result
 }
 
+func (c *Provider) Register(member *iface.Member) error {
+	if c.reg == nil {
+		return errConsulNotInitialized
+	}
+	return c.reg.register(member)
+}
+
+func (c *Provider) Deregister(memberId uint64) error {
+	if c.reg == nil {
+		return errConsulNotInitialized
+	}
+	return c.reg.deregister(memberId)
+}
+
 func (c *Provider) Shutdown(ctx context.Context) error {
 	c.stopOnce.Do(func() {
 		close(c.stopCh)
+
+		// 清理所有注册的成员
+		if c.reg != nil {
+			c.reg.cleanup()
+		}
 	})
 	return nil
 }
