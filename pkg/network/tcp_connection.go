@@ -102,6 +102,11 @@ func (c *TCPConnection) read() error {
 		}
 		return readErr
 	}
+
+	if n == 0 {
+		// TCP 连接读取到 0 字节通常表示连接关闭
+		return io.EOF
+	}
 	
 	if _, readErr = c.buffer.Write(c.tmpBuf[:n]); readErr != nil {
 		glog.Error("TCP读取消息失败", zap.Int64("connectionId", c.ID()), zap.Error(readErr))
