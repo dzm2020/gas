@@ -24,7 +24,6 @@ type baseConnection struct {
 	timeoutTicker         *time.Ticker  // 心跳超时定时器
 	lastActive            time.Time     // 最后活动时间（用于超时检测）
 	timeout               time.Duration // 超时时间
-	closeChan             chan struct{} // 关闭信号
 	handler               IHandler
 	codec                 ICodec
 	typ                   ConnectionType
@@ -40,7 +39,6 @@ func initBaseConnection(typ ConnectionType, localAddr, remoteAddr net.Addr, opti
 		id:         generateConnID(),
 		lastActive: time.Now(),
 		timeout:    options.keepAlive,
-		closeChan:  make(chan struct{}),
 		handler:    options.handler,
 		codec:      options.codec,
 		typ:        typ,
@@ -53,7 +51,7 @@ func initBaseConnection(typ ConnectionType, localAddr, remoteAddr net.Addr, opti
 		bc.timeoutTicker = time.NewTicker(options.keepAlive / 2)
 	}
 
-	glog.Info("创建TCP连接", zap.Int64("connectionId", bc.ID()),
+	glog.Info("创建连接", zap.Int64("connectionId", bc.ID()),
 		zap.String("localAddr", bc.LocalAddr()),
 		zap.String("remoteAddr", bc.RemoteAddr()))
 
@@ -69,8 +67,19 @@ func (b *baseConnection) Type() ConnectionType {
 	return b.typ
 }
 
-func (c *baseConnection) LocalAddr() string  { return c.localAddr.String() }
-func (c *baseConnection) RemoteAddr() string { return c.remoteAddr.String() }
+func (b *baseConnection) LocalAddr() string {
+	if b.localAddr == nil {
+		return ""
+	}
+	return b.localAddr.String()
+}
+
+func (b *baseConnection) RemoteAddr() string {
+	if b.remoteAddr == nil {
+		return ""
+	}
+	return b.remoteAddr.String()
+}
 
 func (b *baseConnection) Context() interface{} {
 	return b.ctx
@@ -89,11 +98,6 @@ func (b *baseConnection) isClosed() bool {
 // 返回是否成功关闭（false表示已经关闭过）
 func (b *baseConnection) closeBase() bool {
 	return b.closed.CompareAndSwap(false, true)
-}
-
-// closeChanSignal 返回关闭信号通道
-func (b *baseConnection) closeChanSignal() chan struct{} {
-	return b.closeChan
 }
 
 // checkClosed 检查连接是否已关闭，如果已关闭返回错误
@@ -232,10 +236,11 @@ func (b *baseConnection) process(connection IConnection, data []byte) (int, erro
 }
 
 func (b *baseConnection) Close(connection IConnection, err error) (w error) {
-	if b.closeChan != nil {
-		close(b.closeChan)
-		b.closeChan = nil
+	if b.sendChan != nil {
+		close(b.sendChan)
+		b.sendChan = nil
 	}
+
 	if connection != nil {
 		RemoveConnection(connection)
 		connection = nil

@@ -13,7 +13,6 @@ type WebSocketConnection struct {
 	*baseConnection // 嵌入基类
 	conn            *websocket.Conn
 	server          *WebSocketServer // 所属服务器
-	sendChan        chan []byte      // 发送队列（读写分离核心）
 }
 
 func newWebSocketConnection(conn *websocket.Conn, typ ConnectionType, options *Options) *WebSocketConnection {
@@ -21,7 +20,6 @@ func newWebSocketConnection(conn *websocket.Conn, typ ConnectionType, options *O
 
 	wsConn := &WebSocketConnection{
 		baseConnection: base,
-		sendChan:       make(chan []byte, options.sendChanSize),
 		conn:           conn,
 	}
 
@@ -34,6 +32,26 @@ func newWebSocketConnection(conn *websocket.Conn, typ ConnectionType, options *O
 	})
 
 	return wsConn
+}
+
+// Send 发送消息（线程安全）
+func (c *WebSocketConnection) Send(msg interface{}) error {
+	if err := c.checkClosed(); err != nil {
+		return err
+	}
+	// 编码消息
+	data, err := c.encode(msg)
+	if err != nil {
+		glog.Error("WebSocket消息编码失败", zap.Int64("connectionId", c.ID()), zap.Error(err))
+		return err
+	}
+	select {
+	case c.sendChan <- data:
+	default:
+		glog.Error("WebSocket发送消息失败channel已满", zap.Int64("connectionId", c.ID()))
+		return ErrSendQueueFull
+	}
+	return nil
 }
 
 func (c *WebSocketConnection) readLoop() {
@@ -75,11 +93,15 @@ func (c *WebSocketConnection) writeLoop() {
 
 	for {
 		select {
-		case data, ok := <-c.sendChan:
+		case msg, ok := <-c.sendChan:
 			if !ok {
 				return // 通道已关闭
 			}
-			// 默认使用二进制消息类型
+			data, w := c.encode(msg)
+			if w != nil {
+				err = w
+				return
+			}
 			err = c.conn.WriteMessage(websocket.BinaryMessage, data)
 			if err != nil {
 				return
@@ -110,5 +132,5 @@ func (c *WebSocketConnection) Close(err error) (w error) {
 		}
 	}
 
-	return nil
+	return
 }

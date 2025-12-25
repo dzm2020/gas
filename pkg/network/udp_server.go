@@ -30,6 +30,7 @@ type UDPServer struct {
 	protoAddress string
 	once         sync.Once
 	sendChan     chan *udpPacket
+	closeChan    chan struct{}
 }
 
 // NewUDPServer 创建UDP服务器
@@ -42,6 +43,7 @@ func NewUDPServer(proto, addr string, option ...Option) *UDPServer {
 		connections:  make(map[string]*UDPConnection),
 		protoAddress: fmt.Sprintf("%s:%s", proto, addr),
 		sendChan:     make(chan *udpPacket, 1024),
+		closeChan:    make(chan struct{}),
 	}
 }
 
@@ -140,17 +142,24 @@ func (s *UDPServer) handlePacket(remoteAddr *net.UDPAddr, buf []byte) {
 
 func (s *UDPServer) writeLoop() {
 	for {
-		if err := s.write(); err != nil {
+		select {
+		case <-s.closeChan:
 			return
+		default:
+			if err := s.write(); err != nil {
+				return
+			}
 		}
 	}
 }
 
 func (s *UDPServer) write() error {
 	defer grs.Recover(func(err any) {
-		glog.Error("UDP服务器", zap.String("address", s.Addr()), zap.Any("err", err))
+		glog.Error("UDP服务器写入异常", zap.String("address", s.Addr()), zap.Any("err", err))
 	})
 	select {
+	case <-s.closeChan:
+		return io.EOF
 	case packet, ok := <-s.sendChan:
 		if !ok {
 			return io.EOF
@@ -177,6 +186,10 @@ func (s *UDPServer) send(data []byte, remoteAddr *net.UDPAddr) error {
 
 func (s *UDPServer) Shutdown() (err error) {
 	s.once.Do(func() {
+		// 关闭 closeChan，通知 writeLoop 退出
+		if s.closeChan != nil {
+			close(s.closeChan)
+		}
 		if s.conn != nil {
 			if err = s.conn.Close(); err != nil {
 				return
