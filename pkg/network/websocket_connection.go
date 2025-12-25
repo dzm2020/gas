@@ -3,7 +3,6 @@ package network
 import (
 	"context"
 	"gas/pkg/glog"
-	"gas/pkg/lib"
 	"gas/pkg/lib/grs"
 	"net"
 	"time"
@@ -17,14 +16,12 @@ type WebSocketConnection struct {
 	conn            *websocket.Conn
 	server          *WebSocketServer // 所属服务器
 	sendChan        chan []byte      // 发送队列（读写分离核心）
-	buffer          lib.IBuffer
 }
 
 func newWebSocketConnection(conn *websocket.Conn, typ ConnectionType, options *Options) *WebSocketConnection {
 	wsConn := &WebSocketConnection{
 		baseConnection: initBaseConnection(typ, options),
 		sendChan:       make(chan []byte, options.sendChanSize),
-		buffer:         lib.New(options.readBufSize),
 		conn:           conn,
 	}
 	AddConnection(wsConn)

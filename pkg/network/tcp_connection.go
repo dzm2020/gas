@@ -5,6 +5,7 @@ import (
 	"gas/pkg/glog"
 	"gas/pkg/lib"
 	"gas/pkg/lib/grs"
+	"io"
 	"net"
 	"time"
 
@@ -95,15 +96,13 @@ func (c *TCPConnection) readLoop(ctx context.Context) {
 func (c *TCPConnection) read() error {
 	n, readErr := c.conn.Read(c.tmpBuf)
 
-	if n == 0 {
-		return ErrTCPReadZeroBytes
-	}
-
 	if readErr != nil {
-		glog.Error("TCP读取消息失败", zap.Int64("connectionId", c.ID()), zap.Error(readErr))
+		if readErr != io.EOF {
+			glog.Error("TCP读取消息失败", zap.Int64("connectionId", c.ID()), zap.Error(readErr))
+		}
 		return readErr
 	}
-
+	
 	if _, readErr = c.buffer.Write(c.tmpBuf[:n]); readErr != nil {
 		glog.Error("TCP读取消息失败", zap.Int64("connectionId", c.ID()), zap.Error(readErr))
 		return readErr

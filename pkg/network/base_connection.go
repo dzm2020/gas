@@ -1,6 +1,7 @@
 package network
 
 import (
+	"sync"
 	"sync/atomic"
 	"time"
 )
@@ -13,6 +14,7 @@ type baseConnection struct {
 	lastActive    time.Time     // 最后活动时间（用于超时检测）
 	timeout       time.Duration // 超时时间
 	closeChan     chan struct{} // 关闭信号
+	closeOnce     sync.Once     // 确保 closeChan 只关闭一次
 	handler       IHandler
 	codec         ICodec
 	typ           ConnectionType
@@ -99,12 +101,14 @@ func (b *baseConnection) process(connection IConnection, data []byte) (int, erro
 }
 
 func (b *baseConnection) Close(connection IConnection, err error) error {
-	RemoveConnection(connection)
-	close(b.closeChan)
-	_ = b.handler.OnClose(connection, err)
-	if b.timeoutTicker != nil {
-		b.timeoutTicker.Stop()
-	}
+	b.closeOnce.Do(func() {
+		close(b.closeChan)
+		RemoveConnection(connection)
+		_ = b.handler.OnClose(connection, err)
+		if b.timeoutTicker != nil {
+			b.timeoutTicker.Stop()
+		}
+	})
 	return err
 }
 
