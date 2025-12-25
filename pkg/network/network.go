@@ -60,8 +60,8 @@ type IConnection interface {
 type IServer interface {
 	// Start 启动服务器（阻塞直到停止）
 	Start() error
-	// Stop 停止服务器（优雅关闭，等待所有连接退出）
-	Stop() error
+	// Shutdown 停止服务器
+	Shutdown() error
 
 	Addr() string
 }
@@ -111,11 +111,11 @@ func NewServer(protoAddr string, option ...Option) (IServer, error) {
 	}
 	switch proto {
 	case "tcp", "tcp4", "tcp6":
-		return NewTCPServer(proto, addr, option...), nil
+		return NewTCPServer(protoAddr, proto, addr, option...), nil
 	case "udp", "udp4", "udp6":
-		return NewUDPServer(proto, addr, option...), nil
+		return NewUDPServer(protoAddr, proto, addr, option...), nil
 	case "ws", "wss":
-		return NewWebSocketServer(addr, proto == "wss", option...), nil
+		return NewWebSocketServer(protoAddr, addr, proto == "wss", option...), nil
 	default:
 		return nil, ErrUnsupportedProtocol(proto)
 	}

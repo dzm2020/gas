@@ -3,7 +3,6 @@ package network
 import (
 	"context"
 	"errors"
-	"fmt"
 	"gas/pkg/glog"
 	"gas/pkg/lib/grs"
 	"io"
@@ -33,14 +32,14 @@ type UDPServer struct {
 }
 
 // NewUDPServer 创建UDP服务器
-func NewUDPServer(proto, addr string, option ...Option) *UDPServer {
+func NewUDPServer(protoAddr, proto, addr string, option ...Option) *UDPServer {
 	opts := loadOptions(option...)
 	return &UDPServer{
 		options:      opts,
 		addr:         addr,
 		proto:        proto,
 		connections:  make(map[string]*UDPConnection),
-		protoAddress: fmt.Sprintf("%s:%s", proto, addr),
+		protoAddress: protoAddr,
 		sendChan:     make(chan *udpPacket, 1024),
 	}
 }
@@ -74,7 +73,7 @@ func (s *UDPServer) addConnection(connKey string, remoteAddr *net.UDPAddr) *UDPC
 	return udpConn
 }
 
-func (s *UDPServer) Listen() error {
+func (s *UDPServer) Start() error {
 	if err := s.listen(); err != nil {
 		glog.Error("UDP服务器监听错误", zap.String("address", s.Addr()), zap.Error(err))
 		return err

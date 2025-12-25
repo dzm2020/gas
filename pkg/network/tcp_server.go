@@ -2,7 +2,6 @@ package network
 
 import (
 	"context"
-	"fmt"
 	"gas/pkg/glog"
 	"gas/pkg/lib/grs"
 	"io"
@@ -18,22 +17,22 @@ type TCPServer struct {
 	options     *Options
 	listener    net.Listener // TCP监听器
 	proto, addr string       // 监听地址（如 ":8080"）
-	address     string
+	protoAddr   string
 	once        sync.Once
 }
 
 // NewTCPServer 创建TCP服务器
-func NewTCPServer(proto, addr string, option ...Option) *TCPServer {
+func NewTCPServer(protoAddr, proto, addr string, option ...Option) *TCPServer {
 	return &TCPServer{
-		options: loadOptions(option...),
-		addr:    addr,
-		proto:   proto,
-		address: fmt.Sprintf("%s:%s", proto, addr),
+		options:   loadOptions(option...),
+		addr:      addr,
+		proto:     proto,
+		protoAddr: protoAddr,
 	}
 }
 
 func (s *TCPServer) Addr() string {
-	return s.address
+	return s.protoAddr
 }
 
 func (s *TCPServer) Start() error {

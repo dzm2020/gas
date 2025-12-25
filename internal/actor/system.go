@@ -201,7 +201,7 @@ func (s *System) clusterUnname(name string) error {
 	if cluster == nil {
 		return ErrClusterIsNil
 	}
-	s.node.RemoteTag(name)
+	s.node.RemoveTag(name)
 	if err := cluster.UpdateMember(); err != nil {
 		return err
 	}

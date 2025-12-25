@@ -109,5 +109,5 @@ func (g *Gate) Stop(ctx context.Context) error {
 	if g.server == nil {
 		return nil
 	}
-	return g.server.Stop()
+	return g.server.Shutdown()
 }

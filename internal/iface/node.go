@@ -17,7 +17,7 @@ type (
 		GetTags() []string
 		GetMeta() map[string]string
 		SetTags(tags []string)
-		RemoteTag(tag string)
+		RemoveTag(tag string)
 		AddTag(tag string)
 	}
 

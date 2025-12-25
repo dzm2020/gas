@@ -3,7 +3,6 @@ package network
 import (
 	"context"
 	"crypto/tls"
-	"errors"
 	"fmt"
 	"gas/pkg/glog"
 	"gas/pkg/lib/grs"
@@ -35,6 +34,7 @@ type WebSocketServer struct {
 	addr       string             // 监听地址（如 ":8080"）
 	path       string             // WebSocket 路径（如 "/ws"）
 	useTLS     bool               // 是否使用 TLS
+	protoAddr  string
 	once       sync.Once
 }
 
@@ -42,7 +42,7 @@ type WebSocketServer struct {
 // addr: 监听地址，格式为 "host:port" 或 "host:port/path"
 // useTLS: 是否使用 TLS
 // option: 可选的配置选项
-func NewWebSocketServer(addr string, useTLS bool, option ...Option) *WebSocketServer {
+func NewWebSocketServer(protoAddr, addr string, useTLS bool, option ...Option) *WebSocketServer {
 	upgrader := defaultUpgrader
 	opts := loadOptions(option...)
 	if opts.readBufSize > 0 {
@@ -60,11 +60,12 @@ func NewWebSocketServer(addr string, useTLS bool, option ...Option) *WebSocketSe
 	}
 
 	return &WebSocketServer{
-		options:  opts,
-		upgrader: upgrader,
-		addr:     addr,
-		path:     path,
-		useTLS:   useTLS,
+		options:   opts,
+		upgrader:  upgrader,
+		addr:      addr,
+		path:      path,
+		useTLS:    useTLS,
+		protoAddr: protoAddr,
 	}
 }
 
@@ -77,49 +78,45 @@ func (s *WebSocketServer) Addr() string {
 }
 
 func (s *WebSocketServer) Start() error {
-
 	mux := http.NewServeMux()
 	mux.HandleFunc(s.path, s.handleWebSocket)
-
 	s.httpServer = &http.Server{
 		Addr:    s.addr,
 		Handler: mux,
 	}
-
-	// 配置 TLS
-	if s.useTLS {
-		if s.options.tlsCertFile == "" || s.options.tlsKeyFile == "" {
-			return fmt.Errorf("TLS证书文件或私钥文件未配置")
+	grs.Go(func(ctx context.Context) {
+		var err error
+		if s.useTLS {
+			err = s.listenAndServeWSTLS()
+		} else {
+			err = s.listenAndServeWS()
 		}
-
-		cert, err := tls.LoadX509KeyPair(s.options.tlsCertFile, s.options.tlsKeyFile)
 		if err != nil {
-			return fmt.Errorf("加载TLS证书失败: %w", err)
+			glog.Error("WebSocket监听失败", zap.Error(err))
 		}
+	})
+	return nil
+}
 
-		s.httpServer.TLSConfig = &tls.Config{
-			Certificates: []tls.Certificate{cert},
-		}
-
-		glog.Info("WebSocket服务器启动监听(TLS)", zap.String("addr", s.addr), zap.String("path", s.path),
-			zap.String("cert", s.options.tlsCertFile), zap.String("key", s.options.tlsKeyFile))
-
-		grs.Go(func(ctx context.Context) {
-			if err := s.httpServer.ListenAndServeTLS("", ""); err != nil && !errors.Is(err, http.ErrServerClosed) {
-				glog.Error("WebSocket服务器监听失败", zap.String("addr", s.addr), zap.Error(err))
-			}
-		})
-	} else {
-		glog.Info("WebSocket服务器启动监听", zap.String("addr", s.addr), zap.String("path", s.path))
-
-		grs.Go(func(ctx context.Context) {
-			if err := s.httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-				glog.Error("WebSocket服务器监听失败", zap.String("addr", s.addr), zap.Error(err))
-			}
-		})
+func (s *WebSocketServer) listenAndServeWSTLS() error {
+	if s.options.tlsCertFile == "" || s.options.tlsKeyFile == "" {
+		return fmt.Errorf("TLS证书文件或私钥文件未配置")
 	}
 
-	return nil
+	cert, err := tls.LoadX509KeyPair(s.options.tlsCertFile, s.options.tlsKeyFile)
+	if err != nil {
+		return fmt.Errorf("加载TLS证书失败: %w", err)
+	}
+
+	s.httpServer.TLSConfig = &tls.Config{
+		Certificates: []tls.Certificate{cert},
+	}
+
+	return s.httpServer.ListenAndServeTLS("", "")
+}
+
+func (s *WebSocketServer) listenAndServeWS() error {
+	return s.httpServer.ListenAndServe()
 }
 
 func (s *WebSocketServer) handleWebSocket(w http.ResponseWriter, r *http.Request) {

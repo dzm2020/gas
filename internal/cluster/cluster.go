@@ -49,7 +49,7 @@ func (r *Cluster) Start(ctx context.Context) error {
 		return err
 	}
 	// 注册节点到服务发现
-	if err := r.dis.Add(r.node.Info()); err != nil {
+	if err := r.dis.Register(r.node.Info()); err != nil {
 		return err
 	}
 	// 订阅消息队列
@@ -171,7 +171,7 @@ func (r *Cluster) Call(msg *iface.ActorMessage) (bin []byte, err error) {
 }
 
 func (r *Cluster) UpdateMember() error {
-	return r.dis.Add(r.node.Info())
+	return r.dis.Register(r.node.Info())
 }
 
 func (r *Cluster) Select(tag string, strategy discovery.RouteStrategy) uint64 {
