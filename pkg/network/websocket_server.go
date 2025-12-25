@@ -9,7 +9,7 @@ import (
 	"gas/pkg/lib/grs"
 	"net/http"
 	"strings"
-	"sync/atomic"
+	"sync"
 
 	"github.com/gorilla/websocket"
 	"go.uber.org/zap"
@@ -35,7 +35,7 @@ type WebSocketServer struct {
 	addr       string             // 监听地址（如 ":8080"）
 	path       string             // WebSocket 路径（如 "/ws"）
 	useTLS     bool               // 是否使用 TLS
-	running    atomic.Bool        // 运行状态（原子操作）
+	once       sync.Once
 }
 
 // NewWebSocketServer 创建 WebSocket 服务器
@@ -68,10 +68,15 @@ func NewWebSocketServer(addr string, useTLS bool, option ...Option) *WebSocketSe
 	}
 }
 
-func (s *WebSocketServer) Start() error {
-	if !s.running.CompareAndSwap(false, true) {
-		return ErrWebSocketServerAlreadyRunning
+func (s *WebSocketServer) Addr() string {
+	protocol := "ws"
+	if s.useTLS {
+		protocol = "wss"
 	}
+	return fmt.Sprintf("%s://%s%s", protocol, s.addr, s.path)
+}
+
+func (s *WebSocketServer) Start() error {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc(s.path, s.handleWebSocket)
@@ -84,13 +89,11 @@ func (s *WebSocketServer) Start() error {
 	// 配置 TLS
 	if s.useTLS {
 		if s.options.tlsCertFile == "" || s.options.tlsKeyFile == "" {
-			s.running.Store(false)
 			return fmt.Errorf("TLS证书文件或私钥文件未配置")
 		}
 
 		cert, err := tls.LoadX509KeyPair(s.options.tlsCertFile, s.options.tlsKeyFile)
 		if err != nil {
-			s.running.Store(false)
 			return fmt.Errorf("加载TLS证书失败: %w", err)
 		}
 
@@ -120,11 +123,6 @@ func (s *WebSocketServer) Start() error {
 }
 
 func (s *WebSocketServer) handleWebSocket(w http.ResponseWriter, r *http.Request) {
-	if !s.running.Load() {
-		http.Error(w, "Server is not running", http.StatusServiceUnavailable)
-		return
-	}
-
 	// 升级 HTTP 连接为 WebSocket 连接
 	conn, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
@@ -132,27 +130,22 @@ func (s *WebSocketServer) handleWebSocket(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	_ = newWebSocketConnection(conn, Accept, s.options)
+	connection := newWebSocketConnection(conn, Accept, s.options)
+	AddConnection(connection)
 }
 
-func (s *WebSocketServer) Addr() string {
-	protocol := "ws"
-	if s.useTLS {
-		protocol = "wss"
-	}
-	return fmt.Sprintf("%s://%s%s", protocol, s.addr, s.path)
-}
+func (s *WebSocketServer) Shutdown() error {
+	var err error
+	s.once.Do(func() {
+		glog.Info("WebSocket服务器关闭", zap.String("addr", s.addr), zap.String("path", s.path))
 
-func (s *WebSocketServer) Stop() error {
-	if !s.running.CompareAndSwap(true, false) {
-		return ErrWebSocketServerNotRunning
-	}
+		if s.httpServer != nil {
+			ctx := context.Background()
+			if err = s.httpServer.Shutdown(ctx); err != nil {
+				return
+			}
+		}
 
-	if s.httpServer != nil {
-		ctx := context.Background()
-		_ = s.httpServer.Shutdown(ctx)
-	}
-
-	glog.Info("WebSocket服务器关闭", zap.String("addr", s.addr), zap.String("path", s.path))
-	return nil
+	})
+	return err
 }

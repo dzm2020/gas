@@ -20,8 +20,9 @@ type TCPConnection struct {
 }
 
 func newTCPConnection(conn net.Conn, typ ConnectionType, options *Options) *TCPConnection {
+	base := initBaseConnection(typ, conn.LocalAddr(), conn.RemoteAddr(), options)
 	tcpConn := &TCPConnection{
-		baseConnection: initBaseConnection(typ, options),
+		baseConnection: base,
 		tmpBuf:         make([]byte, options.readBufSize),
 		buffer:         buffer.New(options.readBufSize),
 		conn:           conn,
@@ -35,14 +36,8 @@ func newTCPConnection(conn net.Conn, typ ConnectionType, options *Options) *TCPC
 		tcpConn.writeLoop()
 	})
 
-	glog.Info("创建TCP连接", zap.Int64("connectionId", tcpConn.ID()),
-		zap.String("localAddr", tcpConn.LocalAddr().String()),
-		zap.String("remoteAddr", tcpConn.RemoteAddr().String()))
 	return tcpConn
 }
-
-func (c *TCPConnection) LocalAddr() net.Addr  { return c.conn.LocalAddr() }
-func (c *TCPConnection) RemoteAddr() net.Addr { return c.conn.RemoteAddr() }
 
 func (c *TCPConnection) readLoop() {
 	var err error
@@ -95,11 +90,9 @@ func (c *TCPConnection) writeLoop() {
 		_ = c.Close(err)
 	}()
 
-	var msg interface{}
-	var ok bool
 	for {
 		select {
-		case msg, ok = <-c.sendChan:
+		case msg, ok := <-c.sendChan:
 			if !ok {
 				return // 通道已关闭
 			}
@@ -117,7 +110,7 @@ func (c *TCPConnection) writeLoop() {
 func (c *TCPConnection) batchWriteMsg(msg interface{}) error {
 	var ok bool
 	l := len(c.sendChan)
-	msgList := make([]interface{}, l+1)
+	msgList := make([]interface{}, 0, l+1)
 	msgList = append(msgList, msg)
 	for i := 0; i < l; i++ {
 		msg, ok = <-c.sendChan

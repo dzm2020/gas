@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"gas/pkg/glog"
 	"gas/pkg/lib/grs"
+	"io"
 	"net"
 	"sync"
 
@@ -51,10 +52,8 @@ func (s *TCPServer) Start() error {
 }
 
 func (s *TCPServer) acceptLoop() {
-	var err error
-	defer glog.Info("TCP服务器退出ACCEPT协程", zap.String("address", s.Addr()), zap.Error(err))
 	for {
-		if err = s.accept(); err != nil {
+		if err := s.accept(); err != nil {
 			return
 		}
 	}
@@ -69,6 +68,9 @@ func (s *TCPServer) accept() error {
 	}
 	conn, err := s.listener.Accept()
 	if err != nil {
+		if err != io.EOF {
+			glog.Info("TCP服务器退出ACCEPT协程", zap.String("address", s.Addr()), zap.Error(err))
+		}
 		return err
 	}
 	connection := newTCPConnection(conn, Accept, s.options)

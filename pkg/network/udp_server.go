@@ -2,6 +2,7 @@ package network
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"gas/pkg/glog"
 	"gas/pkg/lib/grs"
@@ -13,6 +14,11 @@ import (
 	"go.uber.org/zap"
 )
 
+type udpPacket struct {
+	data       []byte
+	remoteAddr *net.UDPAddr
+}
+
 // ------------------------------ UDP服务器 ------------------------------
 
 type UDPServer struct {
@@ -23,6 +29,7 @@ type UDPServer struct {
 	rwMutex      sync.RWMutex // 保护connections并发
 	protoAddress string
 	once         sync.Once
+	sendChan     chan *udpPacket
 }
 
 // NewUDPServer 创建UDP服务器
@@ -34,6 +41,7 @@ func NewUDPServer(proto, addr string, option ...Option) *UDPServer {
 		proto:        proto,
 		connections:  make(map[string]*UDPConnection),
 		protoAddress: fmt.Sprintf("%s:%s", proto, addr),
+		sendChan:     make(chan *udpPacket, 1024),
 	}
 }
 
@@ -74,6 +82,9 @@ func (s *UDPServer) Listen() error {
 	grs.Go(func(ctx context.Context) {
 		s.readLoop()
 	})
+	grs.Go(func(ctx context.Context) {
+		s.writeLoop()
+	})
 	glog.Info("UDP服务器监听", zap.String("address", s.Addr()))
 	return nil
 
@@ -89,10 +100,8 @@ func (s *UDPServer) listen() error {
 }
 
 func (s *UDPServer) readLoop() {
-	var err error
-	defer glog.Info("UDP服务器退出READ协程", zap.String("address", s.Addr()), zap.Error(err))
 	for {
-		if err = s.read(); err != nil {
+		if err := s.read(); err != nil {
 			return
 		}
 	}
@@ -100,12 +109,16 @@ func (s *UDPServer) readLoop() {
 
 func (s *UDPServer) read() error {
 	defer grs.Recover(func(err any) {
-		glog.Panic("UDP服务器", zap.String("address", s.Addr()), zap.Any("err", err))
+		glog.Error("UDP服务器读取数据包异常", zap.String("address", s.Addr()), zap.Any("err", err))
 	})
+
 	buf := make([]byte, s.options.readBufSize)
-	n, remoteAddr, w := s.conn.ReadFromUDP(buf)
-	if w != nil {
-		return w
+	n, remoteAddr, err := s.conn.ReadFromUDP(buf)
+	if err != nil {
+		if err != io.EOF {
+			glog.Error("UDP服务器读取数据包异常", zap.String("address", s.Addr()), zap.Any("err", err))
+		}
+		return err
 	}
 	if n == 0 {
 		return io.EOF
@@ -125,12 +138,52 @@ func (s *UDPServer) handlePacket(remoteAddr *net.UDPAddr, buf []byte) {
 	udpConn.input(buf)
 }
 
+func (s *UDPServer) writeLoop() {
+	for {
+		if err := s.write(); err != nil {
+			return
+		}
+	}
+}
+
+func (s *UDPServer) write() error {
+	defer grs.Recover(func(err any) {
+		glog.Error("UDP服务器", zap.String("address", s.Addr()), zap.Any("err", err))
+	})
+	select {
+	case packet, ok := <-s.sendChan:
+		if !ok {
+			return io.EOF
+		}
+		_, err := s.conn.WriteToUDP(packet.data, packet.remoteAddr)
+		if err != nil {
+			if err != io.EOF {
+				glog.Error("UDP服务器写入失败", zap.String("address", s.Addr()), zap.Error(err))
+			}
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *UDPServer) send(data []byte, remoteAddr *net.UDPAddr) error {
+	select {
+	case s.sendChan <- &udpPacket{data: data, remoteAddr: remoteAddr}:
+	default:
+		return errors.New("channel is full")
+	}
+	return nil
+}
+
 func (s *UDPServer) Shutdown() (err error) {
 	s.once.Do(func() {
 		if s.conn != nil {
 			if err = s.conn.Close(); err != nil {
 				return
 			}
+		}
+		if s.sendChan != nil {
+			close(s.sendChan)
 		}
 	})
 	return nil

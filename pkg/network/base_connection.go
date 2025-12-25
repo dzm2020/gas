@@ -5,6 +5,7 @@ import (
 	"gas/pkg/glog"
 	"gas/pkg/lib/buffer"
 	"io"
+	"net"
 	"sync/atomic"
 	"time"
 
@@ -19,21 +20,22 @@ var (
 
 // baseConnection 连接基类，包含所有连接的通用逻辑
 type baseConnection struct {
-	id            int64         // 连接唯一ID
-	timeoutTicker *time.Ticker  // 心跳超时定时器
-	lastActive    time.Time     // 最后活动时间（用于超时检测）
-	timeout       time.Duration // 超时时间
-	closeChan     chan struct{} // 关闭信号
-	handler       IHandler
-	codec         ICodec
-	typ           ConnectionType
-	ctx           interface{}
-	sendChan      chan interface{}
-	closed        atomic.Bool // 关闭状态（原子操作）
+	id                    int64         // 连接唯一ID
+	timeoutTicker         *time.Ticker  // 心跳超时定时器
+	lastActive            time.Time     // 最后活动时间（用于超时检测）
+	timeout               time.Duration // 超时时间
+	closeChan             chan struct{} // 关闭信号
+	handler               IHandler
+	codec                 ICodec
+	typ                   ConnectionType
+	ctx                   interface{}
+	sendChan              chan interface{}
+	closed                atomic.Bool // 关闭状态（原子操作）
+	localAddr, remoteAddr net.Addr
 }
 
 // initBaseConnection 初始化基类连接
-func initBaseConnection(typ ConnectionType, options *Options) *baseConnection {
+func initBaseConnection(typ ConnectionType, localAddr, remoteAddr net.Addr, options *Options) *baseConnection {
 	bc := &baseConnection{
 		id:         generateConnID(),
 		lastActive: time.Now(),
@@ -43,11 +45,18 @@ func initBaseConnection(typ ConnectionType, options *Options) *baseConnection {
 		codec:      options.codec,
 		typ:        typ,
 		sendChan:   make(chan interface{}),
+		localAddr:  localAddr,
+		remoteAddr: remoteAddr,
 	}
 	// 只有当 keepAlive > 0 时才创建 ticker
 	if options.keepAlive > 0 {
 		bc.timeoutTicker = time.NewTicker(options.keepAlive / 2)
 	}
+
+	glog.Info("创建TCP连接", zap.Int64("connectionId", bc.ID()),
+		zap.String("localAddr", bc.LocalAddr()),
+		zap.String("remoteAddr", bc.RemoteAddr()))
+
 	return bc
 }
 
@@ -59,6 +68,9 @@ func (b *baseConnection) ID() int64 {
 func (b *baseConnection) Type() ConnectionType {
 	return b.typ
 }
+
+func (c *baseConnection) LocalAddr() string  { return c.localAddr.String() }
+func (c *baseConnection) RemoteAddr() string { return c.remoteAddr.String() }
 
 func (b *baseConnection) Context() interface{} {
 	return b.ctx
@@ -146,7 +158,7 @@ func (b *baseConnection) onConnect(connection IConnection) error {
 		glog.Error("连接回调错误", zap.Int64("connectionId", connection.ID()), zap.Error(err))
 		return err
 	}
-	glog.Debug("连接回调错误", zap.Int64("connectionId", connection.ID()))
+	glog.Debug("连接回调成功", zap.Int64("connectionId", connection.ID()))
 	return nil
 }
 
@@ -173,6 +185,9 @@ func (b *baseConnection) Send(msg interface{}) error {
 // write 批量写入多个消息到指定的 Writer
 // 将多个消息编码后合并写入，用于批量发送场景
 func (b *baseConnection) write(c io.Writer, msgList ...interface{}) error {
+	if c == nil {
+		return errors.New("writer is nil")
+	}
 	if len(msgList) == 0 {
 		return nil // 没有消息需要写入，直接返回
 	}

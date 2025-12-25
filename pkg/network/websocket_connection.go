@@ -4,8 +4,6 @@ import (
 	"context"
 	"gas/pkg/glog"
 	"gas/pkg/lib/grs"
-	"net"
-	"time"
 
 	"github.com/gorilla/websocket"
 	"go.uber.org/zap"
@@ -19,51 +17,36 @@ type WebSocketConnection struct {
 }
 
 func newWebSocketConnection(conn *websocket.Conn, typ ConnectionType, options *Options) *WebSocketConnection {
+	base := initBaseConnection(typ, conn.LocalAddr(), conn.RemoteAddr(), options)
+
 	wsConn := &WebSocketConnection{
-		baseConnection: initBaseConnection(typ, options),
+		baseConnection: base,
 		sendChan:       make(chan []byte, options.sendChanSize),
 		conn:           conn,
 	}
-	AddConnection(wsConn)
 
 	grs.Go(func(ctx context.Context) {
-		wsConn.readLoop(ctx)
+		wsConn.readLoop()
 	})
 
 	grs.Go(func(ctx context.Context) {
-		wsConn.writeLoop(ctx)
+		wsConn.writeLoop()
 	})
 
-	glog.Info("创建WebSocket连接", zap.Int64("connectionId", wsConn.ID()),
-		zap.String("localAddr", wsConn.LocalAddr().String()),
-		zap.String("remoteAddr", wsConn.RemoteAddr().String()))
 	return wsConn
 }
 
-func (c *WebSocketConnection) LocalAddr() net.Addr  { return c.conn.LocalAddr() }
-func (c *WebSocketConnection) RemoteAddr() net.Addr { return c.conn.RemoteAddr() }
-
-func (c *WebSocketConnection) readLoop(ctx context.Context) {
+func (c *WebSocketConnection) readLoop() {
 	var err error
 	defer func() {
 		_ = c.Close(err)
 	}()
-	if c.handler != nil {
-		if err = c.handler.OnConnect(c); err != nil {
-			glog.Error("WebSocket连接回调错误", zap.Int64("connectionId", c.ID()), zap.Error(err))
-			return
-		}
+	if err = c.onConnect(c); err != nil {
+		return
 	}
 	for {
-		select {
-		case <-ctx.Done():
-			return // 主动关闭，无错误
-		case <-c.closeChan:
+		if err = c.read(); err != nil {
 			return
-		default:
-			if err = c.read(); err != nil {
-				return
-			}
 		}
 	}
 }
@@ -76,34 +59,22 @@ func (c *WebSocketConnection) read() error {
 		}
 		return err
 	}
-
 	// 只处理文本和二进制消息
 	if messageType != websocket.TextMessage && messageType != websocket.BinaryMessage {
 		return nil
 	}
-
 	_, err = c.process(c, data)
-
-	return nil
+	return err
 }
 
-func (c *WebSocketConnection) writeLoop(ctx context.Context) {
+func (c *WebSocketConnection) writeLoop() {
 	var err error
 	defer func() {
 		_ = c.Close(err)
 	}()
 
-	var timeoutChan <-chan time.Time
-	if c.timeoutTicker != nil {
-		timeoutChan = c.timeoutTicker.C
-	}
-
 	for {
 		select {
-		case <-ctx.Done():
-			return
-		case <-c.closeChan:
-			return
 		case data, ok := <-c.sendChan:
 			if !ok {
 				return // 通道已关闭
@@ -111,13 +82,10 @@ func (c *WebSocketConnection) writeLoop(ctx context.Context) {
 			// 默认使用二进制消息类型
 			err = c.conn.WriteMessage(websocket.BinaryMessage, data)
 			if err != nil {
-				glog.Error("WebSocket写入消息失败", zap.Int64("connectionId", c.ID()), zap.Error(err))
 				return
 			}
-		case <-timeoutChan:
-			if c.isTimeout() {
-				err = ErrWebSocketConnectionKeepAlive
-				glog.Warn("WebSocket心跳超时", zap.Int64("connectionId", c.ID()), zap.Error(err))
+		case <-c.getTimeoutChan():
+			if err = c.checkTimeout(); err != nil {
 				return
 			}
 		}
@@ -129,13 +97,18 @@ func (c *WebSocketConnection) Close(err error) (w error) {
 		return ErrConnectionClosed
 	}
 
-	if w = c.conn.Close(); w != nil {
-		return
+	glog.Info("WebSocket连接断开", zap.Int64("connectionId", c.ID()), zap.Error(err))
+
+	if c.conn != nil {
+		if w = c.conn.Close(); w != nil {
+			return
+		}
 	}
-	if w = c.baseConnection.Close(c, err); w != nil {
-		return
+	if c.baseConnection != nil {
+		if w = c.baseConnection.Close(c, err); w != nil {
+			return
+		}
 	}
 
-	glog.Info("WebSocket连接断开", zap.Int64("connectionId", c.ID()), zap.Error(err))
 	return nil
 }

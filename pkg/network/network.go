@@ -2,7 +2,6 @@ package network
 
 import (
 	"gas/pkg/lib"
-	"net"
 	"sync/atomic"
 	"time"
 )
@@ -47,9 +46,9 @@ type IConnection interface {
 	// Close 关闭连接（线程安全，可重复调用）
 	Close(err error) error
 	// LocalAddr 本地地址
-	LocalAddr() net.Addr
+	LocalAddr() string
 	// RemoteAddr 远程地址（TCP：客户端地址；UDP：当前数据包的远程地址）
-	RemoteAddr() net.Addr
+	RemoteAddr() string
 	// IsClosed  是否关闭
 	IsClosed() bool
 	Type() ConnectionType
