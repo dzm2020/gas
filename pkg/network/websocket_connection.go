@@ -105,13 +105,9 @@ func (c *WebSocketConnection) read() error {
 		return nil
 	}
 
-	if _, writeErr := c.buffer.Write(data); writeErr != nil {
-		glog.Error("WebSocket读取消息失败", zap.Int64("connectionId", c.ID()), zap.Error(writeErr))
-		return writeErr
-	}
 	_, err = c.process(c, data)
-	
-	return err
+
+	return nil
 }
 
 func (c *WebSocketConnection) writeLoop(ctx context.Context) {

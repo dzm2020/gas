@@ -5,6 +5,7 @@ import (
 	"gas/pkg/glog"
 	"gas/pkg/lib/grs"
 	"net"
+	"time"
 
 	"go.uber.org/zap"
 )
@@ -69,13 +70,18 @@ func (c *UDPConnection) writeLoop(ctx context.Context) {
 		return
 	}
 
+	var timeoutChan <-chan time.Time
+	if c.timeoutTicker != nil {
+		timeoutChan = c.timeoutTicker.C
+	}
+
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		case <-c.closeChan:
 			return
-		case <-c.timeoutTicker.C:
+		case <-timeoutChan:
 			if c.isTimeout() {
 				err = ErrUDPConnectionKeepAlive
 				return

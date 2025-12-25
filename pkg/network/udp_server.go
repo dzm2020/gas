@@ -44,6 +44,8 @@ func (s *UDPServer) Start() error {
 	}
 	if err := s.listen(); err != nil {
 		glog.Info("UDP服务器监听错误", zap.String("proto", s.proto), zap.String("addr", s.addr), zap.Error(err))
+		// 监听失败，重置运行状态
+		s.running.Store(false)
 		return err
 	}
 	grs.Go(func(ctx context.Context) {

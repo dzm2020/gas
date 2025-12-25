@@ -7,8 +7,8 @@ import (
 
 var (
 	mu          sync.RWMutex
-	connections map[int64]IConnection // key: 连接ID, value: 连接对象
-	count       atomic.Int64          // 连接数量（原子操作，用于快速查询）
+	connections = make(map[int64]IConnection) // key: 连接ID, value: 连接对象
+	count       atomic.Int64                   // 连接数量（原子操作，用于快速查询）
 )
 
 func AddConnection(conn IConnection) {

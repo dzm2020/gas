@@ -84,11 +84,13 @@ func (s *WebSocketServer) Start() error {
 	// 配置 TLS
 	if s.useTLS {
 		if s.options.tlsCertFile == "" || s.options.tlsKeyFile == "" {
+			s.running.Store(false)
 			return fmt.Errorf("TLS证书文件或私钥文件未配置")
 		}
 
 		cert, err := tls.LoadX509KeyPair(s.options.tlsCertFile, s.options.tlsKeyFile)
 		if err != nil {
+			s.running.Store(false)
 			return fmt.Errorf("加载TLS证书失败: %w", err)
 		}
 

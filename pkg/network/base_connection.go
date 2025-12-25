@@ -102,7 +102,9 @@ func (b *baseConnection) Close(connection IConnection, err error) error {
 	RemoveConnection(connection)
 	close(b.closeChan)
 	_ = b.handler.OnClose(connection, err)
-	b.timeoutTicker.Stop()
+	if b.timeoutTicker != nil {
+		b.timeoutTicker.Stop()
+	}
 	return err
 }
 

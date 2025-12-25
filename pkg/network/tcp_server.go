@@ -37,6 +37,8 @@ func (s *TCPServer) Start() error {
 	if s.listener, err = net.Listen(s.proto, s.addr); err != nil {
 		glog.Error("TCP服务器监听失败", zap.String("proto", s.proto),
 			zap.String("addr", s.addr), zap.Error(err))
+		// 监听失败，重置运行状态
+		s.running.Store(false)
 		return err
 	}
 
