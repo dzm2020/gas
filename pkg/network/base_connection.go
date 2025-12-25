@@ -171,14 +171,8 @@ func (b *baseConnection) Send(msg interface{}) error {
 	if err := b.checkClosed(); err != nil {
 		return err
 	}
-	// 编码消息
-	data, err := b.encode(msg)
-	if err != nil {
-		glog.Error("消息编码失败", zap.Int64("connectionId", b.ID()), zap.Error(err))
-		return err
-	}
 	select {
-	case b.sendChan <- data:
+	case b.sendChan <- msg:
 	default:
 		glog.Error("发送消息失败channel已满", zap.Int64("connectionId", b.ID()))
 		return ErrSendQueueFull
