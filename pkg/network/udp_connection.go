@@ -5,7 +5,6 @@ import (
 	"gas/pkg/glog"
 	"gas/pkg/lib/grs"
 	"net"
-	"time"
 
 	"go.uber.org/zap"
 )
@@ -16,7 +15,7 @@ type UDPConnection struct {
 	*baseConnection              // 嵌入基类
 	server          *UDPServer   // 所属服务器
 	conn            *net.UDPConn // 底层UDP连接（全局共享）
-	writeChan       chan []byte
+	readChan        chan []byte
 	remoteAddr      *net.UDPAddr // 远程地址（虚拟连接的核心标识）
 }
 
@@ -26,14 +25,13 @@ func newUDPConnection(conn *net.UDPConn, typ ConnectionType, remoteAddr *net.UDP
 		conn:           conn,
 		remoteAddr:     remoteAddr,
 		server:         server,
-		writeChan:      make(chan []byte, 100),
+		readChan:       make(chan []byte, 100),
 	}
 
 	glog.Info("创建UDP连接", zap.Int64("connectionId", udpConn.ID()),
 		zap.String("localAddr", udpConn.LocalAddr().String()),
 		zap.String("remoteAddr", udpConn.RemoteAddr().String()))
 
-	AddConnection(udpConn)
 	grs.Go(func(ctx context.Context) {
 		udpConn.writeLoop(ctx)
 	})
@@ -47,7 +45,7 @@ func (c *UDPConnection) Send(msg interface{}) error {
 	if err := c.checkClosed(); err != nil {
 		return err
 	}
-	data, err := c.codec.Encode(msg)
+	data, err := c.encode(msg)
 	if err != nil {
 		glog.Error("UDP消息encode失败", zap.Int64("connectionId", c.ID()), zap.Error(err))
 		return err
@@ -65,14 +63,8 @@ func (c *UDPConnection) writeLoop(ctx context.Context) {
 		_ = c.Close(err)
 	}()
 
-	if err = c.handler.OnConnect(c); err != nil {
-		glog.Error("UDP连接回调错误", zap.Int64("connectionId", c.ID()), zap.Error(err))
+	if err = c.onConnect(c); err != nil {
 		return
-	}
-
-	var timeoutChan <-chan time.Time
-	if c.timeoutTicker != nil {
-		timeoutChan = c.timeoutTicker.C
 	}
 
 	for {
@@ -81,12 +73,11 @@ func (c *UDPConnection) writeLoop(ctx context.Context) {
 			return
 		case <-c.closeChan:
 			return
-		case <-timeoutChan:
-			if c.isTimeout() {
-				err = ErrUDPConnectionKeepAlive
+		case <-c.getTimeoutChan():
+			if err = c.checkTimeout(); err != nil {
 				return
 			}
-		case data := <-c.writeChan:
+		case data := <-c.readChan:
 			_, err = c.baseConnection.process(c, data)
 			if err != nil {
 				return
@@ -97,21 +88,28 @@ func (c *UDPConnection) writeLoop(ctx context.Context) {
 
 func (c *UDPConnection) input(data []byte) {
 	select {
-	case c.writeChan <- data:
+	case c.readChan <- data:
 	default:
 		glog.Error("UDP读取chan已满", zap.Int64("connectionId", c.ID()))
 	}
 }
 
-func (c *UDPConnection) Close(err error) error {
+func (c *UDPConnection) Close(err error) (w error) {
 	if !c.closeBase() {
-		return ErrUDPConnectionClosed
+		return ErrConnectionClosed
 	}
 
-	grs.Go(func(context.Context) {
-		c.server.removeConnection(c.remoteAddr.String())
-		_ = c.baseConnection.Close(c, err)
-	})
 	glog.Info("UDP连接断开", zap.Int64("connectionId", c.ID()), zap.Error(err))
-	return nil
+
+	if c.server != nil && c.remoteAddr != nil {
+		c.server.removeConnection(c.remoteAddr.String())
+	}
+
+	if c.baseConnection != nil {
+		if w = c.baseConnection.Close(c, err); w != nil {
+			return
+		}
+	}
+
+	return
 }

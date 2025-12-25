@@ -43,37 +43,17 @@ func newWebSocketConnection(conn *websocket.Conn, typ ConnectionType, options *O
 func (c *WebSocketConnection) LocalAddr() net.Addr  { return c.conn.LocalAddr() }
 func (c *WebSocketConnection) RemoteAddr() net.Addr { return c.conn.RemoteAddr() }
 
-// Send 发送消息（线程安全）
-func (c *WebSocketConnection) Send(msg interface{}) error {
-	if err := c.checkClosed(); err != nil {
-		return err
-	}
-	// 编码消息
-	data, err := c.codec.Encode(msg)
-	if err != nil {
-		glog.Error("WebSocket发送消息编码失败", zap.Int64("connectionId", c.ID()), zap.Error(err))
-		return err
-	}
-	select {
-	case c.sendChan <- data:
-	default:
-		glog.Error("WebSocket发送消息失败channel已满", zap.Int64("connectionId", c.ID()))
-		return ErrWebSocketSendQueueFull
-	}
-	return nil
-}
-
 func (c *WebSocketConnection) readLoop(ctx context.Context) {
 	var err error
 	defer func() {
 		_ = c.Close(err)
 	}()
-
-	if err = c.handler.OnConnect(c); err != nil {
-		glog.Error("WebSocket连接回调错误", zap.Int64("connectionId", c.ID()), zap.Error(err))
-		return
+	if c.handler != nil {
+		if err = c.handler.OnConnect(c); err != nil {
+			glog.Error("WebSocket连接回调错误", zap.Int64("connectionId", c.ID()), zap.Error(err))
+			return
+		}
 	}
-
 	for {
 		select {
 		case <-ctx.Done():
@@ -144,17 +124,18 @@ func (c *WebSocketConnection) writeLoop(ctx context.Context) {
 	}
 }
 
-func (c *WebSocketConnection) Close(err error) error {
+func (c *WebSocketConnection) Close(err error) (w error) {
 	if !c.closeBase() {
-		return ErrWebSocketConnectionClosed
+		return ErrConnectionClosed
 	}
 
-	grs.Go(func(ctx context.Context) {
-		_ = c.conn.Close()
-		_ = c.baseConnection.Close(c, err)
-	})
+	if w = c.conn.Close(); w != nil {
+		return
+	}
+	if w = c.baseConnection.Close(c, err); w != nil {
+		return
+	}
 
 	glog.Info("WebSocket连接断开", zap.Int64("connectionId", c.ID()), zap.Error(err))
 	return nil
 }
-

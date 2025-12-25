@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"gas/pkg/glog"
 	"gas/pkg/lib/grs"
+	"io"
 	"net"
 	"sync"
-	"sync/atomic"
-	"time"
 
+	"github.com/duke-git/lancet/v2/convertor"
 	"go.uber.org/zap"
 )
 
@@ -17,13 +17,12 @@ import (
 
 type UDPServer struct {
 	options      *Options
-	conn         *net.UDPConn  // UDP监听连接
-	proto, addr  string        // 监听地址
-	running      atomic.Bool   // 运行状态
-	closeChan    chan struct{} // 关闭信号
+	conn         *net.UDPConn // UDP监听连接
+	proto, addr  string       // 监听地址
 	connections  map[string]*UDPConnection
 	rwMutex      sync.RWMutex // 保护connections并发
 	protoAddress string
+	once         sync.Once
 }
 
 // NewUDPServer 创建UDP服务器
@@ -33,26 +32,49 @@ func NewUDPServer(proto, addr string, option ...Option) *UDPServer {
 		options:      opts,
 		addr:         addr,
 		proto:        proto,
-		closeChan:    make(chan struct{}),
 		connections:  make(map[string]*UDPConnection),
 		protoAddress: fmt.Sprintf("%s:%s", proto, addr),
 	}
 }
 
-func (s *UDPServer) Start() error {
-	if !s.running.CompareAndSwap(false, true) {
-		return ErrUDPServerAlreadyRunning
+func (s *UDPServer) Addr() string {
+	return s.protoAddress
+}
+
+func (s *UDPServer) removeConnection(connKey string) {
+	s.rwMutex.Lock()
+	defer s.rwMutex.Unlock()
+	delete(s.connections, connKey)
+}
+
+func (s *UDPServer) getConnection(connKey string) (*UDPConnection, bool) {
+	s.rwMutex.RLock()
+	defer s.rwMutex.RUnlock()
+	conn, ok := s.connections[connKey]
+	return conn, ok
+}
+func (s *UDPServer) addConnection(connKey string, remoteAddr *net.UDPAddr) *UDPConnection {
+	s.rwMutex.Lock()
+	defer s.rwMutex.Unlock()
+	// 双重检查，避免并发创建
+	udpConn, exists := s.connections[connKey]
+	if !exists {
+		udpConn = newUDPConnection(s.conn, Accept, remoteAddr, s)
+		AddConnection(udpConn)
+		s.connections[connKey] = udpConn
 	}
+	return udpConn
+}
+
+func (s *UDPServer) Listen() error {
 	if err := s.listen(); err != nil {
-		glog.Info("UDP服务器监听错误", zap.String("proto", s.proto), zap.String("addr", s.addr), zap.Error(err))
-		// 监听失败，重置运行状态
-		s.running.Store(false)
+		glog.Error("UDP服务器监听错误", zap.String("address", s.Addr()), zap.Error(err))
 		return err
 	}
 	grs.Go(func(ctx context.Context) {
-		s.readLoop(ctx)
+		s.readLoop()
 	})
-	glog.Info("UDP服务器监听", zap.String("proto", s.proto), zap.String("addr", s.addr))
+	glog.Info("UDP服务器监听", zap.String("address", s.Addr()))
 	return nil
 
 }
@@ -66,83 +88,50 @@ func (s *UDPServer) listen() error {
 	return err
 }
 
-func (s *UDPServer) readLoop(ctx context.Context) {
-	readBuf := make([]byte, s.options.readBufSize)
+func (s *UDPServer) readLoop() {
+	var err error
+	defer glog.Info("UDP服务器退出READ协程", zap.String("address", s.Addr()), zap.Error(err))
 	for {
-		select {
-		case <-ctx.Done():
+		if err = s.read(); err != nil {
 			return
-		case <-s.closeChan:
-			return
-		default:
-			n, remoteAddr, w := s.conn.ReadFromUDP(readBuf)
-			if w != nil {
-				glog.Error("UDP读取数据包错误", zap.String("proto", s.proto),
-					zap.String("addr", s.addr), zap.Error(w))
-				return
-			}
-			if n == 0 {
-				return
-			}
-			s.handlePacket(remoteAddr, readBuf, n)
 		}
 	}
 }
 
-// copyUDPAddr 复制 UDPAddr（避免并发问题）
-func copyUDPAddr(addr *net.UDPAddr) *net.UDPAddr {
-	if addr == nil {
-		return nil
+func (s *UDPServer) read() error {
+	defer grs.Recover(func(err any) {
+		glog.Panic("UDP服务器", zap.String("address", s.Addr()), zap.Any("err", err))
+	})
+	buf := make([]byte, s.options.readBufSize)
+	n, remoteAddr, w := s.conn.ReadFromUDP(buf)
+	if w != nil {
+		return w
 	}
-	ip := make(net.IP, len(addr.IP))
-	copy(ip, addr.IP)
-	return &net.UDPAddr{IP: ip, Port: addr.Port, Zone: addr.Zone}
+	if n == 0 {
+		return io.EOF
+	}
+	remoteAddrCopy := convertor.DeepClone(remoteAddr)
+	s.handlePacket(remoteAddrCopy, buf[:n])
+	return nil
 }
 
-// handlePacket 处理UDP数据包（在协程池中并发执行）
-func (s *UDPServer) handlePacket(remoteAddr *net.UDPAddr, readBuf []byte, n int) {
-	data := make([]byte, n)
-	copy(data, readBuf[:n])
-	remoteAddrCopy := copyUDPAddr(remoteAddr)
-
-	connKey := remoteAddrCopy.String()
-
-	s.rwMutex.RLock()
-	udpConn, exists := s.connections[connKey]
-	s.rwMutex.RUnlock()
-
+// handlePacket 处理UDP数据包
+func (s *UDPServer) handlePacket(remoteAddr *net.UDPAddr, buf []byte) {
+	connKey := remoteAddr.String()
+	udpConn, exists := s.getConnection(connKey)
 	if !exists {
-		s.rwMutex.Lock()
-		// 双重检查，避免并发创建
-		if udpConn, exists = s.connections[connKey]; !exists {
-			udpConn = newUDPConnection(s.conn, Accept, remoteAddrCopy, s)
-			s.connections[connKey] = udpConn
+		udpConn = s.addConnection(connKey, remoteAddr)
+	}
+	udpConn.input(buf)
+}
+
+func (s *UDPServer) Shutdown() (err error) {
+	s.once.Do(func() {
+		if s.conn != nil {
+			if err = s.conn.Close(); err != nil {
+				return
+			}
 		}
-		s.rwMutex.Unlock()
-	}
-
-	udpConn.input(data)
-}
-
-func (s *UDPServer) removeConnection(connKey string) {
-	s.rwMutex.Lock()
-	defer s.rwMutex.Unlock()
-	delete(s.connections, connKey)
-}
-
-func (s *UDPServer) Addr() string {
-	return s.protoAddress
-}
-
-func (s *UDPServer) Stop() error {
-	if !s.running.CompareAndSwap(true, false) {
-		return ErrUDPServerNotRunning
-	}
-
-	close(s.closeChan)
-
-	if s.conn != nil {
-		_ = s.conn.Close()
-	}
+	})
 	return nil
 }

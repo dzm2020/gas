@@ -7,32 +7,10 @@ import (
 
 // 连接相关错误
 var (
-	// ErrConnectionClosed 连接已关闭
-	ErrConnectionClosed = errors.New("connection closed")
-	// ErrTCPConnectionClosed TCP连接已关闭
-	ErrTCPConnectionClosed = errors.New("tcp connection already closed")
-	// ErrUDPConnectionClosed UDP连接已关闭
-	ErrUDPConnectionClosed = errors.New("udp connection already closed")
-	// ErrTCPSendQueueFull TCP发送队列已满
-	ErrTCPSendQueueFull = errors.New("tcp send queue full")
-	// ErrTCPReadZeroBytes TCP读取到0字节
-	ErrTCPReadZeroBytes = errors.New("tcp read zero bytes")
-	// ErrTCPConnectionKeepAlive TCP连接超时
-	ErrTCPConnectionKeepAlive = errors.New("tcp connection keepAlive")
-	// ErrUDPConnectionKeepAlive UDP连接超时
-	ErrUDPConnectionKeepAlive = errors.New("udp connection keepAlive")
-)
-
-// 服务器相关错误
-var (
-	// ErrTCPServerAlreadyRunning TCP服务器已在运行
-	ErrTCPServerAlreadyRunning = errors.New("tcp server already running")
-	// ErrTCPServerNotRunning TCP服务器未运行
-	ErrTCPServerNotRunning = errors.New("tcp server not running")
-	// ErrUDPServerAlreadyRunning UDP服务器已在运行
-	ErrUDPServerAlreadyRunning = errors.New("udp server already running")
-	// ErrUDPServerNotRunning UDP服务器未运行
-	ErrUDPServerNotRunning = errors.New("udp server not running")
+	ErrConnectionClosed    = errors.New("connection closed")
+	ErrSendQueueFull       = errors.New("send queue full")
+	ErrConnectionKeepAlive = errors.New("connection keepAlive")
+	ErrListenerIsNil       = errors.New("listener is nil")
 )
 
 // 客户端相关错误
@@ -45,10 +23,7 @@ var (
 
 // WebSocket 相关错误
 var (
-	// ErrWebSocketConnectionClosed WebSocket连接已关闭
-	ErrWebSocketConnectionClosed = errors.New("websocket connection already closed")
-	// ErrWebSocketSendQueueFull WebSocket发送队列已满
-	ErrWebSocketSendQueueFull = errors.New("websocket send queue full")
+
 	// ErrWebSocketConnectionKeepAlive WebSocket连接超时
 	ErrWebSocketConnectionKeepAlive = errors.New("websocket connection keepAlive")
 	// ErrWebSocketServerAlreadyRunning WebSocket服务器已在运行
@@ -61,22 +36,3 @@ var (
 func ErrUnsupportedProtocol(proto string) error {
 	return fmt.Errorf("proto: %s is not support", proto)
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
