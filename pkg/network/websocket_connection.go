@@ -35,24 +35,8 @@ func newWebSocketConnection(conn *websocket.Conn, typ ConnectionType, options *O
 }
 
 // Send 发送消息（线程安全）
-func (c *WebSocketConnection) Send(msg interface{}) error {
-	if err := c.checkClosed(); err != nil {
-		return err
-	}
-	// 编码消息
-	data, err := c.encode(msg)
-	if err != nil {
-		glog.Error("WebSocket消息编码失败", zap.Int64("connectionId", c.ID()), zap.Error(err))
-		return err
-	}
-	select {
-	case c.sendChan <- data:
-	default:
-		glog.Error("WebSocket发送消息失败channel已满", zap.Int64("connectionId", c.ID()))
-		return ErrSendQueueFull
-	}
-	return nil
-}
+// 注意：WebSocketConnection 使用基类的 Send 方法，不在此处编码
+// 编码在 writeLoop 中进行，保持与其他连接类型的一致性
 
 func (c *WebSocketConnection) readLoop() {
 	var err error
