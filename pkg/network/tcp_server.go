@@ -2,9 +2,9 @@ package network
 
 import (
 	"context"
+	"errors"
 	"gas/pkg/glog"
 	"gas/pkg/lib/grs"
-	"io"
 	"net"
 	"sync"
 
@@ -60,15 +60,15 @@ func (s *TCPServer) acceptLoop() {
 
 func (s *TCPServer) accept() error {
 	defer grs.Recover(func(err any) {
-		glog.Info("TCP服务器", zap.String("address", s.Addr()), zap.Any("err", err))
+		glog.Error("TCP服务器", zap.String("address", s.Addr()), zap.Any("err", err))
 	})
 	if s.listener == nil {
 		return ErrListenerIsNil
 	}
 	conn, err := s.listener.Accept()
 	if err != nil {
-		if err != io.EOF {
-			glog.Info("TCP服务器退出ACCEPT协程", zap.String("address", s.Addr()), zap.Error(err))
+		if !errors.Is(err, net.ErrClosed) {
+			glog.Error("TCP服务器退出ACCEPT协程", zap.String("address", s.Addr()), zap.Error(err))
 		}
 		return err
 	}

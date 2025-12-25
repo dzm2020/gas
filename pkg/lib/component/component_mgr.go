@@ -3,6 +3,7 @@ package component
 import (
 	"context"
 	"errors"
+	"gas/pkg/lib/xerror"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -131,7 +132,7 @@ func (cm *Manager[T]) Init(t T) error {
 }
 
 // Start 启动所有已注册的组件
-func (cm *Manager[T]) Start(ctx context.Context, t T) error {
+func (cm *Manager[T]) Start(ctx context.Context, t T) (err error) {
 	if cm.started.Load() {
 		return ErrManagerAlreadyStarted
 	}
@@ -151,8 +152,9 @@ func (cm *Manager[T]) Start(ctx context.Context, t T) error {
 			continue
 		}
 
-		if err := component.Start(ctx, t); err != nil {
-			return cm.stopComponents(ctx, started)
+		if err = component.Start(ctx, t); err != nil {
+			_ = cm.stopComponents(ctx, started)
+			return xerror.Wrapf(err, "组件启动失败 name[%s]", name)
 		}
 
 		started = append(started, component)

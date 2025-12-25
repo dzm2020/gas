@@ -20,10 +20,9 @@ import (
 	_ "gas/pkg/discovery/provider/consul"
 	_ "gas/pkg/messageQue/provider/nats"
 
+	"github.com/spf13/viper"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-
-	"github.com/spf13/viper"
 )
 
 // New 创建节点实例
@@ -154,6 +153,7 @@ func (n *Node) Startup(comps ...component.IComponent[iface.INode]) (err error) {
 		actor.NewComponent(),
 		cluster.NewComponent(),
 	}
+
 	components = append(components, comps...)
 	for _, comp := range components {
 		if err = n.IManager.Register(comp); err != nil {
@@ -171,7 +171,7 @@ func (n *Node) Startup(comps ...component.IComponent[iface.INode]) (err error) {
 
 	// 阻塞等待进程终止信号
 	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGQUIT, syscall.SIGKILL, syscall.SIGTERM)
 	<-sigChan
 
 	return n.shutdown()

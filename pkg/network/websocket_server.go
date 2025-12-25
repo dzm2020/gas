@@ -70,11 +70,7 @@ func NewWebSocketServer(protoAddr, addr string, useTLS bool, option ...Option) *
 }
 
 func (s *WebSocketServer) Addr() string {
-	protocol := "ws"
-	if s.useTLS {
-		protocol = "wss"
-	}
-	return fmt.Sprintf("%s://%s%s", protocol, s.addr, s.path)
+	return s.addr
 }
 
 func (s *WebSocketServer) Start() error {

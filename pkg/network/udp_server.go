@@ -149,7 +149,7 @@ func (s *UDPServer) writeLoop() {
 			}
 			_, err := s.conn.WriteToUDP(packet.data, packet.remoteAddr)
 			if err != nil {
-				if err != io.EOF {
+				if !errors.Is(err, net.ErrClosed) {
 					glog.Error("UDP服务器写入失败", zap.String("address", s.Addr()), zap.Error(err))
 				}
 				return
