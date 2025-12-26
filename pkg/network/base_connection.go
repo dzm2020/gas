@@ -42,7 +42,7 @@ func initBaseConnection(typ ConnectionType, localAddr, remoteAddr net.Addr, opti
 		handler:    options.handler,
 		codec:      options.codec,
 		typ:        typ,
-		sendChan:   make(chan interface{}),
+		sendChan:   make(chan interface{}, 1024),
 		localAddr:  localAddr,
 		remoteAddr: remoteAddr,
 	}

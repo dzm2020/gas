@@ -27,7 +27,7 @@ func newConsulRegistrar(client *api.Client, config *Config) *registrar {
 	}
 }
 
-func (r *registrar) register(member *iface.Member) (err error) {
+func (r *registrar) Register(member *iface.Member) (err error) {
 	r.mu.Lock()
 	m, ok := r.dict[member.GetID()]
 	if !ok {
@@ -48,7 +48,7 @@ func (r *registrar) register(member *iface.Member) (err error) {
 	return nil
 }
 
-func (r *registrar) updateStatus(memberId uint64, status string) error {
+func (r *registrar) UpdateStatus(memberId uint64, status string) error {
 	m := r.get(memberId)
 	if m == nil {
 		return errMemberNotFound
@@ -57,7 +57,7 @@ func (r *registrar) updateStatus(memberId uint64, status string) error {
 	return m.updateStatus(status)
 }
 
-func (r *registrar) deregister(memberId uint64) error {
+func (r *registrar) Deregister(memberId uint64) error {
 	m := r.get(memberId)
 	if m == nil {
 		return nil

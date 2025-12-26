@@ -13,9 +13,10 @@ type IDiscovery interface {
 	Register(member *Member) error
 	Deregister(memberId uint64) error
 	GetById(memberId uint64) *Member
-	GetByKind(kind string) []*Member
-	GetAll() []*Member
-	Watch(kind string, handler ServiceChangeListener) error
+	GetByKind(kind string) map[uint64]*Member
+	GetAll() map[uint64]*Member
+	UpdateStatus(memberId uint64, status string) error
+	Watch(kind string, handler ServiceChangeListener)
 	Unwatch(kind string, handler ServiceChangeListener)
 	Shutdown(ctx context.Context) error
 }

@@ -32,9 +32,9 @@ func (m *serviceListenerManager) Add(listener iface.ServiceChangeListener) {
 }
 
 // Remove 移除指定的监听器
-func (m *serviceListenerManager) Remove(listener iface.ServiceChangeListener) bool {
+func (m *serviceListenerManager) Remove(listener iface.ServiceChangeListener) {
 	if listener == nil {
-		return false
+		return
 	}
 
 	m.mu.Lock()
@@ -55,7 +55,7 @@ func (m *serviceListenerManager) Remove(listener iface.ServiceChangeListener) bo
 	if removed {
 		m.listeners = newListeners
 	}
-	return removed
+	return
 }
 
 // Count 返回当前注册的监听器数量

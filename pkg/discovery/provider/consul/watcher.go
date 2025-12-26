@@ -5,6 +5,7 @@ import (
 	"gas/pkg/discovery/iface"
 	"gas/pkg/glog"
 	"gas/pkg/lib/grs"
+	"sync/atomic"
 	"time"
 
 	"github.com/duke-git/lancet/v2/convertor"
@@ -12,46 +13,44 @@ import (
 	"go.uber.org/zap"
 )
 
-func newConsulWatcher(client *api.Client, kind string, config *Config, stopCh <-chan struct{}) *consulWatcher {
-	return &consulWatcher{
+func newWatcher(ctx context.Context, client *api.Client, kind string, config *Config) *Watcher {
+	watcher := &Watcher{
+		ctx:                    ctx,
 		client:                 client,
 		config:                 config,
-		stopCh:                 stopCh,
 		waitIndex:              0,
-		list:                   iface.NewMemberList(nil),
 		serviceListenerManager: newServiceListenerManager(),
 		kind:                   kind,
 	}
+	watcher.list.Store(iface.NewMemberList(nil))
+
+	grs.Go(func(ctx context.Context) {
+		watcher.loop()
+	})
+
+	return watcher
 }
 
-type consulWatcher struct {
+type Watcher struct {
+	ctx context.Context
 	*serviceListenerManager
 	client    *api.Client
 	config    *Config
-	stopCh    <-chan struct{}
 	waitIndex uint64
-	list      *iface.MemberList
+	list      atomic.Pointer[iface.MemberList] // 并发读写
 	kind      string
 }
 
-func (w *consulWatcher) start() {
-	grs.Go(func(ctx context.Context) {
-		w.loop(ctx, w.kind)
-	})
-}
-
-func (w *consulWatcher) loop(ctx context.Context, service string) {
+func (w *Watcher) loop() {
 	for {
 		select {
-		case <-ctx.Done():
-			return
-		case <-w.stopCh:
+		case <-w.ctx.Done():
 			return
 		default:
-			if err := w.fetch(ctx, service, w.Notify); err != nil {
+			if err := w.fetch(w.Notify); err != nil {
 				select {
 				case <-time.After(time.Second):
-				case <-w.stopCh:
+				case <-w.ctx.Done():
 					return
 				}
 			}
@@ -59,12 +58,13 @@ func (w *consulWatcher) loop(ctx context.Context, service string) {
 	}
 }
 
-func (w *consulWatcher) fetch(ctx context.Context, kind string, listener func(*iface.Topology)) error {
+func (w *Watcher) fetch(listener func(*iface.Topology)) error {
+	kind := w.kind
 	options := &api.QueryOptions{
 		WaitIndex: w.waitIndex,
 		WaitTime:  w.config.WatchWaitTime,
 	}
-	options.WithContext(ctx)
+	options.WithContext(w.ctx)
 	services, meta, err := w.client.Health().Service(kind, "", true, options)
 	if err != nil {
 		glog.Error("Consul获取服务失败", zap.String("service", kind), zap.Error(err))
@@ -95,18 +95,30 @@ func (w *consulWatcher) fetch(ctx context.Context, kind string, listener func(*i
 	}
 
 	list := iface.NewMemberList(nodeDict)
-	topology := list.UpdateTopology(w.list)
-	if len(topology.Left) > 0 || len(topology.Joined) > 0 {
-		glog.Debug("Consul服务拓扑变化", zap.String("kind", kind),
-			zap.Int("joined", len(topology.Joined)), zap.Int("alive", len(topology.Alive)),
-			zap.Int("left", len(topology.Left)), zap.Int("total", len(nodeDict)))
 
-	} else {
-		glog.Debug("Consul服务拓扑未变化", zap.String("kind", kind), zap.Int("total", len(nodeDict)))
-	}
+	old := w.list.Load()
+	topology := list.UpdateTopology(old)
+
+	w.list.Store(list)
+
 	if listener != nil {
 		listener(topology)
 	}
-	w.list = list
 	return nil
+}
+
+func (w *Watcher) GetAll() map[uint64]*iface.Member {
+	old := w.list.Load()
+	if old == nil {
+		return nil
+	}
+	return old.Dict
+}
+
+func (w *Watcher) GetById(id uint64) *iface.Member {
+	old := w.list.Load()
+	if old == nil {
+		return nil
+	}
+	return old.Dict[id]
 }

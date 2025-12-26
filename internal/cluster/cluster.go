@@ -73,41 +73,33 @@ func (r *Cluster) subscribe() (err error) {
 	return
 }
 
-func (r *Cluster) OnMessage(data []byte) (bytes []byte, err error) {
+func (r *Cluster) OnMessage(data []byte, response func(data []byte) error) {
 	message := &iface.Message{}
+	var err error
+	defer func() {
+		if err != nil {
+			glog.Error("集群：处理消息失败", zap.Error(err), zap.Any("message", message))
+		}
+	}()
 	if err = r.node.Unmarshal(data, message); err != nil {
 		return
 	}
 	msg := &iface.ActorMessage{Message: message}
-
+	system := r.node.System()
 	if msg.GetAsync() {
-		return nil, r.OnAsyncMessage(msg)
+		err = system.Send(msg)
 	} else {
-		return r.OnSyncMessage(msg), nil
-	}
-}
-
-func (r *Cluster) OnAsyncMessage(msg *iface.ActorMessage) error {
-	system := r.node.System()
-	if err := system.Send(msg); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (r *Cluster) OnSyncMessage(msg *iface.ActorMessage) (rspBytes []byte) {
-	var bytes []byte
-	var err error
-	defer func() {
-		response := iface.NewResponse(bytes, err)
-		rspBytes, err = r.node.Marshal(response)
+		//  调用本地actor
+		responseData, responseErr := system.Call(msg)
+		//  打包结果
+		responseMessage := iface.NewResponse(responseData, responseErr)
+		responseData, err = r.node.Marshal(responseMessage)
 		if err != nil {
-			glog.Error("序列化同步消息响应失败", zap.Error(err))
+			return
 		}
-	}()
-	system := r.node.System()
-	bytes, err = system.Call(msg)
-	return
+		//  写入到消息队列
+		err = response(responseData)
+	}
 }
 
 // Send 发送消息到集群节点

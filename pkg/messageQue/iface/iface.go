@@ -11,10 +11,10 @@ type IMessageQue interface {
 	Run(ctx context.Context) error
 	// Publish 向指定主题发布消息（无回复）
 	Publish(subject string, data []byte) error
-	// Subscribe 订阅主题，接收消息（非阻塞，通过回调处理）
-	Subscribe(subject string, subscriber ISubscriber) (ISubscription, error)
 	// Request 发送请求并等待回复（同步 RPC 模式）
 	Request(subject string, data []byte, timeout time.Duration) ([]byte, error)
+	// Subscribe 订阅主题，接收消息（非阻塞，通过回调处理）
+	Subscribe(subject string, subscriber ISubscriber) (ISubscription, error)
 	// Shutdown 关闭集群连接
 	Shutdown(ctx context.Context) error
 }
@@ -25,5 +25,11 @@ type ISubscription interface {
 }
 
 type ISubscriber interface {
-	OnMessage(request []byte) ([]byte, error)
+	//
+	// OnMessage
+	//  @Description:
+	//  @param request
+	//  @param response  error 回复成功/失败
+	//
+	OnMessage(request []byte, response func(data []byte) error)
 }

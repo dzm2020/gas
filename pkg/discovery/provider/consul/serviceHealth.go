@@ -107,7 +107,6 @@ func (m *serviceHealth) updateStatus(status string) error {
 func (m *serviceHealth) deregister() error {
 	m.once.Do(func() {
 		close(m.statusCh)
-
 		if err := m.client.Agent().ServiceDeregister(convertor.ToString(m.GetID())); err != nil {
 			glog.Error("Consul取消注册节点失败", zap.Uint64("memberId", m.GetID()), zap.Error(err))
 		}
