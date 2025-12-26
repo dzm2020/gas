@@ -15,7 +15,6 @@ type IDiscovery interface {
 	GetById(memberId uint64) *Member
 	GetByKind(kind string) map[uint64]*Member
 	GetAll() map[uint64]*Member
-	UpdateStatus(memberId uint64, status string) error
 	Watch(kind string, handler ServiceChangeListener)
 	Unwatch(kind string, handler ServiceChangeListener)
 	Shutdown(ctx context.Context) error
@@ -104,6 +103,10 @@ type Topology struct {
 	Alive  []*Member
 	Joined []*Member
 	Left   []*Member
+}
+
+func (t *Topology) IsChange() bool {
+	return len(t.Left) > 0 || len(t.Joined) > 0
 }
 
 type ServiceChangeListener func(_ *Topology)

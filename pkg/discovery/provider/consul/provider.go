@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"gas/pkg/discovery"
+	discoveryApi "gas/pkg/discovery"
 	"gas/pkg/discovery/iface"
 	"gas/pkg/glog"
 	"sync"
@@ -14,7 +14,7 @@ import (
 )
 
 func init() {
-	_ = discovery.Register("consul", func(configData json.RawMessage) (iface.IDiscovery, error) {
+	_ = discoveryApi.Register("consul", func(configData json.RawMessage) (iface.IDiscovery, error) {
 		consulCfg := defaultConfig()
 		if len(configData) > 0 {
 			if err := json.Unmarshal(configData, consulCfg); err != nil {
@@ -46,8 +46,8 @@ type Provider struct {
 	client *api.Client
 	config *Config
 
-	*serviceWatcher
-	*registrar
+	*discovery // 集群监控
+	*registrar // 注册
 
 	stopOnce sync.Once
 
@@ -58,40 +58,33 @@ type Provider struct {
 func (c *Provider) Run(ctx context.Context) error {
 	c.ctx, c.cancel = context.WithCancel(ctx)
 
-	client, err := c.connect()
-	if err != nil {
+	if err := c.connect(); err != nil {
 		glog.Error("consul连接失败", zap.String("address", c.config.Address), zap.Error(err))
 		return err
 	}
-	c.client = client
 
-	c.serviceWatcher = newServiceWatcher(c.ctx, client, c.config)
-	c.registrar = newConsulRegistrar(client, c.config)
+	c.discovery = newDiscovery(c.ctx, c.client, c.config)
+	c.registrar = newRegistrar(c.ctx, c.client, c.config)
 
 	glog.Info("consul连接成功", zap.String("address", c.config.Address))
 	return nil
 }
 
-func (c *Provider) connect() (*api.Client, error) {
+func (c *Provider) connect() error {
 	cfg := api.DefaultConfig()
 	cfg.Address = c.config.Address
 	client, err := api.NewClient(cfg)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	if _, err = client.Status().Leader(); err != nil {
-		return nil, err
+		return err
 	}
-	return client, nil
+	c.client = client
+	return nil
 }
 
 func (c *Provider) Shutdown(ctx context.Context) error {
-	c.stopOnce.Do(func() {
-		c.cancel()
-		// 清理所有注册的成员
-		if c.registrar != nil {
-			c.registrar.cleanup()
-		}
-	})
+	c.cancel()
 	return nil
 }

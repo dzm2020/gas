@@ -64,7 +64,7 @@ func (w *Watcher) fetch(listener func(*iface.Topology)) error {
 		WaitIndex: w.waitIndex,
 		WaitTime:  w.config.WatchWaitTime,
 	}
-	options.WithContext(w.ctx)
+	options = options.WithContext(w.ctx)
 	services, meta, err := w.client.Health().Service(kind, "", true, options)
 	if err != nil {
 		glog.Error("Consul获取服务失败", zap.String("service", kind), zap.Error(err))
@@ -101,8 +101,10 @@ func (w *Watcher) fetch(listener func(*iface.Topology)) error {
 
 	w.list.Store(list)
 
-	if listener != nil {
-		listener(topology)
+	if topology.IsChange() {
+		if listener != nil {
+			listener(topology)
+		}
 	}
 	return nil
 }

@@ -13,8 +13,8 @@ import (
 	"go.uber.org/zap"
 )
 
-// serviceWatcher 服务列表监听器，负责监听 Consul 服务列表变化并管理 watchers
-type serviceWatcher struct {
+// discovery 服务列表监听器，负责监听 Consul 服务列表变化并管理 watchers
+type discovery struct {
 	ctx       context.Context
 	client    *api.Client
 	config    *Config
@@ -23,9 +23,9 @@ type serviceWatcher struct {
 	watchers  map[string]*Watcher
 }
 
-// newServiceWatcher 创建服务列表监听器
-func newServiceWatcher(ctx context.Context, client *api.Client, config *Config) *serviceWatcher {
-	s := &serviceWatcher{
+// newDiscovery 创建服务列表监听器
+func newDiscovery(ctx context.Context, client *api.Client, config *Config) *discovery {
+	s := &discovery{
 		ctx:       ctx,
 		client:    client,
 		config:    config,
@@ -39,7 +39,7 @@ func newServiceWatcher(ctx context.Context, client *api.Client, config *Config) 
 }
 
 // watch 持续监听服务列表变化
-func (sw *serviceWatcher) watch() {
+func (sw *discovery) watch() {
 	for {
 		select {
 		case <-sw.ctx.Done():
@@ -58,7 +58,7 @@ func (sw *serviceWatcher) watch() {
 }
 
 // fetch 获取服务列表并更新 watchers
-func (sw *serviceWatcher) fetch() error {
+func (sw *discovery) fetch() error {
 	options := &api.QueryOptions{
 		WaitIndex: sw.waitIndex,
 		WaitTime:  sw.config.WatchWaitTime,
@@ -80,35 +80,37 @@ func (sw *serviceWatcher) fetch() error {
 	}
 
 	// 清理已删除的服务 watcher
+	sw.mu.Lock()
 	for name := range sw.watchers {
 		if _, exists := services[name]; exists {
 			continue
 		}
 		delete(sw.watchers, name)
 	}
+	sw.mu.Unlock()
 
 	return nil
 }
 
-func (sw *serviceWatcher) getWatcher(name string) *Watcher {
+func (sw *discovery) getWatcher(name string) *Watcher {
 	sw.mu.RLock()
 	defer sw.mu.RUnlock()
 	return sw.watchers[name]
 }
 
-func (sw *serviceWatcher) addWatcher(name string, watcher *Watcher) {
+func (sw *discovery) addWatcher(name string, watcher *Watcher) {
 	sw.mu.Lock()
 	defer sw.mu.Unlock()
 	sw.watchers[name] = watcher
 }
 
-func (sw *serviceWatcher) delWatcher(name string) {
+func (sw *discovery) delWatcher(name string) {
 	sw.mu.Lock()
 	defer sw.mu.Unlock()
 	delete(sw.watchers, name)
 }
 
-func (sw *serviceWatcher) rangeWatcher(f func(watcher *Watcher) bool) {
+func (sw *discovery) rangeWatcher(f func(watcher *Watcher) bool) {
 	sw.mu.RLock()
 	defer sw.mu.RUnlock()
 	for _, watcher := range sw.watchers {
@@ -118,7 +120,7 @@ func (sw *serviceWatcher) rangeWatcher(f func(watcher *Watcher) bool) {
 	}
 }
 
-func (sw *serviceWatcher) getOrCreateWatcher(name string) *Watcher {
+func (sw *discovery) getOrCreateWatcher(name string) *Watcher {
 	var ok bool
 	watcher := sw.getWatcher(name)
 	if watcher != nil {
@@ -136,12 +138,12 @@ func (sw *serviceWatcher) getOrCreateWatcher(name string) *Watcher {
 	return watcher
 }
 
-func (sw *serviceWatcher) Watch(kind string, listener iface.ServiceChangeListener) {
+func (sw *discovery) Watch(kind string, listener iface.ServiceChangeListener) {
 	watcher := sw.getOrCreateWatcher(kind)
 	watcher.Add(listener)
 }
 
-func (sw *serviceWatcher) Unwatch(kind string, listener iface.ServiceChangeListener) {
+func (sw *discovery) Unwatch(kind string, listener iface.ServiceChangeListener) {
 	watcher := sw.getWatcher(kind)
 	if watcher == nil {
 		return
@@ -149,7 +151,7 @@ func (sw *serviceWatcher) Unwatch(kind string, listener iface.ServiceChangeListe
 	watcher.Remove(listener)
 }
 
-func (sw *serviceWatcher) GetByKind(kind string) map[uint64]*iface.Member {
+func (sw *discovery) GetByKind(kind string) map[uint64]*iface.Member {
 	watcher := sw.getWatcher(kind)
 	if watcher == nil {
 		return nil
@@ -157,7 +159,7 @@ func (sw *serviceWatcher) GetByKind(kind string) map[uint64]*iface.Member {
 	return watcher.GetAll()
 }
 
-func (sw *serviceWatcher) GetAll() map[uint64]*iface.Member {
+func (sw *discovery) GetAll() map[uint64]*iface.Member {
 	var result = make(map[uint64]*iface.Member)
 	sw.rangeWatcher(func(watcher *Watcher) bool {
 		result = maputil.Merge(result, watcher.GetAll())
@@ -166,7 +168,7 @@ func (sw *serviceWatcher) GetAll() map[uint64]*iface.Member {
 	return result
 }
 
-func (sw *serviceWatcher) GetById(memberId uint64) *iface.Member {
+func (sw *discovery) GetById(memberId uint64) *iface.Member {
 	var result *iface.Member
 	sw.rangeWatcher(func(watcher *Watcher) bool {
 		result = watcher.GetById(memberId)

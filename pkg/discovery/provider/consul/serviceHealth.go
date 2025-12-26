@@ -2,8 +2,8 @@ package consul
 
 import (
 	"context"
-	"errors"
 	"gas/pkg/discovery/iface"
+
 	"gas/pkg/glog"
 	"gas/pkg/lib/grs"
 	"sync"
@@ -15,34 +15,33 @@ import (
 	"go.uber.org/zap"
 )
 
-func newServiceHealth(client *api.Client, config *Config, info *iface.Member) *serviceHealth {
-	return &serviceHealth{
-		Member:   info,
-		client:   client,
-		config:   config,
-		statusCh: make(chan string, 1024),
-		status:   "pass",
+func newHealthKeeper(ctx context.Context, client *api.Client, config *Config, member *iface.Member) *healthKeeper {
+	return &healthKeeper{
+		client: client,
+		config: config,
+		member: member,
+		ctx:    ctx,
 	}
 }
 
-type serviceHealth struct {
-	*iface.Member
+type healthKeeper struct {
 	client    *api.Client
-	statusCh  chan string
 	config    *Config
+	ctx       context.Context
 	status    string
+	member    *iface.Member
 	once      sync.Once
 	isRunning atomic.Bool
 }
 
-func (m *serviceHealth) Register() error {
+func (m *healthKeeper) Register() error {
 	registration := &api.AgentServiceRegistration{
-		ID:      convertor.ToString(m.GetID()),
-		Name:    m.GetKind(),
-		Address: m.GetAddress(),
-		Port:    m.GetPort(),
-		Tags:    m.GetTags(),
-		Meta:    m.GetMeta(),
+		ID:      convertor.ToString(m.member.GetID()),
+		Name:    m.member.GetKind(),
+		Address: m.member.GetAddress(),
+		Port:    m.member.GetPort(),
+		Tags:    m.member.GetTags(),
+		Meta:    m.member.GetMeta(),
 		Check: &api.AgentServiceCheck{
 			TTL:                            m.config.HealthTTL.String(),
 			DeregisterCriticalServiceAfter: m.config.DeregisterInterval.String(),
@@ -51,65 +50,50 @@ func (m *serviceHealth) Register() error {
 	if err := m.client.Agent().ServiceRegister(registration); err != nil {
 		return err
 	}
-	m.run()
+	m.runUpdateTTLLoop()
 	return nil
 }
 
-func (m *serviceHealth) run() {
+func (m *healthKeeper) runUpdateTTLLoop() {
 	// 如果已经运行，直接返回
 	if !m.isRunning.CompareAndSwap(false, true) {
 		return
 	}
 	grs.Go(func(ctx context.Context) {
-		m.healthLoop(ctx)
+		m.updateTTLLoop()
 	})
 }
 
-func (m *serviceHealth) healthLoop(ctx context.Context) {
+func (m *healthKeeper) updateTTLLoop() {
+	defer func() {
+		_ = m.deregister()
+	}()
 	ticker := time.NewTicker(m.config.HealthTTL / 2)
 	defer ticker.Stop()
 	m.updateTTL()
 	for {
 		select {
-		case <-ctx.Done():
+		case <-m.ctx.Done():
 			return
-		case status, ok := <-m.statusCh:
-			if !ok {
-				return
-			}
-			m.status = status
-			m.updateTTL()
 		case <-ticker.C:
 			m.updateTTL()
 		}
 	}
 }
 
-func (m *serviceHealth) updateTTL() {
-	memberId := m.GetID()
+func (m *healthKeeper) updateTTL() {
+	memberId := m.member.GetID()
 	checkId := "service:" + convertor.ToString(memberId)
 	if err := m.client.Agent().UpdateTTL(checkId, "", m.status); err != nil {
-		glog.Error("Consul定时更新TTL失败", zap.String("status", m.status),
+		glog.Error("Consul定时更新TTL失败", zap.String("status", "pass"),
 			zap.Uint64("memberId", memberId), zap.Error(err))
 	}
 }
 
-// UpdateStatus 更新成员的健康状态
-func (m *serviceHealth) updateStatus(status string) error {
-	select {
-	case m.statusCh <- status:
-	default:
-		return errors.New("member status chan is full")
-	}
-	return nil
-}
-
-func (m *serviceHealth) deregister() error {
+func (m *healthKeeper) deregister() (err error) {
 	m.once.Do(func() {
-		close(m.statusCh)
-		if err := m.client.Agent().ServiceDeregister(convertor.ToString(m.GetID())); err != nil {
-			glog.Error("Consul取消注册节点失败", zap.Uint64("memberId", m.GetID()), zap.Error(err))
-		}
+		memberId := m.member.GetID()
+		err = m.client.Agent().ServiceDeregister(convertor.ToString(memberId))
 	})
-	return nil
+	return
 }
