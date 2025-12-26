@@ -28,7 +28,6 @@ type healthKeeper struct {
 	client    *api.Client
 	config    *Config
 	ctx       context.Context
-	status    string
 	member    *iface.Member
 	once      sync.Once
 	isRunning atomic.Bool
@@ -84,9 +83,8 @@ func (m *healthKeeper) updateTTLLoop() {
 func (m *healthKeeper) updateTTL() {
 	memberId := m.member.GetID()
 	checkId := "service:" + convertor.ToString(memberId)
-	if err := m.client.Agent().UpdateTTL(checkId, "", m.status); err != nil {
-		glog.Error("Consul定时更新TTL失败", zap.String("status", "pass"),
-			zap.Uint64("memberId", memberId), zap.Error(err))
+	if err := m.client.Agent().UpdateTTL(checkId, "", "pass"); err != nil {
+		glog.Error("Consul定时更新TTL失败", zap.Uint64("memberId", memberId), zap.Error(err))
 	}
 }
 

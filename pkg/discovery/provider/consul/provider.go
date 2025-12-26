@@ -85,6 +85,8 @@ func (c *Provider) connect() error {
 }
 
 func (c *Provider) Shutdown(ctx context.Context) error {
-	c.cancel()
+	c.stopOnce.Do(func() {
+		c.cancel()
+	})
 	return nil
 }

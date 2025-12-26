@@ -33,6 +33,10 @@ func NewMemberList(dict map[uint64]*Member) *MemberList {
 func (m *MemberList) UpdateTopology(old *MemberList) *Topology {
 	topology := &Topology{}
 
+	if old == nil {
+		old = NewMemberList(nil)
+	}
+
 	for _, node := range m.Dict {
 		if _, ok := old.Dict[node.GetID()]; ok {
 			topology.Alive = append(topology.Alive, node)
