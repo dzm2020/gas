@@ -16,9 +16,6 @@ type (
 		GetPort() int
 		GetTags() []string
 		GetMeta() map[string]string
-		SetTags(tags []string)
-		RemoveTag(tag string)
-		AddTag(tag string)
 	}
 
 	INode interface {
@@ -32,6 +29,5 @@ type (
 		Cluster() ICluster
 		SetCluster(ICluster)
 		Startup(comps ...component.IComponent[INode]) error
-		GetConfig(key string, cfg interface{}) error
 	}
 )

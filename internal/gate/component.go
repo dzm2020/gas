@@ -3,6 +3,7 @@ package gate
 import (
 	"context"
 	"gas/internal/iface"
+	"gas/internal/profile"
 	"gas/pkg/lib/component"
 )
 
@@ -28,15 +29,15 @@ func (r *Component) Name() string {
 }
 
 func (r *Component) Start(ctx context.Context, node iface.INode) error {
-	config := defaultConfig()
-	if err := node.GetConfig(r.Name(), config); err != nil {
+	conf := defaultConfig()
+	if err := profile.Get(r.Name(), conf); err != nil {
 		return err
 	}
 
-	r.Gate.Options = ToOptions(config)
-	r.Gate.Address = config.Address
+	r.Gate.Options = ToOptions(conf)
+	r.Gate.Address = conf.Address
 	r.Gate.node = node
-	r.Gate.maxConn = int64(config.MaxConn)
+	r.Gate.maxConn = int64(conf.MaxConn)
 	return r.Gate.Start(ctx)
 }
 

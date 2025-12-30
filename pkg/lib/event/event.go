@@ -1,7 +1,8 @@
-package lib
+package event
 
 import (
 	"reflect"
+	"sync"
 
 	"golang.org/x/exp/slices"
 )
@@ -11,6 +12,7 @@ func handlerComparable[T any](this, other T) bool {
 }
 
 type Listener[V any] struct {
+	mu       sync.RWMutex
 	handlers []func(V)
 }
 
@@ -19,6 +21,8 @@ func NewListener[V any]() *Listener[V] {
 }
 
 func (m *Listener[V]) Register(handler func(V)) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	f := func(other func(V)) bool {
 		return handlerComparable(handler, other)
 	}
@@ -30,6 +34,8 @@ func (m *Listener[V]) Register(handler func(V)) {
 }
 
 func (m *Listener[V]) UnRegister(handler func(V)) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	index := slices.IndexFunc(m.handlers, func(other func(V)) bool {
 		return handlerComparable(handler, other)
 	})
@@ -40,6 +46,8 @@ func (m *Listener[V]) UnRegister(handler func(V)) {
 }
 
 func (m *Listener[V]) Notify(param V) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	handlers := m.handlers
 	for _, handler := range handlers {
 		handler(param)

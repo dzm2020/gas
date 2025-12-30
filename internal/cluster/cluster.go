@@ -85,6 +85,9 @@ func (r *Cluster) OnMessage(data []byte, response func(data []byte) error) {
 		return
 	}
 	msg := &iface.ActorMessage{Message: message}
+
+	glog.Debug("集群：处理消息", zap.Any("message", message))
+
 	system := r.node.System()
 	if msg.GetAsync() {
 		err = system.Send(msg)

@@ -2,48 +2,37 @@ package consul
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	discoveryApi "gas/pkg/discovery"
 	"gas/pkg/discovery/iface"
-	"gas/pkg/glog"
 	"sync"
 
 	"github.com/hashicorp/consul/api"
-	"go.uber.org/zap"
+	"github.com/spf13/viper"
 )
 
 func init() {
-	_ = discoveryApi.Register("consul", func(configData json.RawMessage) (iface.IDiscovery, error) {
+	_ = discoveryApi.GetFactoryMgr().Register("consul", func(args ...any) (iface.IDiscovery, error) {
+		config := args[0].(map[string]interface{})
 		consulCfg := defaultConfig()
-		if len(configData) > 0 {
-			if err := json.Unmarshal(configData, consulCfg); err != nil {
-				return nil, fmt.Errorf("failed to parse consul config: %w", err)
-			}
+		vp := viper.New()
+		vp.Set("", config)
+		if err := vp.UnmarshalKey("", consulCfg); err != nil {
+			return nil, err
 		}
-		return New(consulCfg)
+		return New(consulCfg), nil
 	})
 }
 
 var _ iface.IDiscovery = (*Provider)(nil)
 
-func New(config *Config) (*Provider, error) {
-	if config == nil {
-		config = defaultConfig()
-	}
-	if err := config.Validate(); err != nil {
-		return nil, err
-	}
-
-	provider := &Provider{
+func New(config *Config) *Provider {
+	return &Provider{
 		config: config,
 	}
-
-	return provider, nil
 }
 
 type Provider struct {
-	client *api.Client
+	*api.Client
 	config *Config
 
 	*discovery // 集群监控
@@ -59,14 +48,12 @@ func (c *Provider) Run(ctx context.Context) error {
 	c.ctx, c.cancel = context.WithCancel(ctx)
 
 	if err := c.connect(); err != nil {
-		glog.Error("consul连接失败", zap.String("address", c.config.Address), zap.Error(err))
 		return err
 	}
 
-	c.discovery = newDiscovery(c.ctx, c.client, c.config)
-	c.registrar = newRegistrar(c.ctx, c.client, c.config)
+	c.discovery = newDiscovery(c)
+	c.registrar = newRegistrar(c)
 
-	glog.Info("consul连接成功", zap.String("address", c.config.Address))
 	return nil
 }
 
@@ -80,13 +67,15 @@ func (c *Provider) connect() error {
 	if _, err = client.Status().Leader(); err != nil {
 		return err
 	}
-	c.client = client
+	c.Client = client
 	return nil
 }
 
 func (c *Provider) Shutdown(ctx context.Context) error {
 	c.stopOnce.Do(func() {
-		c.cancel()
+		if c.cancel != nil {
+			c.cancel()
+		}
 	})
 	return nil
 }

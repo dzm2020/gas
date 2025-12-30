@@ -3,6 +3,7 @@ package logger
 import (
 	"context"
 	"gas/internal/iface"
+	"gas/internal/profile"
 	logger "gas/pkg/glog"
 	"gas/pkg/lib/component"
 
@@ -47,12 +48,12 @@ func (c *Component) Name() string {
 }
 
 func (c *Component) Start(ctx context.Context, node iface.INode) error {
-	config := defaultConfig()
-	if err := node.GetConfig(c.Name(), config); err != nil {
+	conf := defaultConfig()
+	if err := profile.Get(c.Name(), conf); err != nil {
 		return err
 	}
 	// 使用节点配置中的 glog 配置初始化
-	if err := logger.InitFromConfig(config); err != nil {
+	if err := logger.InitFromConfig(conf); err != nil {
 		return err
 	}
 	options := []zap.Option{

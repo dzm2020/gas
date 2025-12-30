@@ -6,6 +6,7 @@ import (
 	"gas/internal/cluster"
 	"gas/internal/iface"
 	"gas/internal/logger"
+	"gas/internal/profile"
 	"gas/pkg/glog"
 	"gas/pkg/lib"
 	"gas/pkg/lib/component"
@@ -104,46 +105,16 @@ func (n *Node) Unmarshal(data []byte, reply interface{}) error {
 	return n.Serializer().Unmarshal(data, reply)
 }
 
-func (n *Node) GetConfig(key string, cfg interface{}) error {
-	return n.viper.UnmarshalKey(key, cfg)
-}
-
-func (n *Node) initConfig() (err error) {
-	//  读取配置内容
-	n.viper.SetConfigFile(n.path)
-	err = n.viper.ReadInConfig() // 读取配置文件
-	if err != nil {
-		return
-	}
-	//  读取include
-	includeFiles := n.viper.GetStringSlice("include")
-	for _, file := range includeFiles {
-		// 读取包含的配置文件
-		subViper := viper.New()
-		subViper.SetConfigFile(file)
-		if err = subViper.ReadInConfig(); err != nil {
-			return
-		}
-		// 合并到主配置
-		if err = n.viper.MergeConfigMap(subViper.AllSettings()); err != nil {
-			return
-		}
-	}
-	return
-}
-
 func (n *Node) Startup(comps ...component.IComponent[iface.INode]) (err error) {
 	defer xerror.PrintCoreDump()
+
 	grs.SetPanicHandler(func(err interface{}) {
 		glog.Panic("panic", zap.Any("err", err), zap.String("stack", string(debug.Stack())))
 	})
-	//  初始化配置文件
-	if err = n.initConfig(); err != nil {
-		return
-	}
 
-	//  获取node配置
-	if err = n.GetConfig("node", n.Member); err != nil {
+	profile.Init(n.path)
+
+	if err = profile.Get("node", n.Member); err != nil {
 		return
 	}
 

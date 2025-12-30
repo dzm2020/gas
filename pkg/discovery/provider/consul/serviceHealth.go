@@ -2,12 +2,13 @@ package consul
 
 import (
 	"context"
+	"fmt"
 	"gas/pkg/discovery/iface"
+	"sync"
+	"sync/atomic"
 
 	"gas/pkg/glog"
 	"gas/pkg/lib/grs"
-	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/duke-git/lancet/v2/convertor"
@@ -15,25 +16,30 @@ import (
 	"go.uber.org/zap"
 )
 
-func newHealthKeeper(ctx context.Context, client *api.Client, config *Config, member *iface.Member) *healthKeeper {
-	return &healthKeeper{
-		client: client,
-		config: config,
-		member: member,
-		ctx:    ctx,
+func newHealthKeeper(provider *Provider, member *iface.Member) *healthKeeper {
+	h := &healthKeeper{
+		provider: provider,
+		member:   convertor.DeepClone(member),
+		checkId:  fmt.Sprintf("service:%d", member.GetID()),
 	}
+	h.ctx, h.cancel = context.WithCancel(provider.ctx)
+	return h
 }
 
 type healthKeeper struct {
-	client    *api.Client
-	config    *Config
-	ctx       context.Context
-	member    *iface.Member
-	once      sync.Once
-	isRunning atomic.Bool
+	provider    *Provider
+	isStop      atomic.Bool
+	checkId     string
+	member      *iface.Member
+	once        sync.Once
+	onceChecker sync.Once
+	ctx         context.Context
+	cancel      context.CancelFunc
 }
 
 func (m *healthKeeper) Register() error {
+
+	config := m.provider.config
 	registration := &api.AgentServiceRegistration{
 		ID:      convertor.ToString(m.member.GetID()),
 		Name:    m.member.GetKind(),
@@ -42,37 +48,38 @@ func (m *healthKeeper) Register() error {
 		Tags:    m.member.GetTags(),
 		Meta:    m.member.GetMeta(),
 		Check: &api.AgentServiceCheck{
-			TTL:                            m.config.HealthTTL.String(),
-			DeregisterCriticalServiceAfter: m.config.DeregisterInterval.String(),
+			CheckID:                        m.checkId,
+			TTL:                            config.HealthTTL.String(),
+			DeregisterCriticalServiceAfter: config.DeregisterInterval.String(),
 		},
 	}
-	if err := m.client.Agent().ServiceRegister(registration); err != nil {
+	if err := m.provider.Agent().ServiceRegister(registration); err != nil {
 		return err
 	}
-	m.runUpdateTTLLoop()
+
+	glog.Info("注册服务", zap.String("service", registration.ID))
+
+	m.onceChecker.Do(func() {
+		grs.Go(func(ctx context.Context) {
+			glog.Debug("成员健康检测协程运行", zap.Uint64("memberId", m.member.GetID()))
+			m.updateTTLLoop()
+			_ = m.deregister()
+			glog.Debug("成员健康检测协程退出", zap.Uint64("memberId", m.member.GetID()))
+		})
+	})
+
 	return nil
 }
 
-func (m *healthKeeper) runUpdateTTLLoop() {
-	// 如果已经运行，直接返回
-	if !m.isRunning.CompareAndSwap(false, true) {
-		return
-	}
-	grs.Go(func(ctx context.Context) {
-		m.updateTTLLoop()
-	})
-}
-
 func (m *healthKeeper) updateTTLLoop() {
-	defer func() {
-		_ = m.deregister()
-	}()
-	ticker := time.NewTicker(m.config.HealthTTL / 2)
+	config := m.provider.config
+	ctx := m.ctx
+	ticker := time.NewTicker(config.HealthTTL / 2)
 	defer ticker.Stop()
 	m.updateTTL()
 	for {
 		select {
-		case <-m.ctx.Done():
+		case <-ctx.Done():
 			return
 		case <-ticker.C:
 			m.updateTTL()
@@ -81,17 +88,21 @@ func (m *healthKeeper) updateTTLLoop() {
 }
 
 func (m *healthKeeper) updateTTL() {
-	memberId := m.member.GetID()
-	checkId := "service:" + convertor.ToString(memberId)
-	if err := m.client.Agent().UpdateTTL(checkId, "", "pass"); err != nil {
-		glog.Error("Consul定时更新TTL失败", zap.Uint64("memberId", memberId), zap.Error(err))
+	if err := m.provider.Agent().UpdateTTL(m.checkId, "", "pass"); err != nil {
+		if m.isStop.Load() {
+			return
+		}
+		glog.Error("定时更新TTL失败", zap.Uint64("memberId", m.member.GetID()), zap.Error(err))
 	}
 }
 
 func (m *healthKeeper) deregister() (err error) {
 	m.once.Do(func() {
+		m.isStop.Store(true)
 		memberId := m.member.GetID()
-		err = m.client.Agent().ServiceDeregister(convertor.ToString(memberId))
+		m.cancel()
+		err = m.provider.Agent().ServiceDeregister(convertor.ToString(memberId))
+		glog.Info("注销服务", zap.Uint64("memberId", memberId))
 	})
-	return
+	return err
 }

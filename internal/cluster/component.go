@@ -3,6 +3,7 @@ package cluster
 import (
 	"context"
 	"gas/internal/iface"
+	"gas/internal/profile"
 	dis "gas/pkg/discovery"
 	"gas/pkg/lib/component"
 	mq "gas/pkg/messageQue"
@@ -51,19 +52,20 @@ func (r *Component) Name() string {
 
 func (r *Component) Start(ctx context.Context, node iface.INode) (err error) {
 	r.node = node
-	config := defaultConfig()
-	if err = node.GetConfig(r.Name(), config); err != nil {
+
+	conf := defaultConfig()
+	if err = profile.Get(r.Name(), conf); err != nil {
 		return err
 	}
 
-	r.name = config.Name
+	r.name = conf.Name
 	// 创建服务发现实例
-	r.dis, err = dis.NewFromConfig(*config.Discovery)
+	r.dis, err = dis.NewFromConfig(*conf.Discovery)
 	if err != nil {
 		return
 	}
 	// 创建集群通信管理器
-	r.mq, err = mq.NewFromConfig(*config.MessageQueue)
+	r.mq, err = mq.NewFromConfig(*conf.MessageQueue)
 	if err != nil {
 		return
 	}

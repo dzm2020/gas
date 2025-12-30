@@ -235,10 +235,6 @@ func (b *baseConnection) Close(connection IConnection, err error) (w error) {
 		b.sendChan = nil
 	}
 
-	if connection != nil {
-		RemoveConnection(connection)
-		connection = nil
-	}
 	if b.handler != nil {
 		w = b.handler.OnClose(connection, err)
 	}
@@ -246,5 +242,10 @@ func (b *baseConnection) Close(connection IConnection, err error) (w error) {
 		b.timeoutTicker.Stop()
 		b.timeoutTicker = nil
 	}
+
+	if connection != nil {
+		RemoveConnection(connection)
+	}
+
 	return w
 }

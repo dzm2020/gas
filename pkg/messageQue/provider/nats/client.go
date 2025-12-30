@@ -2,7 +2,6 @@ package nats
 
 import (
 	"context"
-	"encoding/json"
 	"gas/pkg/lib/xerror"
 	"gas/pkg/messageQue"
 	"gas/pkg/messageQue/iface"
@@ -10,21 +9,19 @@ import (
 	"time"
 
 	"github.com/nats-io/nats.go"
+	"github.com/spf13/viper"
 )
 
 // todo 增加连接池
 
 func init() {
-	_ = messageQue.Register("nats", func(configData json.RawMessage) (iface.IMessageQue, error) {
-		natsCfg := defaultConfig()
-		// 如果是从 Options 字段传入的 JSON 数据，尝试解析
-		if len(configData) > 0 {
-			if err := json.Unmarshal(configData, natsCfg); err != nil {
-				return nil, err
-			}
-		}
+	_ = messageQue.GetFactoryMgr().Register("nats", func(args ...any) (iface.IMessageQue, error) {
+		config := args[0].(map[string]interface{})
 
-		if err := natsCfg.Validate(); err != nil {
+		natsCfg := defaultConfig()
+		vp := viper.New()
+		vp.Set("", config)
+		if err := vp.UnmarshalKey("", natsCfg); err != nil {
 			return nil, err
 		}
 		return New(natsCfg), nil

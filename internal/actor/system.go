@@ -12,6 +12,7 @@ import (
 
 	"github.com/duke-git/lancet/v2/maputil"
 	"go.uber.org/zap"
+	"golang.org/x/exp/slices"
 )
 
 var (
@@ -167,7 +168,10 @@ func (s *System) clusterNamed(name string) error {
 	if cluster == nil {
 		return ErrClusterIsNil
 	}
-	s.node.AddTag(name)
+
+	info := s.node.Info()
+	info.Tags = append(info.Tags, name)
+
 	if err := cluster.UpdateMember(); err != nil {
 		return err
 	}
@@ -201,7 +205,12 @@ func (s *System) clusterUnname(name string) error {
 	if cluster == nil {
 		return ErrClusterIsNil
 	}
-	s.node.RemoveTag(name)
+	info := s.node.Info()
+
+	info.Tags = slices.DeleteFunc(info.Tags, func(s string) bool {
+		return s == name
+	})
+
 	if err := cluster.UpdateMember(); err != nil {
 		return err
 	}
