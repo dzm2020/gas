@@ -62,3 +62,12 @@ func (r *registrar) getOrCreate(member *iface.Member) *healthKeeper {
 	r.dict[member.GetID()] = m
 	return m
 }
+
+func (r *registrar) shutdown() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, m := range r.dict {
+		_ = m.deregister()
+	}
+	r.dict = make(map[uint64]*healthKeeper)
+}

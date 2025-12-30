@@ -103,7 +103,6 @@ func BenchmarkDiscovery(b *testing.B) {
 		member := &iface.Member{Id: 1, Kind: "test", Address: "127.0.0.1", Port: 8080}
 		member.Id = genId.Add(1)
 		provider.Register(member)
-		provider.Deregister(member.GetID())
 	}
 
 	provider.Shutdown(context.Background())
@@ -124,5 +123,4 @@ func BenchmarkGet(b *testing.B) {
 		provider.GetByKind("test")
 		provider.GetAll()
 	}
-
 }

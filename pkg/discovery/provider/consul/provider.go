@@ -76,6 +76,7 @@ func (c *Provider) Shutdown(ctx context.Context) error {
 		if c.cancel != nil {
 			c.cancel()
 		}
+		c.shutdown()
 	})
 	return nil
 }

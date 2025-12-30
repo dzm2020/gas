@@ -5,6 +5,7 @@ import (
 	"errors"
 	"gas/pkg/glog"
 	"gas/pkg/lib/grs"
+	"gas/pkg/lib/stopper"
 	"net"
 	"sync"
 
@@ -14,11 +15,12 @@ import (
 // ------------------------------ TCP服务器 ------------------------------
 
 type TCPServer struct {
+	stopper.Stopper
 	options     *Options
 	listener    net.Listener // TCP监听器
 	proto, addr string       // 监听地址（如 ":8080"）
 	protoAddr   string
-	once        sync.Once
+	waitGroup   sync.WaitGroup
 }
 
 // NewTCPServer 创建TCP服务器
@@ -35,56 +37,49 @@ func (s *TCPServer) Addr() string {
 	return s.protoAddr
 }
 
-func (s *TCPServer) Start() error {
-	var err error
+func (s *TCPServer) Start() (err error) {
 	if s.listener, err = net.Listen(s.proto, s.addr); err != nil {
-		glog.Error("TCP服务器监听失败", zap.String("address", s.Addr()), zap.Error(err))
-		return err
+		return
 	}
 
 	grs.Go(func(ctx context.Context) {
+		glog.Debug("TCP服务器监听协程启动", zap.String("address", s.Addr()))
 		s.acceptLoop()
+		glog.Debug("TCP服务器监听协程关闭", zap.String("address", s.Addr()))
 	})
 
-	glog.Info("TCP服务器启动监听", zap.String("address", s.Addr()))
-	return nil
+	return
 }
 
 func (s *TCPServer) acceptLoop() {
-	for {
-		if err := s.accept(); err != nil {
-			return
-		}
+	for !s.IsStop() {
+		s.accept()
 	}
 }
 
-func (s *TCPServer) accept() error {
-	defer grs.Recover(func(err any) {
-		glog.Error("TCP服务器", zap.String("address", s.Addr()), zap.Any("err", err))
-	})
-	if s.listener == nil {
-		return ErrListenerIsNil
-	}
+func (s *TCPServer) accept() {
 	conn, err := s.listener.Accept()
 	if err != nil {
 		if !errors.Is(err, net.ErrClosed) {
 			glog.Error("TCP服务器退出ACCEPT协程", zap.String("address", s.Addr()), zap.Error(err))
 		}
-		return err
+		return
 	}
-	connection := newTCPConnection(conn, Accept, s.options)
+	connection := newTCPConnection(conn.(*net.TCPConn), Accept, s.options)
 	AddConnection(connection)
-	return nil
+	return
 }
 
-func (s *TCPServer) Shutdown() (err error) {
-	s.once.Do(func() {
-		glog.Info("TCP服务器关闭", zap.String("address", s.Addr()))
-		if s.listener != nil {
-			if err = s.listener.Close(); err != nil {
-				return
-			}
+func (s *TCPServer) Shutdown(ctx context.Context) (err error) {
+	if !s.Stop() {
+		return
+	}
+	glog.Debug("TCP服务器关闭", zap.String("address", s.Addr()))
+
+	if s.listener != nil {
+		if err = s.listener.Close(); err != nil {
+			return
 		}
-	})
+	}
 	return
 }

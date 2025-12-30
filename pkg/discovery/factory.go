@@ -7,11 +7,11 @@ import (
 )
 
 var (
-	fac = factory.New[iface.IDiscovery]()
+	factoryMgr = factory.New[iface.IDiscovery]()
 )
 
 func GetFactoryMgr() *factory.Manager[iface.IDiscovery] {
-	return fac
+	return factoryMgr
 }
 
 // Config 服务发现配置
@@ -22,7 +22,7 @@ type Config struct {
 
 // NewFromConfig 根据配置创建服务发现实例
 func NewFromConfig(config Config) (iface.IDiscovery, error) {
-	creator, ok := fac.Get(config.Type)
+	creator, ok := factoryMgr.Get(config.Type)
 	if !ok {
 		return nil, errors.New("unsupported discovery type")
 	}

@@ -4,9 +4,9 @@ import (
 	"errors"
 	"gas/pkg/glog"
 	"gas/pkg/lib/buffer"
+	"gas/pkg/lib/stopper"
 	"io"
 	"net"
-	"sync/atomic"
 	"time"
 
 	"go.uber.org/zap"
@@ -20,6 +20,7 @@ var (
 
 // baseConnection 连接基类，包含所有连接的通用逻辑
 type baseConnection struct {
+	stopper.Stopper
 	id                    int64         // 连接唯一ID
 	timeoutTicker         *time.Ticker  // 心跳超时定时器
 	lastActive            time.Time     // 最后活动时间（用于超时检测）
@@ -29,7 +30,6 @@ type baseConnection struct {
 	typ                   ConnectionType
 	ctx                   interface{}
 	sendChan              chan interface{}
-	closed                atomic.Bool // 关闭状态（原子操作）
 	localAddr, remoteAddr net.Addr
 }
 
@@ -89,29 +89,6 @@ func (b *baseConnection) SetContext(ctx interface{}) {
 	b.ctx = ctx
 }
 
-// isClosed 检查连接是否已关闭
-func (b *baseConnection) isClosed() bool {
-	return b.closed.Load()
-}
-
-// closeBase 关闭基类连接（通用逻辑）
-// 返回是否成功关闭（false表示已经关闭过）
-func (b *baseConnection) closeBase() bool {
-	return b.closed.CompareAndSwap(false, true)
-}
-
-// checkClosed 检查连接是否已关闭，如果已关闭返回错误
-func (b *baseConnection) checkClosed() error {
-	if b.closed.Load() {
-		return ErrConnectionClosed
-	}
-	return nil
-}
-
-func (b *baseConnection) IsClosed() bool {
-	return b.closed.Load()
-}
-
 func (b *baseConnection) updateLastActive() {
 	b.lastActive = time.Now()
 }
@@ -168,8 +145,8 @@ func (b *baseConnection) onConnect(connection IConnection) error {
 
 // Send 发送消息（线程安全）
 func (b *baseConnection) Send(msg interface{}) error {
-	if err := b.checkClosed(); err != nil {
-		return err
+	if b.IsStop() {
+		return ErrConnectionClosed
 	}
 	select {
 	case b.sendChan <- msg:
@@ -234,7 +211,6 @@ func (b *baseConnection) Close(connection IConnection, err error) (w error) {
 		close(b.sendChan)
 		b.sendChan = nil
 	}
-
 	if b.handler != nil {
 		w = b.handler.OnClose(connection, err)
 	}
@@ -242,10 +218,8 @@ func (b *baseConnection) Close(connection IConnection, err error) (w error) {
 		b.timeoutTicker.Stop()
 		b.timeoutTicker = nil
 	}
-
 	if connection != nil {
 		RemoveConnection(connection)
 	}
-
 	return w
 }

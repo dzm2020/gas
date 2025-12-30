@@ -49,8 +49,8 @@ type IConnection interface {
 	LocalAddr() string
 	// RemoteAddr 远程地址（TCP：客户端地址；UDP：当前数据包的远程地址）
 	RemoteAddr() string
-	// IsClosed  是否关闭
-	IsClosed() bool
+	// IsStop  是否关闭
+	IsStop() bool
 	Type() ConnectionType
 	Context() interface{}
 	SetContext(interface{})

@@ -7,19 +7,21 @@ import (
 	"gas/pkg/lib/grs"
 	"io"
 	"net"
+	"sync"
 
 	"go.uber.org/zap"
 )
 
 type TCPConnection struct {
 	*baseConnection // 嵌入基类
-	conn            net.Conn
+	conn            *net.TCPConn
 	server          *TCPServer // 所属服务器
 	tmpBuf          []byte
 	buffer          buffer.IBuffer
+	waitGroup       sync.WaitGroup
 }
 
-func newTCPConnection(conn net.Conn, typ ConnectionType, options *Options) *TCPConnection {
+func newTCPConnection(conn *net.TCPConn, typ ConnectionType, options *Options) *TCPConnection {
 	base := initBaseConnection(typ, conn.LocalAddr(), conn.RemoteAddr(), options)
 	tcpConn := &TCPConnection{
 		baseConnection: base,
@@ -48,7 +50,7 @@ func (c *TCPConnection) readLoop() {
 	if err = c.onConnect(c); err != nil {
 		return
 	}
-	for {
+	for !c.IsStop() {
 		if err = c.read(); err != nil {
 			return
 		}
@@ -90,7 +92,7 @@ func (c *TCPConnection) writeLoop() {
 		_ = c.Close(err)
 	}()
 
-	for {
+	for !c.IsStop() {
 		select {
 		case msg, ok := <-c.sendChan:
 			if !ok {
@@ -123,22 +125,16 @@ func (c *TCPConnection) batchWriteMsg(msg interface{}) error {
 }
 
 func (c *TCPConnection) Close(err error) (w error) {
-	if !c.closeBase() {
+	if c.IsStop() {
 		return ErrConnectionClosed
 	}
 
 	glog.Info("TCP连接断开", zap.Int64("connectionId", c.ID()), zap.Error(err))
 
-	if c.conn != nil {
-		if w = c.conn.Close(); w != nil {
-			return
-		}
-	}
-	if c.baseConnection != nil {
-		if w = c.baseConnection.Close(c, err); w != nil {
-			return
-		}
+	if w = c.baseConnection.Close(c, err); w != nil {
+		return
 	}
 
+	c.waitGroup.Wait()
 	return
 }
