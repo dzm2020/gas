@@ -6,13 +6,15 @@ import (
 
 type Option func(*Options)
 type Options struct {
-	handler      IHandler      // 业务回调
-	codec        ICodec        // 协议编解码器
-	keepAlive    time.Duration // 连接超时时间（0表示不检测超时）
-	sendChanSize int           // 发送队列缓冲大小
-	readBufSize  int           // 读缓冲区大小
-	tlsCertFile  string        // TLS 证书文件路径
-	tlsKeyFile   string        // TLS 私钥文件路径
+	handler          IHandler      // 业务回调
+	codec            ICodec        // 协议编解码器
+	keepAlive        time.Duration // 连接超时时间（0表示不检测超时）
+	sendChanSize     int           // 发送队列缓冲大小
+	readBufSize      int           // 读缓冲区大小
+	tlsCertFile      string        // TLS 证书文件路径
+	tlsKeyFile       string        // TLS 私钥文件路径
+	socketRecvBuffer int
+	socketSendBuffer int
 }
 
 func loadOptions(options ...Option) *Options {
@@ -24,6 +26,7 @@ func loadOptions(options ...Option) *Options {
 	for _, option := range options {
 		option(opts)
 	}
+
 	return opts
 }
 

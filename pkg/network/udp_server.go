@@ -3,6 +3,7 @@ package network
 import (
 	"context"
 	"errors"
+	"fmt"
 	"gas/pkg/glog"
 	"gas/pkg/lib/grs"
 	"io"
@@ -21,25 +22,25 @@ type udpPacket struct {
 // ------------------------------ UDP服务器 ------------------------------
 
 type UDPServer struct {
-	options      *Options
-	conn         *net.UDPConn // UDP监听连接
-	proto, addr  string       // 监听地址
-	connections  map[string]*UDPConnection
-	rwMutex      sync.RWMutex // 保护connections并发
-	protoAddress string
-	once         sync.Once
-	sendChan     chan *udpPacket
+	options          *Options
+	conn             *net.UDPConn // UDP监听连接
+	network, address string       // 监听地址
+	connections      map[string]*UDPConnection
+	rwMutex          sync.RWMutex // 保护connections并发
+	protoAddress     string
+	once             sync.Once
+	sendChan         chan *udpPacket
 }
 
 // NewUDPServer 创建UDP服务器
-func NewUDPServer(protoAddr, proto, addr string, option ...Option) *UDPServer {
+func NewUDPServer(network, address string, option ...Option) *UDPServer {
 	opts := loadOptions(option...)
 	return &UDPServer{
 		options:      opts,
-		addr:         addr,
-		proto:        proto,
+		network:      network,
+		address:      address,
 		connections:  make(map[string]*UDPConnection),
-		protoAddress: protoAddr,
+		protoAddress: fmt.Sprintf("%s:%s", network, address),
 		sendChan:     make(chan *udpPacket, 1024),
 	}
 }
@@ -90,11 +91,11 @@ func (s *UDPServer) Start() error {
 }
 
 func (s *UDPServer) listen() error {
-	udpAddr, err := net.ResolveUDPAddr(s.proto, s.addr)
+	udpAddr, err := net.ResolveUDPAddr(s.network, s.address)
 	if err != nil {
 		return err
 	}
-	s.conn, err = net.ListenUDP(s.proto, udpAddr)
+	s.conn, err = net.ListenUDP(s.network, udpAddr)
 	return err
 }
 
@@ -170,16 +171,14 @@ func (s *UDPServer) send(data []byte, remoteAddr *net.UDPAddr) error {
 	return nil
 }
 
-func (s *UDPServer) Shutdown() (err error) {
+func (s *UDPServer) Shutdown(ctx context.Context) {
 	s.once.Do(func() {
 		if s.sendChan != nil {
 			close(s.sendChan)
 		}
 		if s.conn != nil {
-			if err = s.conn.Close(); err != nil {
-				return
-			}
+			_ = s.conn.Close()
 		}
 	})
-	return nil
+	return
 }

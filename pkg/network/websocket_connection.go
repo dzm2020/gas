@@ -99,7 +99,7 @@ func (c *WebSocketConnection) writeLoop() {
 }
 
 func (c *WebSocketConnection) Close(err error) (w error) {
-	if !c.closeBase() {
+	if !c.Stop() {
 		return ErrConnectionClosed
 	}
 
@@ -110,11 +110,6 @@ func (c *WebSocketConnection) Close(err error) (w error) {
 			return
 		}
 	}
-	if c.baseConnection != nil {
-		if w = c.baseConnection.Close(c, err); w != nil {
-			return
-		}
-	}
-
+	c.baseConnection.Close(c, err)
 	return
 }

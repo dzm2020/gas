@@ -37,8 +37,8 @@ func newUDPConnection(conn *net.UDPConn, typ ConnectionType, remoteAddr *net.UDP
 }
 
 func (c *UDPConnection) Send(msg interface{}) error {
-	if err := c.checkClosed(); err != nil {
-		return err
+	if c.IsStop() {
+		return ErrConnectionClosed
 	}
 	data, err := c.encode(msg)
 	if err != nil {
@@ -81,7 +81,7 @@ func (c *UDPConnection) input(data []byte) {
 }
 
 func (c *UDPConnection) Close(err error) (w error) {
-	if !c.closeBase() {
+	if !c.Stop() {
 		return ErrConnectionClosed
 	}
 
@@ -96,11 +96,7 @@ func (c *UDPConnection) Close(err error) (w error) {
 		c.server.removeConnection(c.remoteAddr.String())
 	}
 
-	if c.baseConnection != nil {
-		if w = c.baseConnection.Close(c, err); w != nil {
-			return
-		}
-	}
+	c.baseConnection.Close(c, err)
 
 	return
 }

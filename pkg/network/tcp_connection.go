@@ -4,11 +4,10 @@ import (
 	"context"
 	"gas/pkg/glog"
 	"gas/pkg/lib/buffer"
-	"gas/pkg/lib/grs"
 	"io"
 	"net"
-	"sync"
 
+	"github.com/panjf2000/gnet/v2"
 	"go.uber.org/zap"
 )
 
@@ -18,10 +17,11 @@ type TCPConnection struct {
 	server          *TCPServer // 所属服务器
 	tmpBuf          []byte
 	buffer          buffer.IBuffer
-	waitGroup       sync.WaitGroup
+	ctx             context.Context
+	cancel          context.CancelFunc
 }
 
-func newTCPConnection(conn *net.TCPConn, typ ConnectionType, options *Options) *TCPConnection {
+func newTCPConnection(ctx context.Context, conn *net.TCPConn, typ ConnectionType, options *Options) *TCPConnection {
 	base := initBaseConnection(typ, conn.LocalAddr(), conn.RemoteAddr(), options)
 	tcpConn := &TCPConnection{
 		baseConnection: base,
@@ -29,15 +29,7 @@ func newTCPConnection(conn *net.TCPConn, typ ConnectionType, options *Options) *
 		buffer:         buffer.New(options.readBufSize),
 		conn:           conn,
 	}
-
-	grs.Go(func(ctx context.Context) {
-		tcpConn.readLoop()
-	})
-
-	grs.Go(func(ctx context.Context) {
-		tcpConn.writeLoop()
-	})
-
+	tcpConn.ctx, tcpConn.cancel = context.WithCancel(ctx)
 	return tcpConn
 }
 
@@ -89,15 +81,16 @@ func (c *TCPConnection) read() error {
 func (c *TCPConnection) writeLoop() {
 	var err error
 	defer func() {
+		_ = c.batchWriteMsg(nil)
+		_ = c.conn.Close()
 		_ = c.Close(err)
 	}()
 
 	for !c.IsStop() {
 		select {
-		case msg, ok := <-c.sendChan:
-			if !ok {
-				return // 通道已关闭
-			}
+		case <-c.ctx.Done():
+			return
+		case msg := <-c.sendChan:
 			if err = c.batchWriteMsg(msg); err != nil {
 				return
 			}
@@ -110,31 +103,25 @@ func (c *TCPConnection) writeLoop() {
 }
 
 func (c *TCPConnection) batchWriteMsg(msg interface{}) error {
-	var ok bool
-	l := len(c.sendChan)
-	msgList := make([]interface{}, 0, l+1)
-	msgList = append(msgList, msg)
-	for i := 0; i < l; i++ {
-		msg, ok = <-c.sendChan
-		if !ok {
-			break
-		}
+	var msgList = []interface{}{msg}
+	for i := 0; i < len(c.sendChan); i++ {
+		msg = <-c.sendChan
 		msgList = append(msgList, msg)
 	}
 	return c.write(c.conn, msgList...)
 }
 
 func (c *TCPConnection) Close(err error) (w error) {
-	if c.IsStop() {
+	if !c.Stop() {
 		return ErrConnectionClosed
 	}
 
 	glog.Info("TCP连接断开", zap.Int64("connectionId", c.ID()), zap.Error(err))
 
-	if w = c.baseConnection.Close(c, err); w != nil {
-		return
-	}
+	c.cancel()
 
-	c.waitGroup.Wait()
+	c.baseConnection.Close(c, err)
+
+	gnet.Run()
 	return
 }

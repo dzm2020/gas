@@ -39,10 +39,7 @@ type WebSocketServer struct {
 }
 
 // NewWebSocketServer 创建 WebSocket 服务器
-// addr: 监听地址，格式为 "host:port" 或 "host:port/path"
-// useTLS: 是否使用 TLS
-// option: 可选的配置选项
-func NewWebSocketServer(protoAddr, addr string, useTLS bool, option ...Option) *WebSocketServer {
+func NewWebSocketServer(network, address string, option ...Option) *WebSocketServer {
 	upgrader := defaultUpgrader
 	opts := loadOptions(option...)
 	if opts.readBufSize > 0 {
@@ -54,18 +51,18 @@ func NewWebSocketServer(protoAddr, addr string, useTLS bool, option ...Option) *
 
 	// 解析地址和路径
 	path := "/"
-	if idx := strings.Index(addr, "/"); idx >= 0 {
-		path = addr[idx:]
-		addr = addr[:idx]
+	if idx := strings.Index(address, "/"); idx >= 0 {
+		path = address[idx:]
+		address = address[:idx]
 	}
 
 	return &WebSocketServer{
 		options:   opts,
 		upgrader:  upgrader,
-		addr:      addr,
+		addr:      address,
 		path:      path,
-		useTLS:    useTLS,
-		protoAddr: protoAddr,
+		useTLS:    network == "wss",
+		protoAddr: fmt.Sprintf("%s:%s", network, address),
 	}
 }
 
@@ -127,18 +124,15 @@ func (s *WebSocketServer) handleWebSocket(w http.ResponseWriter, r *http.Request
 	AddConnection(connection)
 }
 
-func (s *WebSocketServer) Shutdown() error {
-	var err error
+func (s *WebSocketServer) Shutdown(ctx context.Context) {
 	s.once.Do(func() {
 		glog.Info("WebSocket服务器关闭", zap.String("addr", s.addr), zap.String("path", s.path))
 
 		if s.httpServer != nil {
 			ctx := context.Background()
-			if err = s.httpServer.Shutdown(ctx); err != nil {
-				return
-			}
+			s.httpServer.Shutdown(ctx)
 		}
 
 	})
-	return err
+	return
 }

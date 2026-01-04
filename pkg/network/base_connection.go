@@ -148,6 +148,9 @@ func (b *baseConnection) Send(msg interface{}) error {
 	if b.IsStop() {
 		return ErrConnectionClosed
 	}
+	if msg == nil {
+		return nil
+	}
 	select {
 	case b.sendChan <- msg:
 	default:
@@ -169,6 +172,9 @@ func (b *baseConnection) write(c io.Writer, msgList ...interface{}) error {
 	// 使用缓冲区合并多个消息
 	buf := buffer.New(4096)
 	for _, msg := range msgList {
+		if msg == nil {
+			continue
+		}
 		// 使用 encode 方法，保持与 Send 方法的一致性
 		bytes, err := b.encode(msg)
 		if err != nil {
@@ -183,7 +189,9 @@ func (b *baseConnection) write(c io.Writer, msgList ...interface{}) error {
 	}
 	// 一次性写入所有数据
 	if _, err := c.Write(buf.Bytes()); err != nil {
-		glog.Error("批量写入消息失败", zap.Int64("connectionId", b.ID()), zap.Error(err))
+		if err != io.EOF {
+			glog.Error("批量写入消息失败", zap.Int64("connectionId", b.ID()), zap.Error(err))
+		}
 		return err
 	}
 	return nil
@@ -206,20 +214,18 @@ func (b *baseConnection) process(connection IConnection, data []byte) (int, erro
 	return n, handler.OnMessage(connection, msg)
 }
 
-func (b *baseConnection) Close(connection IConnection, err error) (w error) {
-	if b.sendChan != nil {
-		close(b.sendChan)
-		b.sendChan = nil
-	}
+func (b *baseConnection) Close(connection IConnection, err error) {
 	if b.handler != nil {
-		w = b.handler.OnClose(connection, err)
+		b.handler.OnClose(connection, err)
 	}
+
 	if b.timeoutTicker != nil {
 		b.timeoutTicker.Stop()
 		b.timeoutTicker = nil
 	}
+
 	if connection != nil {
 		RemoveConnection(connection)
 	}
-	return w
+	return
 }

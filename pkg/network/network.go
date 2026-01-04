@@ -1,7 +1,7 @@
 package network
 
 import (
-	"gas/pkg/lib"
+	"context"
 	"sync/atomic"
 	"time"
 )
@@ -34,7 +34,7 @@ type IHandler interface {
 	// OnMessage 收到消息时回调（已解码为完整业务消息）
 	OnMessage(conn IConnection, msg interface{}) error
 	// OnClose 连接关闭时回调（TCP：连接断开；UDP：超时无数据或主动关闭）
-	OnClose(conn IConnection, err error) error
+	OnClose(conn IConnection, err error)
 }
 
 // IConnection 统一连接接口（TCP/UDP连接的抽象）
@@ -61,7 +61,7 @@ type IServer interface {
 	// Start 启动服务器（阻塞直到停止）
 	Start() error
 	// Shutdown 停止服务器
-	Shutdown() error
+	Shutdown(ctx context.Context)
 
 	Addr() string
 }
@@ -104,19 +104,15 @@ func (e *EmptyCodec) Decode(b []byte) (interface{}, int, error) {
 	return nil, 0, nil
 }
 
-func NewServer(protoAddr string, option ...Option) (IServer, error) {
-	proto, addr, err := lib.ParseProtoAddr(protoAddr)
-	if err != nil {
-		return nil, err
-	}
-	switch proto {
+func NewServer(ctx context.Context, network, address string, option ...Option) (IServer, error) {
+	switch network {
 	case "tcp", "tcp4", "tcp6":
-		return NewTCPServer(protoAddr, proto, addr, option...), nil
+		return NewTCPServer(ctx, network, address, option...), nil
 	case "udp", "udp4", "udp6":
-		return NewUDPServer(protoAddr, proto, addr, option...), nil
+		return NewUDPServer(network, address, option...), nil
 	case "ws", "wss":
-		return NewWebSocketServer(protoAddr, addr, proto == "wss", option...), nil
+		return NewWebSocketServer(network, address, option...), nil
 	default:
-		return nil, ErrUnsupportedProtocol(proto)
+		return nil, ErrUnsupportedProtocol(network)
 	}
 }

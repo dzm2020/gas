@@ -101,3 +101,19 @@ func Shutdown(ctx context.Context) error {
 	}
 	return nil
 }
+
+func GroupWaitWithContext(ctx context.Context, group *sync.WaitGroup) {
+	done := make(chan struct{})
+	go func() {
+		group.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+		return
+	case <-ctx.Done():
+		return
+	}
+
+}
