@@ -2,6 +2,7 @@ package network
 
 import (
 	"context"
+	"strings"
 	"sync/atomic"
 	"time"
 )
@@ -104,6 +105,7 @@ func (e *EmptyCodec) Decode(b []byte) (interface{}, int, error) {
 }
 
 func NewServer(ctx context.Context, network, address string, option ...Option) (IServer, error) {
+	path, address := parseWsAddr(address)
 	base := newBaseServer(ctx, network, address, option...)
 	switch network {
 	case "tcp", "tcp4", "tcp6":
@@ -111,8 +113,18 @@ func NewServer(ctx context.Context, network, address string, option ...Option) (
 	case "udp", "udp4", "udp6":
 		return NewUDPServer(base), nil
 	case "ws", "wss":
-		return NewWebSocketServer(base), nil
+		return NewWebSocketServer(base, path), nil
 	default:
 		return nil, ErrUnsupportedProtocol(network)
 	}
+}
+
+func parseWsAddr(address string) (string, string) {
+	// 解析地址和路径
+	path := "/"
+	if idx := strings.Index(address, "/"); idx >= 0 {
+		path = address[idx:]
+		address = address[:idx]
+	}
+	return path, address
 }
