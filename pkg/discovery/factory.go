@@ -2,8 +2,8 @@ package discovery
 
 import (
 	"errors"
-	"gas/pkg/discovery/iface"
-	"gas/pkg/lib/factory"
+	"github.com/dzm2020/gas/pkg/discovery/iface"
+	"github.com/dzm2020/gas/pkg/lib/factory"
 )
 
 var (

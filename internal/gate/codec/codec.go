@@ -3,7 +3,7 @@ package codec
 import (
 	"encoding/binary"
 	"fmt"
-	"gas/internal/gate/protocol"
+	"github.com/dzm2020/gas/internal/gate/protocol"
 )
 
 var (

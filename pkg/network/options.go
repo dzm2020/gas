@@ -1,8 +1,8 @@
 package network
 
 import (
-	"gas/pkg/glog"
-	"gas/pkg/lib/netutil"
+	"github.com/dzm2020/gas/pkg/glog"
+	"github.com/dzm2020/gas/pkg/lib/netutil"
 	"net"
 	"time"
 

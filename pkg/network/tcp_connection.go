@@ -2,8 +2,8 @@ package network
 
 import (
 	"context"
-	"gas/pkg/glog"
-	"gas/pkg/lib/buffer"
+	"github.com/dzm2020/gas/pkg/glog"
+	"github.com/dzm2020/gas/pkg/lib/buffer"
 	"io"
 	"net"
 

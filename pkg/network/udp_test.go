@@ -2,7 +2,7 @@ package network
 
 import (
 	"context"
-	"gas/pkg/glog"
+	"github.com/dzm2020/gas/pkg/glog"
 	"net"
 	"testing"
 	"time"

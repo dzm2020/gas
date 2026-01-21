@@ -3,7 +3,7 @@ package gate
 import (
 	"time"
 
-	"gas/pkg/network"
+	"github.com/dzm2020/gas/pkg/network"
 )
 
 // defaultConfig 生成默认网关配置

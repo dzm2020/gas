@@ -1,8 +1,8 @@
 package iface
 
 import (
-	discovery "gas/pkg/discovery/iface"
-	"gas/pkg/lib"
+	discovery "github.com/dzm2020/gas/pkg/discovery/iface"
+	"github.com/dzm2020/gas/pkg/lib"
 	"time"
 )
 

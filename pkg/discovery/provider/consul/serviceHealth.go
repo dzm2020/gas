@@ -3,12 +3,12 @@ package consul
 import (
 	"context"
 	"fmt"
-	"gas/pkg/discovery/iface"
+	"github.com/dzm2020/gas/pkg/discovery/iface"
 	"sync"
 	"sync/atomic"
 
-	"gas/pkg/glog"
-	"gas/pkg/lib/grs"
+	"github.com/dzm2020/gas/pkg/glog"
+	"github.com/dzm2020/gas/pkg/lib/grs"
 	"time"
 
 	"github.com/duke-git/lancet/v2/convertor"

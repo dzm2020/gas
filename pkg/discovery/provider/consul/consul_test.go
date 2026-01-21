@@ -2,8 +2,8 @@ package consul
 
 import (
 	"context"
-	"gas/pkg/discovery/iface"
-	"gas/pkg/glog"
+	"github.com/dzm2020/gas/pkg/discovery/iface"
+	"github.com/dzm2020/gas/pkg/glog"
 	"sync/atomic"
 	"testing"
 	"time"

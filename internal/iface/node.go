@@ -1,9 +1,9 @@
 package iface
 
 import (
-	discovery "gas/pkg/discovery/iface"
-	"gas/pkg/lib"
-	"gas/pkg/lib/component"
+	discovery "github.com/dzm2020/gas/pkg/discovery/iface"
+	"github.com/dzm2020/gas/pkg/lib"
+	"github.com/dzm2020/gas/pkg/lib/component"
 )
 
 type (

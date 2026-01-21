@@ -3,9 +3,9 @@ package network
 import (
 	"context"
 	"errors"
-	"gas/pkg/glog"
-	"gas/pkg/lib/buffer"
-	"gas/pkg/lib/stopper"
+	"github.com/dzm2020/gas/pkg/glog"
+	"github.com/dzm2020/gas/pkg/lib/buffer"
+	"github.com/dzm2020/gas/pkg/lib/stopper"
 	"io"
 	"net"
 	"time"

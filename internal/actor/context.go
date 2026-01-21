@@ -2,10 +2,10 @@
 package actor
 
 import (
-	"gas/internal/iface"
-	"gas/internal/session"
-	"gas/pkg/glog"
-	"gas/pkg/lib"
+	"github.com/dzm2020/gas/internal/iface"
+	"github.com/dzm2020/gas/internal/session"
+	"github.com/dzm2020/gas/pkg/glog"
+	"github.com/dzm2020/gas/pkg/lib"
 	"time"
 
 	"github.com/duke-git/lancet/v2/convertor"

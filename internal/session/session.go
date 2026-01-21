@@ -1,7 +1,7 @@
 package session
 
 import (
-	"gas/internal/iface"
+	"github.com/dzm2020/gas/internal/iface"
 
 	"github.com/duke-git/lancet/v2/convertor"
 )

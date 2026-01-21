@@ -1,7 +1,7 @@
 package consul
 
 import (
-	"gas/pkg/discovery/iface"
+	"github.com/dzm2020/gas/pkg/discovery/iface"
 	"sync"
 )
 

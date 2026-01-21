@@ -2,11 +2,11 @@ package actor
 
 import (
 	"errors"
-	"gas/internal/iface"
-	discovery "gas/pkg/discovery/iface"
-	"gas/pkg/glog"
-	"gas/pkg/lib"
-	"gas/pkg/lib/xerror"
+	"github.com/dzm2020/gas/internal/iface"
+	discovery "github.com/dzm2020/gas/pkg/discovery/iface"
+	"github.com/dzm2020/gas/pkg/glog"
+	"github.com/dzm2020/gas/pkg/lib"
+	"github.com/dzm2020/gas/pkg/lib/xerror"
 	"sync/atomic"
 	"time"
 

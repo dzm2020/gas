@@ -2,9 +2,9 @@ package nats
 
 import (
 	"context"
-	"gas/pkg/lib/xerror"
-	"gas/pkg/messageQue"
-	"gas/pkg/messageQue/iface"
+	"github.com/dzm2020/gas/pkg/lib/xerror"
+	"github.com/dzm2020/gas/pkg/messageQue"
+	"github.com/dzm2020/gas/pkg/messageQue/iface"
 	"strings"
 	"time"
 

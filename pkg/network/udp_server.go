@@ -3,9 +3,9 @@ package network
 import (
 	"context"
 	"errors"
-	"gas/pkg/glog"
-	"gas/pkg/lib/grs"
-	"gas/pkg/lib/netutil"
+	"github.com/dzm2020/gas/pkg/glog"
+	"github.com/dzm2020/gas/pkg/lib/grs"
+	"github.com/dzm2020/gas/pkg/lib/netutil"
 	"net"
 	"sync"
 

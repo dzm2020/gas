@@ -5,8 +5,8 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"gas/pkg/glog"
-	"gas/pkg/lib/grs"
+	"github.com/dzm2020/gas/pkg/glog"
+	"github.com/dzm2020/gas/pkg/lib/grs"
 	"net/http"
 
 	"github.com/gorilla/websocket"

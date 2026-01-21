@@ -2,9 +2,9 @@ package gate
 
 import (
 	"context"
-	"gas/internal/iface"
-	"gas/internal/profile"
-	"gas/pkg/lib/component"
+	"github.com/dzm2020/gas/internal/iface"
+	"github.com/dzm2020/gas/internal/profile"
+	"github.com/dzm2020/gas/pkg/lib/component"
 )
 
 const (

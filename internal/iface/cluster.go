@@ -2,7 +2,7 @@ package iface
 
 import (
 	"context"
-	discovery "gas/pkg/discovery/iface"
+	discovery "github.com/dzm2020/gas/pkg/discovery/iface"
 )
 
 type ICluster interface {

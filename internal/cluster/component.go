@@ -2,11 +2,11 @@ package cluster
 
 import (
 	"context"
-	"gas/internal/iface"
-	"gas/internal/profile"
-	dis "gas/pkg/discovery"
-	"gas/pkg/lib/component"
-	mq "gas/pkg/messageQue"
+	"github.com/dzm2020/gas/internal/iface"
+	"github.com/dzm2020/gas/internal/profile"
+	dis "github.com/dzm2020/gas/pkg/discovery"
+	"github.com/dzm2020/gas/pkg/lib/component"
+	mq "github.com/dzm2020/gas/pkg/messageQue"
 )
 
 const (

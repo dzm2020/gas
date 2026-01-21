@@ -2,8 +2,8 @@ package actor
 
 import (
 	"context"
-	"gas/internal/iface"
-	"gas/pkg/lib/component"
+	"github.com/dzm2020/gas/internal/iface"
+	"github.com/dzm2020/gas/pkg/lib/component"
 )
 
 const (

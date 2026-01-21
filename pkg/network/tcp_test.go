@@ -3,7 +3,7 @@ package network
 import (
 	"context"
 	"encoding/binary"
-	"gas/pkg/glog"
+	"github.com/dzm2020/gas/pkg/glog"
 	"net"
 	"testing"
 	"time"

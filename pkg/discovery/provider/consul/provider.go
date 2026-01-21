@@ -2,8 +2,8 @@ package consul
 
 import (
 	"context"
-	discoveryApi "gas/pkg/discovery"
-	"gas/pkg/discovery/iface"
+	discoveryApi "github.com/dzm2020/gas/pkg/discovery"
+	"github.com/dzm2020/gas/pkg/discovery/iface"
 	"sync"
 
 	"github.com/hashicorp/consul/api"

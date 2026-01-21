@@ -2,10 +2,10 @@ package logger
 
 import (
 	"context"
-	"gas/internal/iface"
-	"gas/internal/profile"
-	logger "gas/pkg/glog"
-	"gas/pkg/lib/component"
+	"github.com/dzm2020/gas/internal/iface"
+	"github.com/dzm2020/gas/internal/profile"
+	logger "github.com/dzm2020/gas/pkg/glog"
+	"github.com/dzm2020/gas/pkg/lib/component"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"

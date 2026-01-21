@@ -3,7 +3,7 @@ package network
 import (
 	"context"
 	"errors"
-	"gas/pkg/glog"
+	"github.com/dzm2020/gas/pkg/glog"
 	"net"
 
 	"go.uber.org/zap"

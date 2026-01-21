@@ -2,8 +2,8 @@ package messageQue
 
 import (
 	"errors"
-	"gas/pkg/lib/factory"
-	"gas/pkg/messageQue/iface"
+	"github.com/dzm2020/gas/pkg/lib/factory"
+	"github.com/dzm2020/gas/pkg/messageQue/iface"
 )
 
 var (

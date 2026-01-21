@@ -1,7 +1,7 @@
 package profile
 
 import (
-	"gas/pkg/glog"
+	"github.com/dzm2020/gas/pkg/glog"
 
 	"github.com/spf13/viper"
 	"go.uber.org/zap"

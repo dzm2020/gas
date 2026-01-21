@@ -2,12 +2,12 @@ package gate
 
 import (
 	"errors"
-	"gas/internal/gate/protocol"
-	"gas/internal/iface"
-	"gas/internal/session"
-	"gas/pkg/glog"
-	"gas/pkg/lib/xerror"
-	"gas/pkg/network"
+	"github.com/dzm2020/gas/internal/gate/protocol"
+	"github.com/dzm2020/gas/internal/iface"
+	"github.com/dzm2020/gas/internal/session"
+	"github.com/dzm2020/gas/pkg/glog"
+	"github.com/dzm2020/gas/pkg/lib/xerror"
+	"github.com/dzm2020/gas/pkg/network"
 
 	"go.uber.org/zap"
 )

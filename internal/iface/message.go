@@ -3,7 +3,7 @@ package iface
 import (
 	"errors"
 	"fmt"
-	"gas/pkg/lib"
+	"github.com/dzm2020/gas/pkg/lib"
 )
 
 var (

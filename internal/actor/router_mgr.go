@@ -1,8 +1,8 @@
 package actor
 
 import (
-	"gas/internal/iface"
-	"gas/pkg/glog"
+	"github.com/dzm2020/gas/internal/iface"
+	"github.com/dzm2020/gas/pkg/glog"
 	"reflect"
 	"sync"
 

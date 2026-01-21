@@ -3,7 +3,7 @@ package component
 import (
 	"context"
 	"errors"
-	"gas/pkg/lib/xerror"
+	"github.com/dzm2020/gas/pkg/lib/xerror"
 	"sync"
 	"sync/atomic"
 	"time"

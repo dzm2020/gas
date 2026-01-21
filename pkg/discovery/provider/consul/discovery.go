@@ -3,9 +3,9 @@ package consul
 import (
 	"context"
 	"errors"
-	"gas/pkg/discovery/iface"
-	"gas/pkg/glog"
-	"gas/pkg/lib/grs"
+	"github.com/dzm2020/gas/pkg/discovery/iface"
+	"github.com/dzm2020/gas/pkg/glog"
+	"github.com/dzm2020/gas/pkg/lib/grs"
 	"sync"
 	"time"
 

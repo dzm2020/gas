@@ -3,7 +3,7 @@ package network
 import (
 	"context"
 	"fmt"
-	"gas/pkg/lib/stopper"
+	"github.com/dzm2020/gas/pkg/lib/stopper"
 	"sync"
 )
 

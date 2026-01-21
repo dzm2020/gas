@@ -3,12 +3,12 @@ package gate
 import (
 	"context"
 	"errors"
-	"gas/internal/gate/codec"
-	"gas/internal/gate/protocol"
-	"gas/internal/iface"
-	"gas/internal/session"
-	"gas/pkg/glog"
-	"gas/pkg/network"
+	"github.com/dzm2020/gas/internal/gate/codec"
+	"github.com/dzm2020/gas/internal/gate/protocol"
+	"github.com/dzm2020/gas/internal/iface"
+	"github.com/dzm2020/gas/internal/session"
+	"github.com/dzm2020/gas/pkg/glog"
+	"github.com/dzm2020/gas/pkg/network"
 
 	"github.com/duke-git/lancet/v2/convertor"
 	"go.uber.org/atomic"

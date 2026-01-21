@@ -1,7 +1,7 @@
 package actor
 
 import (
-	"gas/internal/iface"
+	"github.com/dzm2020/gas/internal/iface"
 	"sync/atomic"
 )
 

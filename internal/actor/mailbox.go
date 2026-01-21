@@ -1,9 +1,9 @@
 package actor
 
 import (
-	"gas/internal/iface"
-	"gas/pkg/glog"
-	"gas/pkg/lib"
+	"github.com/dzm2020/gas/internal/iface"
+	"github.com/dzm2020/gas/pkg/glog"
+	"github.com/dzm2020/gas/pkg/lib"
 	"runtime"
 	"sync/atomic"
 
