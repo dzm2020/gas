@@ -18,3 +18,4 @@ func setSockOptLinger(fd uintptr, level, opt int, linger *syscall.Linger) error 
 func setReusePort(fd uintptr) error {
 	return nil
 }
+

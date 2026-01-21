@@ -103,8 +103,15 @@ func (s *UDPServer) listen() (err error) {
 	}
 	var ln net.PacketConn
 	ln, err = config.ListenPacket(s.ctx, s.network, s.address)
+	if err != nil {
+		return err
+	}
 
-	s.conn = ln.(*net.UDPConn)
+	udpConn, ok := ln.(*net.UDPConn)
+	if !ok {
+		return errors.New("listener is not *net.UDPConn")
+	}
+	s.conn = udpConn
 
 	setConOptions(s.options, s.conn)
 	return err

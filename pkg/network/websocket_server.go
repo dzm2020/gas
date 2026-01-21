@@ -115,7 +115,7 @@ func (s *WebSocketServer) Shutdown(ctx context.Context) {
 	}
 	glog.Info("WebSocket服务器关闭", zap.String("addr", s.Addr()), zap.String("path", s.path))
 	if s.httpServer != nil {
-		_ = s.httpServer.Shutdown(context.Background())
+		_ = s.httpServer.Shutdown(ctx)
 	}
 	s.cancel()
 

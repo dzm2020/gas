@@ -70,7 +70,8 @@ type IServer interface {
 // ------------------------------ 基础常量与默认配置 ------------------------------
 const (
 	// 默认发送队列缓冲大小（避免发送阻塞）
-	defaultSendChanBuf = 1024
+	defaultSendChanBuf   = 1024
+	defaultUdpRcvChanCap = 1024
 	// 默认TCP读缓冲区大小
 	defaultTCPReadBuf = 4096
 	// 默认超时时间（无数据时自动关闭虚拟连接）

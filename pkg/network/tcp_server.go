@@ -61,7 +61,12 @@ func (s *TCPServer) accept() {
 }
 
 func (s *TCPServer) newTcpCon(conn net.Conn) {
-	tcpCon := conn.(*net.TCPConn)
+	tcpCon, ok := conn.(*net.TCPConn)
+	if !ok {
+		glog.Error("连接类型错误，期望 *net.TCPConn", zap.String("address", s.Addr()))
+		_ = conn.Close()
+		return
+	}
 	connection := newTCPConnection(s.ctx, tcpCon, Accept, s.options)
 	AddConnection(connection)
 

@@ -65,6 +65,9 @@ func (c *TCPConnection) read() error {
 	// 循环解码（处理粘包，可能一次读取多个消息）
 	for c.buffer.Len() > 0 {
 		pn, err := c.process(c, c.buffer.Bytes())
+		if err != nil {
+			return err
+		}
 		if pn == 0 {
 			break // 数据不完整，等待下一次读取
 		}

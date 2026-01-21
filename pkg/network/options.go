@@ -28,6 +28,7 @@ type Options struct {
 	LingerOnOff      bool          // 是否启用 SO_LINGER
 	LingerSec        int           // SO_LINGER 延迟关闭时间（秒）
 	UdpSendChanSize  int
+	UdpRcvChanSize   int
 }
 
 func loadOptions(options ...Option) *Options {
@@ -35,6 +36,7 @@ func loadOptions(options ...Option) *Options {
 		SendChanSize:     defaultSendChanBuf,
 		ReadBufSize:      defaultTCPReadBuf,
 		HeartInterval:    defaultHeartInterval,
+		UdpRcvChanSize:   defaultUdpRcvChanCap,
 		UdpSendChanSize:  1024,
 		ReuseAddr:        true,  // 默认启用 SO_REUSEADDR
 		ReusePort:        false, // 默认不启用 SO_REUSEPORT（仅 Linux 支持）
@@ -174,6 +176,12 @@ func WithUdpSendChanSize(udpSendChanSize int) Option {
 	}
 }
 
+func WithUdpRcvChanSize(udpRcvChanSize int) Option {
+	return func(opts *Options) {
+		opts.UdpRcvChanSize = udpRcvChanSize
+	}
+}
+
 func setConOptions(opts *Options, conn net.Conn) {
 	address := conn.LocalAddr().String()
 	// 设置 SO_REUSEADDR
@@ -214,9 +222,20 @@ func setConOptions(opts *Options, conn net.Conn) {
 
 	// 设置 TCP KeepAlive
 	if opts.TCPKeepAlive > 0 {
-		if err := netutil.SetTCPKeepAlive(conn, true, opts.TCPKeepAlive); err != nil {
+		// 如果设置了 TCPKeepInterval，优先使用它作为探测间隔
+		period := opts.TCPKeepAlive
+		if opts.TCPKeepInterval > 0 {
+			period = opts.TCPKeepInterval
+		}
+		if err := netutil.SetTCPKeepAlive(conn, true, period); err != nil {
 			glog.Warn("设置 TCP KeepAlive 失败", zap.String("localAddr", address),
-				zap.Duration("interval", opts.TCPKeepAlive), zap.Error(err))
+				zap.Duration("interval", period), zap.Error(err))
+		}
+	} else if opts.TCPKeepInterval > 0 {
+		// 如果只设置了 TCPKeepInterval，也启用 KeepAlive
+		if err := netutil.SetTCPKeepAlive(conn, true, opts.TCPKeepInterval); err != nil {
+			glog.Warn("设置 TCP KeepAlive 失败", zap.String("localAddr", address),
+				zap.Duration("interval", opts.TCPKeepInterval), zap.Error(err))
 		}
 	}
 

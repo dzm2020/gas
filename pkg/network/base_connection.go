@@ -38,6 +38,7 @@ type baseConnection struct {
 
 // initBaseConnection 初始化基类连接
 func initBaseConnection(ctx context.Context, typ ConnectionType, localAddr, remoteAddr net.Addr, options *Options) *baseConnection {
+	sendChanSize := options.SendChanSize
 	bc := &baseConnection{
 		id:         generateConnID(),
 		lastActive: time.Now(),
@@ -45,7 +46,7 @@ func initBaseConnection(ctx context.Context, typ ConnectionType, localAddr, remo
 		handler:    options.Handler,
 		codec:      options.Codec,
 		typ:        typ,
-		sendChan:   make(chan interface{}, 1024),
+		sendChan:   make(chan interface{}, sendChanSize),
 		localAddr:  localAddr,
 		remoteAddr: remoteAddr,
 	}

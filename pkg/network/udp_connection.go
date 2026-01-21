@@ -21,12 +21,13 @@ type UDPConnection struct {
 
 func newUDPConnection(ctx context.Context, conn *net.UDPConn, typ ConnectionType, remoteAddr *net.UDPAddr, server *UDPServer) *UDPConnection {
 	base := initBaseConnection(ctx, typ, conn.LocalAddr(), remoteAddr, server.options)
+	rcvChanSize := server.options.UdpRcvChanSize
 	udpConn := &UDPConnection{
 		baseConnection: base,
 		remoteAddr:     remoteAddr,
 		conn:           conn,
 		server:         server,
-		rcvChan:        make(chan []byte, 1024),
+		rcvChan:        make(chan []byte, rcvChanSize),
 	}
 	return udpConn
 }
