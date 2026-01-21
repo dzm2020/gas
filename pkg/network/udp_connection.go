@@ -2,8 +2,8 @@ package network
 
 import (
 	"context"
+	"errors"
 	"gas/pkg/glog"
-	"gas/pkg/lib/grs"
 	"net"
 
 	"go.uber.org/zap"
@@ -16,23 +16,18 @@ type UDPConnection struct {
 	remoteAddr      *net.UDPAddr
 	server          *UDPServer   // 所属服务器
 	conn            *net.UDPConn // 底层UDP连接（全局共享）
-	readChan        chan []byte
+	rcvChan         chan []byte
 }
 
-func newUDPConnection(conn *net.UDPConn, typ ConnectionType, remoteAddr *net.UDPAddr, server *UDPServer) *UDPConnection {
-	base := initBaseConnection(typ, conn.LocalAddr(), remoteAddr, server.options)
+func newUDPConnection(ctx context.Context, conn *net.UDPConn, typ ConnectionType, remoteAddr *net.UDPAddr, server *UDPServer) *UDPConnection {
+	base := initBaseConnection(ctx, typ, conn.LocalAddr(), remoteAddr, server.options)
 	udpConn := &UDPConnection{
 		baseConnection: base,
 		remoteAddr:     remoteAddr,
 		conn:           conn,
 		server:         server,
-		readChan:       make(chan []byte, 100),
+		rcvChan:        make(chan []byte, 1024),
 	}
-
-	grs.Go(func(ctx context.Context) {
-		udpConn.writeLoop()
-	})
-
 	return udpConn
 }
 
@@ -44,10 +39,19 @@ func (c *UDPConnection) Send(msg interface{}) error {
 	if err != nil {
 		return err
 	}
-	return c.server.send(data, c.remoteAddr)
+	if data == nil {
+		return nil
+	}
+	ch := c.server.getSendChan()
+	select {
+	case ch <- &udpPacket{data: data, remoteAddr: c.remoteAddr}:
+	default:
+		return errors.New("channel is full")
+	}
+	return nil
 }
 
-func (c *UDPConnection) writeLoop() {
+func (c *UDPConnection) readLoop() {
 	var err error
 	defer func() {
 		_ = c.Close(err)
@@ -57,13 +61,15 @@ func (c *UDPConnection) writeLoop() {
 		return
 	}
 
-	for {
+	for !c.IsStop() {
 		select {
+		case <-c.ctx.Done():
+			return
 		case <-c.getTimeoutChan():
 			if err = c.checkTimeout(); err != nil {
 				return
 			}
-		case data := <-c.readChan:
+		case data := <-c.rcvChan:
 			_, err = c.baseConnection.process(c, data)
 			if err != nil {
 				return
@@ -72,9 +78,9 @@ func (c *UDPConnection) writeLoop() {
 	}
 }
 
-func (c *UDPConnection) input(data []byte) {
+func (c *UDPConnection) writeRcvChan(data []byte) {
 	select {
-	case c.readChan <- data:
+	case c.rcvChan <- data:
 	default:
 		glog.Error("UDP读取chan已满", zap.Int64("connectionId", c.ID()))
 	}
@@ -87,16 +93,9 @@ func (c *UDPConnection) Close(err error) (w error) {
 
 	glog.Info("UDP连接断开", zap.Int64("connectionId", c.ID()), zap.Error(err))
 
-	if c.readChan != nil {
-		close(c.readChan)
-		c.readChan = nil
-	}
-
 	if c.server != nil && c.remoteAddr != nil {
 		c.server.removeConnection(c.remoteAddr.String())
 	}
-
 	c.baseConnection.Close(c, err)
-
 	return
 }

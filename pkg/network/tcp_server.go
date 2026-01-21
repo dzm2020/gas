@@ -3,65 +3,49 @@ package network
 import (
 	"context"
 	"errors"
-	"fmt"
 	"gas/pkg/glog"
 	"gas/pkg/lib/grs"
-	"gas/pkg/lib/stopper"
+	"gas/pkg/lib/netutil"
 	"net"
-	"sync"
 
-	"github.com/duke-git/lancet/v2/maputil"
 	"go.uber.org/zap"
 )
 
 // ------------------------------ TCP服务器 ------------------------------
 
-type TCPServer struct {
-	stopper.Stopper
-	options          *Options
-	listener         net.Listener // TCP监听器
-	network, address string       // 监听地址（如 ":8080"）
-	protoAddress     string
-	connDict         *maputil.ConcurrentMap[int64, IConnection]
-	waitGroup        sync.WaitGroup
-	ctx              context.Context
-	cancel           context.CancelFunc
-}
-
 // NewTCPServer 创建TCP服务器
-func NewTCPServer(ctx context.Context, network, address string, option ...Option) *TCPServer {
-	server := &TCPServer{
-		options:      loadOptions(option...),
-		network:      network,
-		address:      address,
-		protoAddress: fmt.Sprintf("%s:%s", network, address),
-		connDict:     maputil.NewConcurrentMap[int64, IConnection](10),
+func NewTCPServer(base *baseServer) *TCPServer {
+	return &TCPServer{
+		baseServer: base,
 	}
-	server.ctx, server.cancel = context.WithCancel(ctx)
-	return server
 }
 
-func (s *TCPServer) Addr() string {
-	return s.protoAddress
+type TCPServer struct {
+	*baseServer
+	listener net.Listener // TCP监听器
 }
 
 func (s *TCPServer) Start() (err error) {
-	if s.listener, err = net.Listen(s.network, s.address); err != nil {
+	config := netutil.ListenConfig{
+		ReuseAddr: s.options.ReuseAddr,
+		ReusePort: s.options.ReusePort,
+	}
+	if s.listener, err = config.Listen(s.ctx, s.network, s.address); err != nil {
 		return
 	}
-
 	s.waitGroup.Add(1)
 	grs.Go(func(ctx context.Context) {
 		s.acceptLoop()
 		s.waitGroup.Done()
 	})
-
 	return
 }
 
 func (s *TCPServer) acceptLoop() {
 	for !s.IsStop() {
-		s.accept()
+		grs.Try(func() {
+			s.accept()
+		}, nil)
 	}
 }
 
@@ -73,10 +57,13 @@ func (s *TCPServer) accept() {
 		}
 		return
 	}
+	s.newTcpCon(conn)
+}
+
+func (s *TCPServer) newTcpCon(conn net.Conn) {
 	tcpCon := conn.(*net.TCPConn)
 	connection := newTCPConnection(s.ctx, tcpCon, Accept, s.options)
 	AddConnection(connection)
-	s.connDict.Set(connection.ID(), connection)
 
 	s.waitGroup.Add(1)
 	grs.Go(func(ctx context.Context) {
@@ -91,8 +78,6 @@ func (s *TCPServer) accept() {
 		s.waitGroup.Done()
 		glog.Debug("TCP连接写协程关闭", zap.Int64("connectionId", connection.ID()))
 	})
-
-	return
 }
 
 func (s *TCPServer) Shutdown(ctx context.Context) {

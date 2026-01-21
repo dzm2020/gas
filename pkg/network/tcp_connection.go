@@ -7,7 +7,6 @@ import (
 	"io"
 	"net"
 
-	"github.com/panjf2000/gnet/v2"
 	"go.uber.org/zap"
 )
 
@@ -17,19 +16,18 @@ type TCPConnection struct {
 	server          *TCPServer // 所属服务器
 	tmpBuf          []byte
 	buffer          buffer.IBuffer
-	ctx             context.Context
-	cancel          context.CancelFunc
 }
 
 func newTCPConnection(ctx context.Context, conn *net.TCPConn, typ ConnectionType, options *Options) *TCPConnection {
-	base := initBaseConnection(typ, conn.LocalAddr(), conn.RemoteAddr(), options)
+	setConOptions(options, conn)
+
+	base := initBaseConnection(ctx, typ, conn.LocalAddr(), conn.RemoteAddr(), options)
 	tcpConn := &TCPConnection{
 		baseConnection: base,
-		tmpBuf:         make([]byte, options.readBufSize),
-		buffer:         buffer.New(options.readBufSize),
+		tmpBuf:         make([]byte, options.ReadBufSize),
+		buffer:         buffer.New(options.ReadBufSize),
 		conn:           conn,
 	}
-	tcpConn.ctx, tcpConn.cancel = context.WithCancel(ctx)
 	return tcpConn
 }
 
@@ -118,10 +116,6 @@ func (c *TCPConnection) Close(err error) (w error) {
 
 	glog.Info("TCP连接断开", zap.Int64("connectionId", c.ID()), zap.Error(err))
 
-	c.cancel()
-
 	c.baseConnection.Close(c, err)
-
-	gnet.Run()
 	return
 }

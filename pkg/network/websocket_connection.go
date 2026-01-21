@@ -3,7 +3,6 @@ package network
 import (
 	"context"
 	"gas/pkg/glog"
-	"gas/pkg/lib/grs"
 
 	"github.com/gorilla/websocket"
 	"go.uber.org/zap"
@@ -15,23 +14,13 @@ type WebSocketConnection struct {
 	server          *WebSocketServer // 所属服务器
 }
 
-func newWebSocketConnection(conn *websocket.Conn, typ ConnectionType, options *Options) *WebSocketConnection {
-	base := initBaseConnection(typ, conn.LocalAddr(), conn.RemoteAddr(), options)
-
-	wsConn := &WebSocketConnection{
+func newWebSocketConnection(ctx context.Context, conn *websocket.Conn, typ ConnectionType, options *Options) *WebSocketConnection {
+	setConOptions(options, conn.NetConn())
+	base := initBaseConnection(ctx, typ, conn.LocalAddr(), conn.RemoteAddr(), options)
+	return &WebSocketConnection{
 		baseConnection: base,
 		conn:           conn,
 	}
-
-	grs.Go(func(ctx context.Context) {
-		wsConn.readLoop()
-	})
-
-	grs.Go(func(ctx context.Context) {
-		wsConn.writeLoop()
-	})
-
-	return wsConn
 }
 
 // Send 发送消息（线程安全）
@@ -43,10 +32,12 @@ func (c *WebSocketConnection) readLoop() {
 	defer func() {
 		_ = c.Close(err)
 	}()
+
 	if err = c.onConnect(c); err != nil {
 		return
 	}
-	for {
+
+	for !c.IsStop() {
 		if err = c.read(); err != nil {
 			return
 		}
@@ -75,12 +66,11 @@ func (c *WebSocketConnection) writeLoop() {
 		_ = c.Close(err)
 	}()
 
-	for {
+	for !c.IsStop() {
 		select {
-		case msg, ok := <-c.sendChan:
-			if !ok {
-				return // 通道已关闭
-			}
+		case <-c.ctx.Done():
+			return
+		case msg, _ := <-c.sendChan:
 			data, w := c.encode(msg)
 			if w != nil {
 				err = w

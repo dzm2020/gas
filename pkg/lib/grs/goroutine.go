@@ -65,20 +65,6 @@ func Try(f func(), reFun func(err any)) {
 	f()
 }
 
-func Recover(f func(err any)) {
-	defer func() {
-		// 捕获panic，避免单个协程崩溃影响整体
-		if r := recover(); r != nil {
-			if f != nil {
-				f(r)
-			}
-			if panicHandler != nil {
-				panicHandler(r)
-			}
-		}
-	}()
-}
-
 func SetPanicHandler(handler func(interface{})) {
 	panicHandler = handler
 }

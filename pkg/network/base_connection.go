@@ -1,6 +1,7 @@
 package network
 
 import (
+	"context"
 	"errors"
 	"gas/pkg/glog"
 	"gas/pkg/lib/buffer"
@@ -28,28 +29,31 @@ type baseConnection struct {
 	handler               IHandler
 	codec                 ICodec
 	typ                   ConnectionType
-	ctx                   interface{}
+	user                  interface{}
 	sendChan              chan interface{}
 	localAddr, remoteAddr net.Addr
+	ctx                   context.Context
+	cancel                context.CancelFunc
 }
 
 // initBaseConnection 初始化基类连接
-func initBaseConnection(typ ConnectionType, localAddr, remoteAddr net.Addr, options *Options) *baseConnection {
+func initBaseConnection(ctx context.Context, typ ConnectionType, localAddr, remoteAddr net.Addr, options *Options) *baseConnection {
 	bc := &baseConnection{
 		id:         generateConnID(),
 		lastActive: time.Now(),
-		timeout:    options.keepAlive,
-		handler:    options.handler,
-		codec:      options.codec,
+		timeout:    options.HeartInterval,
+		handler:    options.Handler,
+		codec:      options.Codec,
 		typ:        typ,
 		sendChan:   make(chan interface{}, 1024),
 		localAddr:  localAddr,
 		remoteAddr: remoteAddr,
 	}
-	// 只有当 keepAlive > 0 时才创建 ticker
-	if options.keepAlive > 0 {
-		bc.timeoutTicker = time.NewTicker(options.keepAlive / 2)
+	// 只有当 heartInterval > 0 时才创建 ticker
+	if options.HeartInterval > 0 {
+		bc.timeoutTicker = time.NewTicker(options.HeartInterval / 2)
 	}
+	bc.ctx, bc.cancel = context.WithCancel(ctx)
 
 	glog.Info("创建连接", zap.Int64("connectionId", bc.ID()),
 		zap.String("localAddr", bc.LocalAddr()),
@@ -86,7 +90,7 @@ func (b *baseConnection) Context() interface{} {
 }
 
 func (b *baseConnection) SetContext(ctx interface{}) {
-	b.ctx = ctx
+	b.user = ctx
 }
 
 func (b *baseConnection) updateLastActive() {
@@ -227,5 +231,8 @@ func (b *baseConnection) Close(connection IConnection, err error) {
 	if connection != nil {
 		RemoveConnection(connection)
 	}
+
+	b.cancel()
+
 	return
 }

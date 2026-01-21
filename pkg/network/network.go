@@ -73,7 +73,7 @@ const (
 	// 默认TCP读缓冲区大小
 	defaultTCPReadBuf = 4096
 	// 默认超时时间（无数据时自动关闭虚拟连接）
-	defaultKeepAlive = 5 * time.Second
+	defaultHeartInterval = 5 * time.Second
 )
 
 type ConnectionType int
@@ -99,19 +99,19 @@ type EmptyCodec struct{}
 func (e *EmptyCodec) Encode(msg interface{}) ([]byte, error) {
 	return nil, nil
 }
-
 func (e *EmptyCodec) Decode(b []byte) (interface{}, int, error) {
 	return nil, 0, nil
 }
 
 func NewServer(ctx context.Context, network, address string, option ...Option) (IServer, error) {
+	base := newBaseServer(ctx, network, address, option...)
 	switch network {
 	case "tcp", "tcp4", "tcp6":
-		return NewTCPServer(ctx, network, address, option...), nil
+		return NewTCPServer(base), nil
 	case "udp", "udp4", "udp6":
-		return NewUDPServer(network, address, option...), nil
+		return NewUDPServer(base), nil
 	case "ws", "wss":
-		return NewWebSocketServer(network, address, option...), nil
+		return NewWebSocketServer(base), nil
 	default:
 		return nil, ErrUnsupportedProtocol(network)
 	}

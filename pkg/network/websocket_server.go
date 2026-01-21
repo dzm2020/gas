@@ -8,7 +8,6 @@ import (
 	"gas/pkg/lib/grs"
 	"net/http"
 	"strings"
-	"sync"
 
 	"github.com/gorilla/websocket"
 	"go.uber.org/zap"
@@ -28,56 +27,50 @@ var (
 )
 
 type WebSocketServer struct {
-	options    *Options
+	*baseServer
 	upgrader   websocket.Upgrader // WebSocket 升级器
 	httpServer *http.Server       // HTTP 服务器
-	addr       string             // 监听地址（如 ":8080"）
 	path       string             // WebSocket 路径（如 "/ws"）
 	useTLS     bool               // 是否使用 TLS
-	protoAddr  string
-	once       sync.Once
 }
 
 // NewWebSocketServer 创建 WebSocket 服务器
-func NewWebSocketServer(network, address string, option ...Option) *WebSocketServer {
+func NewWebSocketServer(base *baseServer) *WebSocketServer {
 	upgrader := defaultUpgrader
-	opts := loadOptions(option...)
-	if opts.readBufSize > 0 {
-		upgrader.ReadBufferSize = opts.readBufSize
+
+	if base.options.ReadBufSize > 0 {
+		upgrader.ReadBufferSize = base.options.ReadBufSize
 	}
-	if opts.sendChanSize > 0 {
-		upgrader.WriteBufferSize = opts.sendChanSize
+	if base.options.SendChanSize > 0 {
+		upgrader.WriteBufferSize = base.options.SendChanSize
 	}
 
 	// 解析地址和路径
 	path := "/"
+	address := base.address
 	if idx := strings.Index(address, "/"); idx >= 0 {
 		path = address[idx:]
 		address = address[:idx]
 	}
 
 	return &WebSocketServer{
-		options:   opts,
-		upgrader:  upgrader,
-		addr:      address,
-		path:      path,
-		useTLS:    network == "wss",
-		protoAddr: fmt.Sprintf("%s:%s", network, address),
+		upgrader: upgrader,
+		path:     path,
+		useTLS:   base.network == "wss",
 	}
-}
 
-func (s *WebSocketServer) Addr() string {
-	return s.addr
 }
 
 func (s *WebSocketServer) Start() error {
 	mux := http.NewServeMux()
 	mux.HandleFunc(s.path, s.handleWebSocket)
 	s.httpServer = &http.Server{
-		Addr:    s.addr,
+		Addr:    s.Addr(),
 		Handler: mux,
 	}
+	s.waitGroup.Add(1)
 	grs.Go(func(ctx context.Context) {
+		defer s.waitGroup.Done()
 		var err error
 		if s.useTLS {
 			err = s.listenAndServeWSTLS()
@@ -92,11 +85,11 @@ func (s *WebSocketServer) Start() error {
 }
 
 func (s *WebSocketServer) listenAndServeWSTLS() error {
-	if s.options.tlsCertFile == "" || s.options.tlsKeyFile == "" {
+	if s.options.TLSCertFile == "" || s.options.TLSKeyFile == "" {
 		return fmt.Errorf("TLS证书文件或私钥文件未配置")
 	}
 
-	cert, err := tls.LoadX509KeyPair(s.options.tlsCertFile, s.options.tlsKeyFile)
+	cert, err := tls.LoadX509KeyPair(s.options.TLSCertFile, s.options.TLSKeyFile)
 	if err != nil {
 		return fmt.Errorf("加载TLS证书失败: %w", err)
 	}
@@ -116,23 +109,36 @@ func (s *WebSocketServer) handleWebSocket(w http.ResponseWriter, r *http.Request
 	// 升级 HTTP 连接为 WebSocket 连接
 	conn, err := s.upgrader.Upgrade(w, r, nil)
 	if err != nil {
-		glog.Error("WebSocket升级失败", zap.String("addr", s.addr), zap.Error(err))
+		glog.Error("WebSocket升级失败", zap.String("addr", s.Addr()), zap.Error(err))
 		return
 	}
 
-	connection := newWebSocketConnection(conn, Accept, s.options)
-	AddConnection(connection)
+	wsConn := newWebSocketConnection(s.ctx, conn, Accept, s.options)
+	AddConnection(wsConn)
+
+	s.waitGroup.Add(1)
+	grs.Go(func(ctx context.Context) {
+		wsConn.readLoop()
+		s.waitGroup.Done()
+	})
+
+	s.waitGroup.Add(1)
+	grs.Go(func(ctx context.Context) {
+		wsConn.writeLoop()
+		s.waitGroup.Done()
+	})
 }
 
 func (s *WebSocketServer) Shutdown(ctx context.Context) {
-	s.once.Do(func() {
-		glog.Info("WebSocket服务器关闭", zap.String("addr", s.addr), zap.String("path", s.path))
+	if !s.Stop() {
+		return
+	}
+	glog.Info("WebSocket服务器关闭", zap.String("addr", s.Addr()), zap.String("path", s.path))
+	if s.httpServer != nil {
+		_ = s.httpServer.Shutdown(context.Background())
+	}
+	s.cancel()
 
-		if s.httpServer != nil {
-			ctx := context.Background()
-			s.httpServer.Shutdown(ctx)
-		}
-
-	})
+	grs.GroupWaitWithContext(ctx, &s.waitGroup)
 	return
 }
