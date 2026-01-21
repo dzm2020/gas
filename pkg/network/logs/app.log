@@ -26959,3 +26959,162 @@
 {"L":"error","T":"2026/01/04 10:33:15.887449+0800","C":"network/base_connection.go:193","M":"批量写入消息失败","connectionId":1,"error":"write tcp 127.0.0.1:9988->127.0.0.1:56038: wsasend: An existing connection was forcibly closed by the remote host.","S":"gas/pkg/network.(*baseConnection).write\n\tE:/github/gas/pkg/network/base_connection.go:193\ngas/pkg/network.(*TCPConnection).batchWriteMsg\n\tE:/github/gas/pkg/network/tcp_connection.go:112\ngas/pkg/network.(*TCPConnection).writeLoop.func1\n\tE:/github/gas/pkg/network/tcp_connection.go:85\ngas/pkg/network.(*TCPConnection).writeLoop\n\tE:/github/gas/pkg/network/tcp_connection.go:104\ngas/pkg/network.(*TCPServer).accept.func2\n\tE:/github/gas/pkg/network/tcp_server.go:90\ngas/pkg/lib/grs.GoTry.func1\n\tE:/github/gas/pkg/lib/grs/goroutine.go:49"}
 {"L":"debug","T":"2026/01/04 10:33:15.887449+0800","C":"network/tcp_server.go:92","M":"TCP连接写协程关闭","connectionId":1}
 {"L":"debug","T":"2026/01/04 10:33:15.888005+0800","C":"network/tcp_server.go:112","M":"TCP服务器已关闭","address":"tcp:127.0.0.1:9988"}
+{"L":"info","T":"2026/01/21 13:38:28.664912+0800","C":"network/udp_server.go:94","M":"UDP服务器监听","address":"udp:127.0.0.1:9989"}
+{"L":"debug","T":"2026/01/21 13:38:38.680487+0800","C":"network/udp_server.go:183","M":"UDP服务器开始关闭","address":"udp:127.0.0.1:9989"}
+{"L":"error","T":"2026/01/21 13:38:38.680487+0800","C":"network/udp_server.go:133","M":"UDP服务器读取数据包异常","address":"udp:127.0.0.1:9989","err":"read udp 127.0.0.1:9989: use of closed network connection","S":"gas/pkg/network.(*UDPServer).read\n\tE:/github/gas/pkg/network/udp_server.go:133\ngas/pkg/network.(*UDPServer).readLoop.func1\n\tE:/github/gas/pkg/network/udp_server.go:123\ngas/pkg/lib/grs.Try\n\tE:/github/gas/pkg/lib/grs/goroutine.go:65\ngas/pkg/network.(*UDPServer).readLoop\n\tE:/github/gas/pkg/network/udp_server.go:122\ngas/pkg/network.(*UDPServer).Start.func1\n\tE:/github/gas/pkg/network/udp_server.go:86\ngas/pkg/lib/grs.GoTry.func1\n\tE:/github/gas/pkg/lib/grs/goroutine.go:49"}
+{"L":"debug","T":"2026/01/21 13:38:38.680487+0800","C":"network/udp_server.go:193","M":"UDP服务器已关闭","address":"udp:127.0.0.1:9989"}
+{"L":"info","T":"2026/01/21 13:39:54.561290+0800","C":"network/udp_server.go:94","M":"UDP服务器监听","address":"udp:127.0.0.1:9989"}
+{"L":"debug","T":"2026/01/21 13:40:04.575923+0800","C":"network/udp_server.go:183","M":"UDP服务器开始关闭","address":"udp:127.0.0.1:9989"}
+{"L":"error","T":"2026/01/21 13:40:34.344075+0800","C":"network/udp_server.go:133","M":"UDP服务器读取数据包异常","address":"udp:127.0.0.1:9989","err":"read udp 127.0.0.1:9989: use of closed network connection","S":"gas/pkg/network.(*UDPServer).read\n\tE:/github/gas/pkg/network/udp_server.go:133\ngas/pkg/network.(*UDPServer).readLoop.func1\n\tE:/github/gas/pkg/network/udp_server.go:123\ngas/pkg/lib/grs.Try\n\tE:/github/gas/pkg/lib/grs/goroutine.go:65\ngas/pkg/network.(*UDPServer).readLoop\n\tE:/github/gas/pkg/network/udp_server.go:122\ngas/pkg/network.(*UDPServer).Start.func1\n\tE:/github/gas/pkg/network/udp_server.go:86\ngas/pkg/lib/grs.GoTry.func1\n\tE:/github/gas/pkg/lib/grs/goroutine.go:49"}
+{"L":"debug","T":"2026/01/21 13:40:34.344075+0800","C":"network/udp_server.go:193","M":"UDP服务器已关闭","address":"udp:127.0.0.1:9989"}
+{"L":"info","T":"2026/01/21 13:40:48.829655+0800","C":"network/udp_server.go:93","M":"UDP服务器监听","address":"udp:127.0.0.1:9989"}
+{"L":"debug","T":"2026/01/21 13:40:58.846288+0800","C":"network/udp_server.go:182","M":"UDP服务器开始关闭","address":"udp:127.0.0.1:9989"}
+{"L":"debug","T":"2026/01/21 13:41:06.840812+0800","C":"network/udp_server.go:192","M":"UDP服务器已关闭","address":"udp:127.0.0.1:9989"}
+{"L":"info","T":"2026/01/21 13:41:50.806196+0800","C":"network/udp_server.go:93","M":"UDP服务器监听","address":"udp:127.0.0.1:9991"}
+{"L":"info","T":"2026/01/21 13:41:50.923104+0800","C":"network/base_connection.go:59","M":"创建连接","connectionId":1,"localAddr":"127.0.0.1:9991","remoteAddr":"127.0.0.1:57688"}
+{"L":"debug","T":"2026/01/21 13:41:50.923104+0800","C":"network/udp_test.go:83","M":"UDP OnConnect","connectionId":1}
+{"L":"debug","T":"2026/01/21 13:41:50.923104+0800","C":"network/base_connection.go:147","M":"连接回调成功","connectionId":1}
+{"L":"debug","T":"2026/01/21 13:41:50.923104+0800","C":"network/udp_test.go:89","M":"UDP OnMessage","connectionId":1,"msg":"client1 message"}
+{"L":"info","T":"2026/01/21 13:41:50.973539+0800","C":"network/base_connection.go:59","M":"创建连接","connectionId":2,"localAddr":"127.0.0.1:9991","remoteAddr":"127.0.0.1:57689"}
+{"L":"debug","T":"2026/01/21 13:41:50.973539+0800","C":"network/udp_test.go:83","M":"UDP OnConnect","connectionId":2}
+{"L":"debug","T":"2026/01/21 13:41:50.973539+0800","C":"network/base_connection.go:147","M":"连接回调成功","connectionId":2}
+{"L":"debug","T":"2026/01/21 13:41:50.973539+0800","C":"network/udp_test.go:89","M":"UDP OnMessage","connectionId":2,"msg":"client2 message"}
+{"L":"info","T":"2026/01/21 13:41:51.024155+0800","C":"network/udp_test.go:64","M":"收到消息","msg":"\u0000\u0014udp response message","from":"127.0.0.1:9991"}
+{"L":"info","T":"2026/01/21 13:41:51.074715+0800","C":"network/udp_test.go:64","M":"收到消息","msg":"\u0000\u0014udp response message","from":"127.0.0.1:9991"}
+{"L":"debug","T":"2026/01/21 13:41:51.125370+0800","C":"network/udp_server.go:182","M":"UDP服务器开始关闭","address":"udp:127.0.0.1:9991"}
+{"L":"info","T":"2026/01/21 13:41:51.125370+0800","C":"network/udp_connection.go:95","M":"UDP连接断开","connectionId":1}
+{"L":"debug","T":"2026/01/21 13:41:51.125370+0800","C":"network/udp_test.go:100","M":"UDP OnClose","connectionId":1}
+{"L":"info","T":"2026/01/21 13:41:51.125370+0800","C":"network/udp_connection.go:95","M":"UDP连接断开","connectionId":2}
+{"L":"debug","T":"2026/01/21 13:41:51.125370+0800","C":"network/udp_test.go:100","M":"UDP OnClose","connectionId":2}
+{"L":"debug","T":"2026/01/21 13:41:51.125370+0800","C":"network/udp_server.go:192","M":"UDP服务器已关闭","address":"udp:127.0.0.1:9991"}
+{"L":"info","T":"2026/01/21 13:42:22.360039+0800","C":"network/udp_server.go:93","M":"UDP服务器监听","address":"udp:127.0.0.1:9990"}
+{"L":"info","T":"2026/01/21 13:42:22.476393+0800","C":"network/base_connection.go:59","M":"创建连接","connectionId":1,"localAddr":"127.0.0.1:9990","remoteAddr":"127.0.0.1:55845"}
+{"L":"debug","T":"2026/01/21 13:42:22.477011+0800","C":"network/udp_test.go:83","M":"UDP OnConnect","connectionId":1}
+{"L":"debug","T":"2026/01/21 13:42:22.477011+0800","C":"network/base_connection.go:147","M":"连接回调成功","connectionId":1}
+{"L":"debug","T":"2026/01/21 13:42:22.477011+0800","C":"network/udp_test.go:89","M":"UDP OnMessage","connectionId":1,"msg":"hello"}
+{"L":"debug","T":"2026/01/21 13:42:22.527051+0800","C":"network/udp_test.go:89","M":"UDP OnMessage","connectionId":1,"msg":"world"}
+{"L":"debug","T":"2026/01/21 13:42:22.577700+0800","C":"network/udp_test.go:89","M":"UDP OnMessage","connectionId":1,"msg":"udp test"}
+{"L":"info","T":"2026/01/21 13:42:22.628320+0800","C":"network/udp_test.go:64","M":"收到消息","msg":"\u0000\u0014udp response message","from":"127.0.0.1:9990"}
+{"L":"info","T":"2026/01/21 13:42:22.678985+0800","C":"network/udp_test.go:64","M":"收到消息","msg":"\u0000\u0014udp response message","from":"127.0.0.1:9990"}
+{"L":"debug","T":"2026/01/21 13:42:22.729361+0800","C":"network/udp_server.go:182","M":"UDP服务器开始关闭","address":"udp:127.0.0.1:9990"}
+{"L":"info","T":"2026/01/21 13:42:22.729361+0800","C":"network/udp_connection.go:95","M":"UDP连接断开","connectionId":1}
+{"L":"debug","T":"2026/01/21 13:42:22.729361+0800","C":"network/udp_test.go:100","M":"UDP OnClose","connectionId":1}
+{"L":"debug","T":"2026/01/21 13:42:22.729361+0800","C":"network/udp_server.go:192","M":"UDP服务器已关闭","address":"udp:127.0.0.1:9990"}
+{"L":"info","T":"2026/01/21 13:46:29.688040+0800","C":"network/websocket_server.go:117","M":"WebSocket服务器关闭","addr":"ws:127.0.0.1:9992","path":"/ws"}
+{"L":"error","T":"2026/01/21 13:46:29.700467+0800","C":"network/websocket_server.go:64","M":"WebSocket监听失败","error":"http: Server closed","S":"gas/pkg/network.(*WebSocketServer).Start.func1\n\tE:/github/gas/pkg/network/websocket_server.go:64\ngas/pkg/lib/grs.GoTry.func1\n\tE:/github/gas/pkg/lib/grs/goroutine.go:49"}
+{"L":"info","T":"2026/01/21 13:48:51.516809+0800","C":"network/websocket_server.go:118","M":"WebSocket服务器关闭","addr":"ws:127.0.0.1:9992","path":"/ws"}
+{"L":"error","T":"2026/01/21 13:48:53.477006+0800","C":"network/websocket_server.go:64","M":"WebSocket监听失败","error":"http: Server closed","S":"gas/pkg/network.(*WebSocketServer).Start.func1\n\tE:/github/gas/pkg/network/websocket_server.go:64\ngas/pkg/lib/grs.GoTry.func1\n\tE:/github/gas/pkg/lib/grs/goroutine.go:49"}
+{"L":"info","T":"2026/01/21 13:50:05.551546+0800","C":"network/websocket_server.go:63","M":"WebSocket监听","addr":"ws:127.0.0.1:9992","path":"/ws"}
+{"L":"info","T":"2026/01/21 13:50:15.552107+0800","C":"network/websocket_server.go:118","M":"WebSocket服务器关闭","addr":"ws:127.0.0.1:9992","path":"/ws"}
+{"L":"error","T":"2026/01/21 13:51:49.854899+0800","C":"network/websocket_server.go:65","M":"WebSocket监听","addr":"ws:127.0.0.1:9992","path":"/ws","error":"http: Server closed","S":"gas/pkg/network.(*WebSocketServer).Start.func1\n\tE:/github/gas/pkg/network/websocket_server.go:65\ngas/pkg/lib/grs.GoTry.func1\n\tE:/github/gas/pkg/lib/grs/goroutine.go:49"}
+{"L":"info","T":"2026/01/21 13:52:12.186039+0800","C":"network/websocket_server.go:64","M":"WebSocket监听","addr":"ws:127.0.0.1:9992","path":"/ws"}
+{"L":"info","T":"2026/01/21 13:52:22.186319+0800","C":"network/websocket_server.go:119","M":"WebSocket服务器关闭","addr":"ws:127.0.0.1:9992","path":"/ws"}
+{"L":"info","T":"2026/01/21 13:52:45.511964+0800","C":"network/websocket_server.go:64","M":"WebSocket监听","addr":"ws:127.0.0.1:9993","path":"/ws"}
+{"L":"info","T":"2026/01/21 13:52:45.613617+0800","C":"network/base_connection.go:59","M":"创建连接","connectionId":1,"localAddr":"127.0.0.1:9993","remoteAddr":"127.0.0.1:62660"}
+{"L":"debug","T":"2026/01/21 13:52:45.613617+0800","C":"network/websocket_test.go:83","M":"WebSocket OnConnect","connectionId":1}
+{"L":"debug","T":"2026/01/21 13:52:45.613617+0800","C":"network/base_connection.go:147","M":"连接回调成功","connectionId":1}
+{"L":"debug","T":"2026/01/21 13:52:45.613617+0800","C":"network/websocket_test.go:89","M":"WebSocket OnMessage","connectionId":1,"msg":"hello"}
+{"L":"debug","T":"2026/01/21 13:52:45.664219+0800","C":"network/websocket_test.go:89","M":"WebSocket OnMessage","connectionId":1,"msg":"world"}
+{"L":"debug","T":"2026/01/21 13:52:45.714691+0800","C":"network/websocket_test.go:89","M":"WebSocket OnMessage","connectionId":1,"msg":"ws test"}
+{"L":"info","T":"2026/01/21 13:52:45.764957+0800","C":"network/websocket_test.go:64","M":"收到消息","msg":"\u0000\u0013ws response message","messageType":2}
+{"L":"info","T":"2026/01/21 13:52:45.815182+0800","C":"network/websocket_test.go:64","M":"收到消息","msg":"\u0000\u0013ws response message","messageType":2}
+{"L":"info","T":"2026/01/21 13:52:45.865696+0800","C":"network/websocket_server.go:119","M":"WebSocket服务器关闭","addr":"ws:127.0.0.1:9993","path":"/ws"}
+{"L":"info","T":"2026/01/21 13:52:45.865696+0800","C":"network/websocket_connection.go:96","M":"WebSocket连接断开","connectionId":1}
+{"L":"debug","T":"2026/01/21 13:52:45.865696+0800","C":"network/websocket_test.go:100","M":"WebSocket OnClose","connectionId":1}
+{"L":"info","T":"2026/01/21 13:53:34.284995+0800","C":"network/websocket_server.go:64","M":"WebSocket监听","addr":"ws:127.0.0.1:9994","path":"/ws"}
+{"L":"info","T":"2026/01/21 13:53:34.386485+0800","C":"network/base_connection.go:59","M":"创建连接","connectionId":1,"localAddr":"127.0.0.1:9994","remoteAddr":"127.0.0.1:62696"}
+{"L":"debug","T":"2026/01/21 13:53:34.386485+0800","C":"network/websocket_test.go:83","M":"WebSocket OnConnect","connectionId":1}
+{"L":"debug","T":"2026/01/21 13:53:34.386485+0800","C":"network/base_connection.go:147","M":"连接回调成功","connectionId":1}
+{"L":"info","T":"2026/01/21 13:53:34.386997+0800","C":"network/base_connection.go:59","M":"创建连接","connectionId":2,"localAddr":"127.0.0.1:9994","remoteAddr":"127.0.0.1:62697"}
+{"L":"debug","T":"2026/01/21 13:53:34.386997+0800","C":"network/websocket_test.go:89","M":"WebSocket OnMessage","connectionId":1,"msg":"client1 message"}
+{"L":"debug","T":"2026/01/21 13:53:34.386997+0800","C":"network/websocket_test.go:83","M":"WebSocket OnConnect","connectionId":2}
+{"L":"debug","T":"2026/01/21 13:53:34.386997+0800","C":"network/base_connection.go:147","M":"连接回调成功","connectionId":2}
+{"L":"debug","T":"2026/01/21 13:53:34.437266+0800","C":"network/websocket_test.go:89","M":"WebSocket OnMessage","connectionId":2,"msg":"client2 message"}
+{"L":"info","T":"2026/01/21 13:53:34.487878+0800","C":"network/websocket_test.go:64","M":"收到消息","msg":"\u0000\u0013ws response message","messageType":2}
+{"L":"info","T":"2026/01/21 13:53:34.539112+0800","C":"network/websocket_test.go:64","M":"收到消息","msg":"\u0000\u0013ws response message","messageType":2}
+{"L":"info","T":"2026/01/21 13:53:34.589547+0800","C":"network/websocket_connection.go:96","M":"WebSocket连接断开","connectionId":2,"error":"websocket: close 1006 (abnormal closure): unexpected EOF"}
+{"L":"info","T":"2026/01/21 13:53:34.589547+0800","C":"network/websocket_connection.go:96","M":"WebSocket连接断开","connectionId":1,"error":"websocket: close 1006 (abnormal closure): unexpected EOF"}
+{"L":"debug","T":"2026/01/21 13:53:34.589547+0800","C":"network/websocket_test.go:100","M":"WebSocket OnClose","connectionId":2,"error":"websocket: close 1006 (abnormal closure): unexpected EOF"}
+{"L":"debug","T":"2026/01/21 13:53:34.589547+0800","C":"network/websocket_test.go:100","M":"WebSocket OnClose","connectionId":1,"error":"websocket: close 1006 (abnormal closure): unexpected EOF"}
+{"L":"info","T":"2026/01/21 13:53:34.589547+0800","C":"network/websocket_server.go:119","M":"WebSocket服务器关闭","addr":"ws:127.0.0.1:9994","path":"/ws"}
+{"L":"info","T":"2026/01/21 13:53:42.808450+0800","C":"network/websocket_server.go:64","M":"WebSocket监听","addr":"ws:127.0.0.1:9995","path":"/chat"}
+{"L":"info","T":"2026/01/21 13:53:42.910111+0800","C":"network/base_connection.go:59","M":"创建连接","connectionId":1,"localAddr":"127.0.0.1:9995","remoteAddr":"127.0.0.1:62719"}
+{"L":"debug","T":"2026/01/21 13:53:42.910111+0800","C":"network/websocket_test.go:83","M":"WebSocket OnConnect","connectionId":1}
+{"L":"debug","T":"2026/01/21 13:53:42.910111+0800","C":"network/base_connection.go:147","M":"连接回调成功","connectionId":1}
+{"L":"debug","T":"2026/01/21 13:53:42.910626+0800","C":"network/websocket_test.go:89","M":"WebSocket OnMessage","connectionId":1,"msg":"custom path test"}
+{"L":"info","T":"2026/01/21 13:53:42.961120+0800","C":"network/websocket_test.go:64","M":"收到消息","msg":"\u0000\u0013ws response message","messageType":2}
+{"L":"info","T":"2026/01/21 13:53:43.012045+0800","C":"network/websocket_server.go:119","M":"WebSocket服务器关闭","addr":"ws:127.0.0.1:9995","path":"/chat"}
+{"L":"info","T":"2026/01/21 13:53:43.012045+0800","C":"network/websocket_connection.go:96","M":"WebSocket连接断开","connectionId":1,"error":"websocket: close 1006 (abnormal closure): unexpected EOF"}
+{"L":"debug","T":"2026/01/21 13:53:43.012549+0800","C":"network/websocket_test.go:100","M":"WebSocket OnClose","connectionId":1,"error":"websocket: close 1006 (abnormal closure): unexpected EOF"}
+{"L":"info","T":"2026/01/21 13:57:53.643246+0800","C":"network/websocket_server.go:64","M":"WebSocket监听","addr":"ws:127.0.0.1:9995","path":"/chat"}
+{"L":"info","T":"2026/01/21 13:57:53.744913+0800","C":"network/base_connection.go:59","M":"创建连接","connectionId":1,"localAddr":"127.0.0.1:9995","remoteAddr":"127.0.0.1:62853"}
+{"L":"debug","T":"2026/01/21 13:57:53.744913+0800","C":"network/websocket_test.go:83","M":"WebSocket OnConnect","connectionId":1}
+{"L":"debug","T":"2026/01/21 13:57:53.744913+0800","C":"network/base_connection.go:147","M":"连接回调成功","connectionId":1}
+{"L":"debug","T":"2026/01/21 13:57:53.744913+0800","C":"network/websocket_test.go:89","M":"WebSocket OnMessage","connectionId":1,"msg":"custom path test"}
+{"L":"info","T":"2026/01/21 13:57:53.795465+0800","C":"network/websocket_test.go:64","M":"收到消息","msg":"\u0000\u0013ws response message","messageType":2}
+{"L":"info","T":"2026/01/21 13:57:53.846122+0800","C":"network/websocket_server.go:119","M":"WebSocket服务器关闭","addr":"ws:127.0.0.1:9995","path":"/chat"}
+{"L":"info","T":"2026/01/21 13:57:53.846122+0800","C":"network/websocket_connection.go:97","M":"WebSocket连接断开","connectionId":1,"error":"websocket: close 1006 (abnormal closure): unexpected EOF"}
+{"L":"debug","T":"2026/01/21 13:57:53.846122+0800","C":"network/websocket_test.go:100","M":"WebSocket OnClose","connectionId":1,"error":"websocket: close 1006 (abnormal closure): unexpected EOF"}
+{"L":"info","T":"2026/01/21 13:59:22.933163+0800","C":"network/websocket_server.go:64","M":"WebSocket监听","addr":"ws:127.0.0.1:9995","path":"/chat"}
+{"L":"info","T":"2026/01/21 13:59:23.035277+0800","C":"network/base_connection.go:59","M":"创建连接","connectionId":1,"localAddr":"127.0.0.1:9995","remoteAddr":"127.0.0.1:62992"}
+{"L":"debug","T":"2026/01/21 13:59:23.035277+0800","C":"network/websocket_test.go:83","M":"WebSocket OnConnect","connectionId":1}
+{"L":"debug","T":"2026/01/21 13:59:23.035277+0800","C":"network/base_connection.go:147","M":"连接回调成功","connectionId":1}
+{"L":"debug","T":"2026/01/21 13:59:23.035277+0800","C":"network/websocket_test.go:89","M":"WebSocket OnMessage","connectionId":1,"msg":"custom path test"}
+{"L":"info","T":"2026/01/21 13:59:23.085560+0800","C":"network/websocket_test.go:64","M":"收到消息","msg":"\u0000\u0013ws response message","messageType":2}
+{"L":"info","T":"2026/01/21 13:59:23.136200+0800","C":"network/websocket_server.go:119","M":"WebSocket服务器关闭","addr":"ws:127.0.0.1:9995","path":"/chat"}
+{"L":"info","T":"2026/01/21 13:59:23.136200+0800","C":"network/websocket_connection.go:97","M":"WebSocket连接断开","connectionId":1,"error":"websocket: close 1006 (abnormal closure): unexpected EOF"}
+{"L":"debug","T":"2026/01/21 13:59:30.555064+0800","C":"network/websocket_test.go:100","M":"WebSocket OnClose","connectionId":1,"error":"websocket: close 1006 (abnormal closure): unexpected EOF"}
+{"L":"info","T":"2026/01/21 14:00:01.906574+0800","C":"network/websocket_server.go:64","M":"WebSocket监听","addr":"ws:127.0.0.1:9995","path":"/chat"}
+{"L":"info","T":"2026/01/21 14:00:02.007661+0800","C":"network/base_connection.go:59","M":"创建连接","connectionId":1,"localAddr":"127.0.0.1:9995","remoteAddr":"127.0.0.1:63022"}
+{"L":"debug","T":"2026/01/21 14:00:02.008194+0800","C":"network/websocket_test.go:83","M":"WebSocket OnConnect","connectionId":1}
+{"L":"debug","T":"2026/01/21 14:00:02.008194+0800","C":"network/base_connection.go:147","M":"连接回调成功","connectionId":1}
+{"L":"debug","T":"2026/01/21 14:00:02.008194+0800","C":"network/websocket_test.go:89","M":"WebSocket OnMessage","connectionId":1,"msg":"custom path test"}
+{"L":"info","T":"2026/01/21 14:00:02.058220+0800","C":"network/websocket_test.go:64","M":"收到消息","msg":"\u0000\u0013ws response message","messageType":2}
+{"L":"info","T":"2026/01/21 14:00:02.108477+0800","C":"network/websocket_server.go:119","M":"WebSocket服务器关闭","addr":"ws:127.0.0.1:9995","path":"/chat"}
+{"L":"info","T":"2026/01/21 14:00:02.108477+0800","C":"network/websocket_connection.go:97","M":"WebSocket连接断开","connectionId":1,"error":"websocket: close 1006 (abnormal closure): unexpected EOF"}
+{"L":"debug","T":"2026/01/21 14:00:18.309551+0800","C":"network/websocket_test.go:100","M":"WebSocket OnClose","connectionId":1,"error":"websocket: close 1006 (abnormal closure): unexpected EOF"}
+{"L":"info","T":"2026/01/21 14:00:40.390504+0800","C":"network/websocket_server.go:64","M":"WebSocket监听","addr":"ws:127.0.0.1:9995","path":"/chat"}
+{"L":"info","T":"2026/01/21 14:00:40.492690+0800","C":"network/base_connection.go:59","M":"创建连接","connectionId":1,"localAddr":"127.0.0.1:9995","remoteAddr":"127.0.0.1:63060"}
+{"L":"debug","T":"2026/01/21 14:00:40.492690+0800","C":"network/websocket_test.go:83","M":"WebSocket OnConnect","connectionId":1}
+{"L":"debug","T":"2026/01/21 14:00:40.492690+0800","C":"network/base_connection.go:147","M":"连接回调成功","connectionId":1}
+{"L":"debug","T":"2026/01/21 14:00:40.493194+0800","C":"network/websocket_test.go:89","M":"WebSocket OnMessage","connectionId":1,"msg":"custom path test"}
+{"L":"info","T":"2026/01/21 14:00:40.543220+0800","C":"network/websocket_test.go:64","M":"收到消息","msg":"\u0000\u0013ws response message","messageType":2}
+{"L":"info","T":"2026/01/21 14:01:34.142455+0800","C":"network/websocket_connection.go:97","M":"WebSocket连接断开","connectionId":1,"error":"websocket: close 1006 (abnormal closure): unexpected EOF"}
+{"L":"info","T":"2026/01/21 14:01:34.142455+0800","C":"network/websocket_server.go:119","M":"WebSocket服务器关闭","addr":"ws:127.0.0.1:9995","path":"/chat"}
+{"L":"debug","T":"2026/01/21 14:01:34.142455+0800","C":"network/websocket_test.go:100","M":"WebSocket OnClose","connectionId":1,"error":"websocket: close 1006 (abnormal closure): unexpected EOF"}
+{"L":"info","T":"2026/01/21 14:01:38.370110+0800","C":"network/websocket_server.go:64","M":"WebSocket监听","addr":"ws:127.0.0.1:9995","path":"/chat"}
+{"L":"info","T":"2026/01/21 14:01:38.471916+0800","C":"network/base_connection.go:59","M":"创建连接","connectionId":1,"localAddr":"127.0.0.1:9995","remoteAddr":"127.0.0.1:63120"}
+{"L":"debug","T":"2026/01/21 14:01:38.471916+0800","C":"network/websocket_test.go:83","M":"WebSocket OnConnect","connectionId":1}
+{"L":"debug","T":"2026/01/21 14:01:38.472419+0800","C":"network/base_connection.go:147","M":"连接回调成功","connectionId":1}
+{"L":"debug","T":"2026/01/21 14:01:38.472419+0800","C":"network/websocket_test.go:89","M":"WebSocket OnMessage","connectionId":1,"msg":"custom path test"}
+{"L":"info","T":"2026/01/21 14:01:38.522462+0800","C":"network/websocket_test.go:64","M":"收到消息","msg":"\u0000\u0013ws response message","messageType":2}
+{"L":"info","T":"2026/01/21 14:01:38.573259+0800","C":"network/websocket_server.go:119","M":"WebSocket服务器关闭","addr":"ws:127.0.0.1:9995","path":"/chat"}
+{"L":"info","T":"2026/01/21 14:01:38.573259+0800","C":"network/websocket_connection.go:98","M":"WebSocket连接断开","connectionId":1,"error":"websocket: close 1006 (abnormal closure): unexpected EOF"}
+{"L":"debug","T":"2026/01/21 14:01:44.718093+0800","C":"network/websocket_test.go:100","M":"WebSocket OnClose","connectionId":1,"error":"websocket: close 1006 (abnormal closure): unexpected EOF"}
+{"L":"info","T":"2026/01/21 14:02:10.325948+0800","C":"network/websocket_server.go:64","M":"WebSocket监听","addr":"ws:127.0.0.1:9995","path":"/chat"}
+{"L":"info","T":"2026/01/21 14:02:10.427373+0800","C":"network/base_connection.go:59","M":"创建连接","connectionId":1,"localAddr":"127.0.0.1:9995","remoteAddr":"127.0.0.1:63143"}
+{"L":"debug","T":"2026/01/21 14:02:10.427373+0800","C":"network/websocket_test.go:83","M":"WebSocket OnConnect","connectionId":1}
+{"L":"debug","T":"2026/01/21 14:02:10.428028+0800","C":"network/base_connection.go:147","M":"连接回调成功","connectionId":1}
+{"L":"debug","T":"2026/01/21 14:02:10.428028+0800","C":"network/websocket_test.go:89","M":"WebSocket OnMessage","connectionId":1,"msg":"custom path test"}
+{"L":"info","T":"2026/01/21 14:02:10.477992+0800","C":"network/websocket_test.go:64","M":"收到消息","msg":"\u0000\u0013ws response message","messageType":2}
+{"L":"info","T":"2026/01/21 14:02:10.528592+0800","C":"network/websocket_server.go:119","M":"WebSocket服务器关闭","addr":"ws:127.0.0.1:9995","path":"/chat"}
+{"L":"info","T":"2026/01/21 14:02:43.822429+0800","C":"network/websocket_connection.go:98","M":"WebSocket连接断开","connectionId":1,"error":"websocket: close 1006 (abnormal closure): unexpected EOF"}
+{"L":"debug","T":"2026/01/21 14:02:43.822429+0800","C":"network/websocket_test.go:100","M":"WebSocket OnClose","connectionId":1,"error":"websocket: close 1006 (abnormal closure): unexpected EOF"}
+{"L":"info","T":"2026/01/21 14:02:46.300961+0800","C":"network/websocket_server.go:64","M":"WebSocket监听","addr":"ws:127.0.0.1:9995","path":"/chat"}
+{"L":"info","T":"2026/01/21 14:02:46.402740+0800","C":"network/base_connection.go:59","M":"创建连接","connectionId":1,"localAddr":"127.0.0.1:9995","remoteAddr":"127.0.0.1:63175"}
+{"L":"debug","T":"2026/01/21 14:02:46.402740+0800","C":"network/websocket_test.go:83","M":"WebSocket OnConnect","connectionId":1}
+{"L":"debug","T":"2026/01/21 14:02:46.402740+0800","C":"network/base_connection.go:147","M":"连接回调成功","connectionId":1}
+{"L":"debug","T":"2026/01/21 14:02:46.402740+0800","C":"network/websocket_test.go:89","M":"WebSocket OnMessage","connectionId":1,"msg":"custom path test"}
+{"L":"info","T":"2026/01/21 14:02:46.453229+0800","C":"network/websocket_test.go:64","M":"收到消息","msg":"\u0000\u0013ws response message","messageType":2}
+{"L":"info","T":"2026/01/21 14:02:58.039084+0800","C":"network/websocket_server.go:119","M":"WebSocket服务器关闭","addr":"ws:127.0.0.1:9995","path":"/chat"}
+{"L":"info","T":"2026/01/21 14:02:58.039084+0800","C":"network/websocket_connection.go:98","M":"WebSocket连接断开","connectionId":1,"error":"connection keepAlive"}
+{"L":"debug","T":"2026/01/21 14:02:58.039735+0800","C":"network/websocket_test.go:100","M":"WebSocket OnClose","connectionId":1,"error":"connection keepAlive"}
+{"L":"info","T":"2026/01/21 14:03:39.028168+0800","C":"network/websocket_server.go:64","M":"WebSocket监听","addr":"ws:127.0.0.1:9995","path":"/chat"}
+{"L":"info","T":"2026/01/21 14:03:39.130186+0800","C":"network/base_connection.go:59","M":"创建连接","connectionId":1,"localAddr":"127.0.0.1:9995","remoteAddr":"127.0.0.1:63251"}
+{"L":"debug","T":"2026/01/21 14:03:39.130186+0800","C":"network/websocket_test.go:83","M":"WebSocket OnConnect","connectionId":1}
+{"L":"debug","T":"2026/01/21 14:03:39.130186+0800","C":"network/base_connection.go:147","M":"连接回调成功","connectionId":1}
+{"L":"debug","T":"2026/01/21 14:03:39.130186+0800","C":"network/websocket_test.go:89","M":"WebSocket OnMessage","connectionId":1,"msg":"custom path test"}
+{"L":"info","T":"2026/01/21 14:03:39.180596+0800","C":"network/websocket_test.go:64","M":"收到消息","msg":"\u0000\u0013ws response message","messageType":2}
+{"L":"info","T":"2026/01/21 14:03:39.231036+0800","C":"network/websocket_server.go:119","M":"WebSocket服务器关闭","addr":"ws:127.0.0.1:9995","path":"/chat"}
+{"L":"info","T":"2026/01/21 14:03:39.231036+0800","C":"network/websocket_connection.go:98","M":"WebSocket连接断开","connectionId":1}
+{"L":"debug","T":"2026/01/21 14:03:39.231036+0800","C":"network/websocket_test.go:100","M":"WebSocket OnClose","connectionId":1}

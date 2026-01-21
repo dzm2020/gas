@@ -3,6 +3,7 @@ package network
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"fmt"
 	"gas/pkg/glog"
 	"gas/pkg/lib/grs"
@@ -43,9 +44,10 @@ func NewWebSocketServer(base *baseServer, path string) *WebSocketServer {
 		upgrader.WriteBufferSize = base.options.SendChanSize
 	}
 	return &WebSocketServer{
-		upgrader: upgrader,
-		path:     path,
-		useTLS:   base.network == "wss",
+		baseServer: base,
+		upgrader:   upgrader,
+		path:       path,
+		useTLS:     base.network == "wss",
 	}
 }
 
@@ -59,8 +61,10 @@ func (s *WebSocketServer) Start() error {
 	s.waitGroup.Add(1)
 	grs.Go(func(ctx context.Context) {
 		defer s.waitGroup.Done()
-		if err := s.listenAndServe(); err != nil {
-			glog.Error("WebSocket监听失败", zap.Error(err))
+		glog.Info("WebSocket监听", zap.String("addr", s.Addr()), zap.String("path", s.path))
+		if err := s.listenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			glog.Error("WebSocket监听", zap.String("addr", s.Addr()), zap.String("path", s.path), zap.Error(err))
+			return
 		}
 	})
 	return nil
@@ -68,7 +72,6 @@ func (s *WebSocketServer) Start() error {
 
 func (s *WebSocketServer) listenAndServe() error {
 	if s.useTLS {
-		//  todo 错误放到errors文件
 		if s.options.TLSCertFile == "" || s.options.TLSKeyFile == "" {
 			return fmt.Errorf("TLS证书文件或私钥文件未配置")
 		}

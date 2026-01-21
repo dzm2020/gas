@@ -33,10 +33,10 @@ type Options struct {
 
 func loadOptions(options ...Option) *Options {
 	opts := &Options{
-		SendChanSize:     defaultSendChanBuf,
-		ReadBufSize:      defaultTCPReadBuf,
-		HeartInterval:    defaultHeartInterval,
-		UdpRcvChanSize:   defaultUdpRcvChanCap,
+		SendChanSize:     1024 * 4,
+		ReadBufSize:      1024 * 4,
+		HeartInterval:    5 * time.Second,
+		UdpRcvChanSize:   1024,
 		UdpSendChanSize:  1024,
 		ReuseAddr:        true,  // 默认启用 SO_REUSEADDR
 		ReusePort:        false, // 默认不启用 SO_REUSEPORT（仅 Linux 支持）

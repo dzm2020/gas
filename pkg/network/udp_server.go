@@ -6,7 +6,6 @@ import (
 	"gas/pkg/glog"
 	"gas/pkg/lib/grs"
 	"gas/pkg/lib/netutil"
-	"io"
 	"net"
 	"sync"
 
@@ -129,7 +128,7 @@ func (s *UDPServer) read() {
 	buf := make([]byte, s.options.ReadBufSize)
 	n, remoteAddr, err := s.conn.ReadFromUDP(buf)
 	if err != nil {
-		if err != io.EOF {
+		if !errors.Is(err, net.ErrClosed) {
 			glog.Error("UDP服务器读取数据包异常", zap.String("address", s.Addr()), zap.Any("err", err))
 		}
 		return

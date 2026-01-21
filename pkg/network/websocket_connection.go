@@ -3,6 +3,7 @@ package network
 import (
 	"context"
 	"gas/pkg/glog"
+	"time"
 
 	"github.com/gorilla/websocket"
 	"go.uber.org/zap"
@@ -49,8 +50,9 @@ func (c *WebSocketConnection) read() error {
 	if err != nil {
 		if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
 			glog.Error("WebSocket读取消息失败", zap.Int64("connectionId", c.ID()), zap.Error(err))
+			return err
 		}
-		return err
+		return nil
 	}
 	// 只处理文本和二进制消息
 	if messageType != websocket.TextMessage && messageType != websocket.BinaryMessage {
@@ -96,6 +98,9 @@ func (c *WebSocketConnection) Close(err error) (w error) {
 	glog.Info("WebSocket连接断开", zap.Int64("connectionId", c.ID()), zap.Error(err))
 
 	if c.conn != nil {
+		// 优雅关闭连接（发送关闭帧，避免1006）
+		timeout := time.Now().Add(1 * time.Second)
+		w = c.conn.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""), timeout)
 		if w = c.conn.Close(); w != nil {
 			return
 		}
