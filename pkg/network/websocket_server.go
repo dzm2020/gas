@@ -123,12 +123,10 @@ func (s *WebSocketServer) Shutdown(ctx context.Context) {
 	if !s.Stop() {
 		return
 	}
-	glog.Info("WebSocket服务器关闭", zap.String("addr", s.Addr()), zap.String("path", s.path))
-	if s.httpServer != nil {
-		_ = s.httpServer.Shutdown(ctx)
-	}
-	s.cancel()
 
-	grs.GroupWaitWithContext(ctx, &s.waitGroup)
+	s.baseServer.Shutdown(ctx)
+	_ = s.httpServer.Shutdown(ctx)
+
+	glog.Info("WebSocket服务器关闭", zap.String("addr", s.Addr()), zap.String("path", s.path))
 	return
 }

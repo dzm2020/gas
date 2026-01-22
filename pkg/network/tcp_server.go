@@ -34,6 +34,7 @@ func (s *TCPServer) Start() (err error) {
 	if s.listener, err = config.Listen(s.ctx, s.network, s.address); err != nil {
 		return
 	}
+
 	s.waitGroup.Add(1)
 	grs.Go(func(ctx context.Context) {
 		s.acceptLoop()
@@ -96,16 +97,10 @@ func (s *TCPServer) Shutdown(ctx context.Context) {
 	if !s.Stop() {
 		return
 	}
-	glog.Debug("TCP服务器开始关闭", zap.String("address", s.Addr()))
 
-	if s.listener != nil {
-		_ = s.listener.Close()
-	}
+	s.baseServer.Shutdown(ctx)
+	_ = s.listener.Close()
 
-	s.cancel()
-
-	grs.GroupWaitWithContext(ctx, &s.waitGroup)
-
-	glog.Debug("TCP服务器已关闭", zap.String("address", s.Addr()))
+	glog.Debug("TCP服务器关闭", zap.String("address", s.Addr()))
 	return
 }

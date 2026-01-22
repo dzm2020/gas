@@ -33,10 +33,12 @@ func NewUDPServer(base *baseServer) *UDPServer {
 
 type UDPServer struct {
 	*baseServer
-	conn        *net.UDPConn // UDP监听连接
+	conn *net.UDPConn // UDP监听连接
+	// todo connections  抽离出来做一个全局变量
 	connections map[string]*UDPConnection
 	rwMutex     sync.RWMutex // 保护connections并发
-	sendChan    chan *udpPacket
+
+	sendChan chan *udpPacket
 }
 
 func (s *UDPServer) getSendChan() chan<- *udpPacket {
@@ -84,9 +86,9 @@ func (s *UDPServer) addConnection(connKey string, remoteAddr *net.UDPAddr) *UDPC
 
 func (s *UDPServer) Start() error {
 	if err := s.listen(); err != nil {
-		glog.Error("UDP服务器监听错误", zap.String("address", s.Addr()), zap.Error(err))
 		return err
 	}
+
 	s.waitGroup.Add(1)
 	grs.Go(func(ctx context.Context) {
 		s.readLoop()
@@ -186,15 +188,8 @@ func (s *UDPServer) Shutdown(ctx context.Context) {
 		return
 	}
 
-	glog.Debug("UDP服务器开始关闭", zap.String("address", s.Addr()))
-
-	s.cancel()
-
-	if s.conn != nil {
-		_ = s.conn.Close()
-	}
-
-	grs.GroupWaitWithContext(ctx, &s.waitGroup)
+	s.baseServer.Shutdown(ctx)
+	_ = s.conn.Close()
 
 	glog.Debug("UDP服务器已关闭", zap.String("address", s.Addr()))
 	return

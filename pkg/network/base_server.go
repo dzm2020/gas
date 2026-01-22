@@ -3,8 +3,10 @@ package network
 import (
 	"context"
 	"fmt"
-	"github.com/dzm2020/gas/pkg/lib/stopper"
 	"sync"
+
+	"github.com/dzm2020/gas/pkg/lib/grs"
+	"github.com/dzm2020/gas/pkg/lib/stopper"
 )
 
 func newBaseServer(ctx context.Context, network, address string, option ...Option) *baseServer {
@@ -30,4 +32,10 @@ type baseServer struct {
 
 func (s *baseServer) Addr() string {
 	return s.protoAddress
+}
+
+func (s *baseServer) Shutdown(ctx context.Context) {
+	s.cancel()
+	grs.GroupWaitWithContext(ctx, &s.waitGroup)
+	return
 }
