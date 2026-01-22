@@ -93,7 +93,7 @@ func (c *UDPConnection) Close(err error) (w error) {
 
 	glog.Info("UDP连接断开", zap.Int64("connectionId", c.ID()), zap.Error(err))
 
-	c.server.removeConnection(c.remoteAddr.String())
+	RemoveUDPConnection(c.RemoteAddr())
 
 	c.baseConn.Close(c, err)
 	return
