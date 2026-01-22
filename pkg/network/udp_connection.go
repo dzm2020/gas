@@ -3,8 +3,9 @@ package network
 import (
 	"context"
 	"errors"
-	"github.com/dzm2020/gas/pkg/glog"
 	"net"
+
+	"github.com/dzm2020/gas/pkg/glog"
 
 	"go.uber.org/zap"
 )
@@ -12,22 +13,24 @@ import (
 // ------------------------------ UDP虚拟连接 ------------------------------
 
 type UDPConnection struct {
-	*baseConnection // 嵌入基类
-	remoteAddr      *net.UDPAddr
-	server          *UDPServer   // 所属服务器
-	conn            *net.UDPConn // 底层UDP连接（全局共享）
-	rcvChan         chan []byte
+	*baseConn  // 嵌入基类
+	remoteAddr *net.UDPAddr
+	server     *UDPServer   // 所属服务器
+	conn       *net.UDPConn // 底层UDP连接（全局共享）
+	rcvChan    chan []byte
 }
 
-func newUDPConnection(ctx context.Context, conn *net.UDPConn, typ ConnectionType, remoteAddr *net.UDPAddr, server *UDPServer) *UDPConnection {
-	base := initBaseConnection(ctx, typ, conn.LocalAddr(), remoteAddr, server.options)
+func newUDPConnection(ctx context.Context, conn *net.UDPConn, typ ConnType, remoteAddr *net.UDPAddr, server *UDPServer) *UDPConnection {
+	base := newBaseConn(ctx, "udp", typ, conn, server.options)
+	base.remoteAddr = remoteAddr
+
 	rcvChanSize := server.options.UdpRcvChanSize
 	udpConn := &UDPConnection{
-		baseConnection: base,
-		remoteAddr:     remoteAddr,
-		conn:           conn,
-		server:         server,
-		rcvChan:        make(chan []byte, rcvChanSize),
+		baseConn:   base,
+		remoteAddr: remoteAddr,
+		conn:       conn,
+		server:     server,
+		rcvChan:    make(chan []byte, rcvChanSize),
 	}
 	return udpConn
 }
@@ -66,12 +69,8 @@ func (c *UDPConnection) readLoop() {
 		select {
 		case <-c.ctx.Done():
 			return
-		case <-c.getTimeoutChan():
-			if err = c.checkTimeout(); err != nil {
-				return
-			}
 		case data := <-c.rcvChan:
-			_, err = c.baseConnection.process(c, data)
+			_, err = c.process(c, data)
 			if err != nil {
 				return
 			}
@@ -94,9 +93,8 @@ func (c *UDPConnection) Close(err error) (w error) {
 
 	glog.Info("UDP连接断开", zap.Int64("connectionId", c.ID()), zap.Error(err))
 
-	if c.server != nil && c.remoteAddr != nil {
-		c.server.removeConnection(c.remoteAddr.String())
-	}
-	c.baseConnection.Close(c, err)
+	c.server.removeConnection(c.remoteAddr.String())
+
+	c.baseConn.Close(c, err)
 	return
 }

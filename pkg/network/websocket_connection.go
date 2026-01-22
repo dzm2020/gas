@@ -11,17 +11,15 @@ import (
 )
 
 type WebSocketConnection struct {
-	*baseConnection // 嵌入基类
-	conn            *websocket.Conn
-	server          *WebSocketServer // 所属服务器
+	*baseConn // 嵌入基类
+	conn      *websocket.Conn
 }
 
-func newWebSocketConnection(ctx context.Context, conn *websocket.Conn, typ ConnectionType, options *Options) *WebSocketConnection {
-	setConOptions(options, conn.NetConn())
-	base := initBaseConnection(ctx, typ, conn.LocalAddr(), conn.RemoteAddr(), options)
+func newWebSocketConnection(ctx context.Context, conn *websocket.Conn, typ ConnType, options *Options) *WebSocketConnection {
+	base := newBaseConn(ctx, "ws", typ, conn.NetConn(), options)
 	return &WebSocketConnection{
-		baseConnection: base,
-		conn:           conn,
+		baseConn: base,
+		conn:     conn,
 	}
 }
 
@@ -40,27 +38,20 @@ func (c *WebSocketConnection) readLoop() {
 	}
 
 	for !c.IsStop() {
-		if err = c.read(); err != nil {
+		messageType, data, w := c.conn.ReadMessage()
+		if w != nil {
+			err = w
+			return
+		}
+		// 只处理文本和二进制消息
+		if messageType != websocket.TextMessage && messageType != websocket.BinaryMessage {
+			continue
+		}
+		_, err = c.process(c, data)
+		if err != nil {
 			return
 		}
 	}
-}
-
-func (c *WebSocketConnection) read() error {
-	messageType, data, err := c.conn.ReadMessage()
-	if err != nil {
-		if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-			glog.Error("WebSocket读取消息失败", zap.Int64("connectionId", c.ID()), zap.Error(err))
-			return err
-		}
-		return nil
-	}
-	// 只处理文本和二进制消息
-	if messageType != websocket.TextMessage && messageType != websocket.BinaryMessage {
-		return nil
-	}
-	_, err = c.process(c, data)
-	return err
 }
 
 func (c *WebSocketConnection) writeLoop() {
@@ -74,21 +65,16 @@ func (c *WebSocketConnection) writeLoop() {
 		case <-c.ctx.Done():
 			return
 		case msg, _ := <-c.sendChan:
-			data, w := c.encode(msg)
-			if w != nil {
-				err = w
-				return
-			}
-			err = c.conn.WriteMessage(websocket.BinaryMessage, data)
-			if err != nil {
-				return
-			}
-		case <-c.getTimeoutChan():
-			if err = c.checkTimeout(); err != nil {
+			if err = c.write(c, msg); err != nil {
 				return
 			}
 		}
 	}
+}
+
+func (c *WebSocketConnection) Write(p []byte) (n int, err error) {
+	err = c.conn.WriteMessage(websocket.BinaryMessage, p)
+	return len(p), err
 }
 
 func (c *WebSocketConnection) Close(err error) (w error) {
@@ -98,14 +84,11 @@ func (c *WebSocketConnection) Close(err error) (w error) {
 
 	glog.Info("WebSocket连接断开", zap.Int64("connectionId", c.ID()), zap.Error(err))
 
-	if c.conn != nil {
-		// 优雅关闭连接（发送关闭帧，避免1006）
-		timeout := time.Now().Add(1 * time.Second)
-		w = c.conn.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""), timeout)
-		if w = c.conn.Close(); w != nil {
-			return
-		}
-	}
-	c.baseConnection.Close(c, err)
+	// 优雅关闭连接（发送关闭帧，避免1006）
+	timeout := time.Now().Add(1 * time.Second)
+	_ = c.conn.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""), timeout)
+	_ = c.conn.Close()
+
+	c.baseConn.Close(c, err)
 	return
 }

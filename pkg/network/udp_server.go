@@ -3,11 +3,12 @@ package network
 import (
 	"context"
 	"errors"
+	"net"
+	"sync"
+
 	"github.com/dzm2020/gas/pkg/glog"
 	"github.com/dzm2020/gas/pkg/lib/grs"
 	"github.com/dzm2020/gas/pkg/lib/netutil"
-	"net"
-	"sync"
 
 	"github.com/duke-git/lancet/v2/convertor"
 	"go.uber.org/zap"
@@ -69,6 +70,12 @@ func (s *UDPServer) addConnection(connKey string, remoteAddr *net.UDPAddr) *UDPC
 			s.waitGroup.Done()
 		})
 
+		s.waitGroup.Add(1)
+		grs.Go(func(ctx context.Context) {
+			udpConn.heartLoop(udpConn)
+			s.waitGroup.Done()
+		})
+
 		AddConnection(udpConn)
 		s.connections[connKey] = udpConn
 	}
@@ -90,6 +97,7 @@ func (s *UDPServer) Start() error {
 		s.writeLoop()
 		s.waitGroup.Done()
 	})
+
 	glog.Info("UDP服务器监听", zap.String("address", s.Addr()))
 	return nil
 
@@ -110,9 +118,8 @@ func (s *UDPServer) listen() (err error) {
 	if !ok {
 		return errors.New("listener is not *net.UDPConn")
 	}
-	s.conn = udpConn
 
-	setConOptions(s.options, s.conn)
+	s.conn = udpConn
 	return err
 }
 

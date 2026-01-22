@@ -5,9 +5,10 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"net/http"
+
 	"github.com/dzm2020/gas/pkg/glog"
 	"github.com/dzm2020/gas/pkg/lib/grs"
-	"net/http"
 
 	"github.com/gorilla/websocket"
 	"go.uber.org/zap"
@@ -40,8 +41,8 @@ func NewWebSocketServer(base *baseServer, path string) *WebSocketServer {
 	if base.options.ReadBufSize > 0 {
 		upgrader.ReadBufferSize = base.options.ReadBufSize
 	}
-	if base.options.SendChanSize > 0 {
-		upgrader.WriteBufferSize = base.options.SendChanSize
+	if base.options.SendBufferSize > 0 {
+		upgrader.WriteBufferSize = base.options.SendBufferSize
 	}
 	return &WebSocketServer{
 		baseServer: base,
@@ -108,6 +109,12 @@ func (s *WebSocketServer) handleWebSocket(w http.ResponseWriter, r *http.Request
 	s.waitGroup.Add(1)
 	grs.Go(func(ctx context.Context) {
 		wsConn.writeLoop()
+		s.waitGroup.Done()
+	})
+
+	s.waitGroup.Add(1)
+	grs.Go(func(ctx context.Context) {
+		wsConn.heartLoop(wsConn)
 		s.waitGroup.Done()
 	})
 }

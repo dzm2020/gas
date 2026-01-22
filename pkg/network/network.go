@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 	"sync/atomic"
+	"time"
 )
 
 var (
@@ -51,9 +52,15 @@ type IConnection interface {
 	RemoteAddr() string
 	// IsStop  是否关闭
 	IsStop() bool
-	Type() ConnectionType
+	Type() ConnType
 	Context() interface{}
 	SetContext(interface{})
+
+	SetReadBuffer(bytes int) error
+	SetWriteBuffer(bytes int) error
+	SetLinger(enable bool, sec int) error
+	SetNoDelay(noDelay bool) error
+	SetTCPKeepAlive(enable bool, period time.Duration) error
 }
 
 // IServer 服务器接口（TCP/UDP服务器的抽象）
@@ -68,11 +75,11 @@ type IServer interface {
 
 // ------------------------------ 基础常量与默认配置 ------------------------------
 
-type ConnectionType int
+type ConnType = int
 
 const (
-	Accept  ConnectionType = iota
-	Connect ConnectionType = iota
+	Accept  ConnType = iota
+	Connect ConnType = iota
 )
 
 // ------------------------------ 空实现（避免用户未实现接口报错） ------------------------------

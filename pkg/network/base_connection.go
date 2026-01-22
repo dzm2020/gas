@@ -2,154 +2,139 @@ package network
 
 import (
 	"context"
-	"errors"
-	"github.com/dzm2020/gas/pkg/glog"
-	"github.com/dzm2020/gas/pkg/lib/buffer"
-	"github.com/dzm2020/gas/pkg/lib/stopper"
 	"io"
 	"net"
 	"time"
 
+	"github.com/dzm2020/gas/pkg/glog"
+	"github.com/dzm2020/gas/pkg/lib/buffer"
+	"github.com/dzm2020/gas/pkg/lib/netutil"
+	"github.com/dzm2020/gas/pkg/lib/stopper"
+
 	"go.uber.org/zap"
 )
 
-var (
-	ErrCodecIsNil      = errors.New("codec is nil")
-	ErrHandlerIsNil    = errors.New("handler is nil")
-	ErrBinLengthIsZero = errors.New("bin length is zero")
-)
-
-// baseConnection 连接基类，包含所有连接的通用逻辑
-type baseConnection struct {
-	stopper.Stopper
-	id                    int64         // 连接唯一ID
-	timeoutTicker         *time.Ticker  // 心跳超时定时器
-	lastActive            time.Time     // 最后活动时间（用于超时检测）
-	timeout               time.Duration // 超时时间
-	handler               IHandler
-	codec                 ICodec
-	typ                   ConnectionType
-	user                  interface{}
-	sendChan              chan interface{}
-	localAddr, remoteAddr net.Addr
-	ctx                   context.Context
-	cancel                context.CancelFunc
-}
-
-// initBaseConnection 初始化基类连接
-func initBaseConnection(ctx context.Context, typ ConnectionType, localAddr, remoteAddr net.Addr, options *Options) *baseConnection {
-	sendChanSize := options.SendChanSize
-	bc := &baseConnection{
-		id:         generateConnID(),
-		lastActive: time.Now(),
-		timeout:    options.HeartInterval,
-		handler:    options.Handler,
-		codec:      options.Codec,
-		typ:        typ,
-		sendChan:   make(chan interface{}, sendChanSize),
-		localAddr:  localAddr,
-		remoteAddr: remoteAddr,
-	}
-	// 只有当 heartInterval > 0 时才创建 ticker
-	if options.HeartInterval > 0 {
-		bc.timeoutTicker = time.NewTicker(options.HeartInterval / 2)
+// newBaseConn 初始化基类连接
+func newBaseConn(ctx context.Context, network string, typ ConnType, conn net.Conn, options *Options) *baseConn {
+	bc := &baseConn{
+		id:          generateConnID(),
+		network:     network,
+		options:     options,
+		conn:        conn,
+		remoteAddr:  conn.RemoteAddr(),
+		lastActive:  time.Now(),
+		typ:         typ,
+		sendChan:    make(chan interface{}, options.SendBufferSize),
+		writeBuffer: buffer.New(options.SendBufferSize),
+		readBuffer:  buffer.New(options.ReadBufSize),
 	}
 	bc.ctx, bc.cancel = context.WithCancel(ctx)
-
-	glog.Info("创建连接", zap.Int64("connectionId", bc.ID()),
+	glog.Info("新建网络连接", zap.Int64("connectionId", bc.ID()),
+		zap.String("network", bc.Network()),
+		zap.Int("typ", bc.Type()),
 		zap.String("localAddr", bc.LocalAddr()),
 		zap.String("remoteAddr", bc.RemoteAddr()))
-
 	return bc
 }
 
+// baseConn 连接基类，包含所有连接的通用逻辑
+type baseConn struct {
+	stopper.Stopper
+	id          int64 // 连接唯一ID
+	network     string
+	options     *Options  // 选项
+	conn        net.Conn  // 原生连接
+	lastActive  time.Time // 最后活动时间（用于超时检测）
+	typ         ConnType  // 连接类型
+	user        interface{}
+	sendChan    chan interface{}
+	ctx         context.Context
+	cancel      context.CancelFunc
+	remoteAddr  net.Addr
+	writeBuffer buffer.IBuffer
+	readBuffer  buffer.IBuffer
+}
+
 // ID 返回连接的唯一ID
-func (b *baseConnection) ID() int64 {
+func (b *baseConn) ID() int64 {
 	return b.id
 }
 
-func (b *baseConnection) Type() ConnectionType {
+func (b *baseConn) Type() ConnType {
 	return b.typ
 }
-
-func (b *baseConnection) LocalAddr() string {
-	if b.localAddr == nil {
-		return ""
-	}
-	return b.localAddr.String()
+func (b *baseConn) Network() string {
+	return b.network
 }
-
-func (b *baseConnection) RemoteAddr() string {
-	if b.remoteAddr == nil {
-		return ""
-	}
+func (b *baseConn) LocalAddr() string {
+	return b.conn.LocalAddr().String()
+}
+func (b *baseConn) RemoteAddr() string {
 	return b.remoteAddr.String()
 }
-
-func (b *baseConnection) Context() interface{} {
+func (b *baseConn) Context() interface{} {
 	return b.ctx
 }
-
-func (b *baseConnection) SetContext(ctx interface{}) {
+func (b *baseConn) SetContext(ctx interface{}) {
 	b.user = ctx
 }
-
-func (b *baseConnection) updateLastActive() {
-	b.lastActive = time.Now()
+func (b *baseConn) SetReadBuffer(bytes int) error {
+	return netutil.SetRcvBuffer(b.conn, bytes)
+}
+func (b *baseConn) SetWriteBuffer(bytes int) error {
+	return netutil.SetSndBuffer(b.conn, bytes)
+}
+func (b *baseConn) SetLinger(enable bool, sec int) error {
+	return netutil.SetTCPLinger(b.conn, enable, sec)
 }
 
-func (b *baseConnection) getLastActive() time.Time {
-	return b.lastActive
+func (b *baseConn) SetNoDelay(noDelay bool) error {
+	return netutil.SetTCPNoDelay(b.conn, noDelay)
+}
+func (b *baseConn) SetTCPKeepAlive(enable bool, period time.Duration) error {
+	return netutil.SetTCPKeepAlive(b.conn, enable, period)
 }
 
-func (b *baseConnection) getTimeoutChan() <-chan time.Time {
-	if b.timeoutTicker != nil {
-		return b.timeoutTicker.C
+func (b *baseConn) heartLoop(connection IConnection) {
+	var err error
+	timeout := b.options.HeartTimeout
+	ticker := time.NewTicker(timeout / 2)
+	defer func() {
+		ticker.Stop()
+		_ = connection.Close(err)
+	}()
+
+	for !b.IsStop() {
+		select {
+		case <-b.ctx.Done():
+			return
+		case <-ticker.C:
+			if time.Since(b.lastActive) > timeout {
+				err = ErrConnHeartTimeout
+				return
+			}
+		}
 	}
-	return nil
 }
 
-func (b *baseConnection) checkTimeout() error {
-	if b.timeout <= 0 {
-		return nil // keepAlive 为 0 表示不检测超时
-	}
-	if time.Since(b.getLastActive()) > b.timeout {
-		return ErrConnectionKeepAlive
-	}
-	return nil
+func (b *baseConn) encode(msg interface{}) (bin []byte, err error) {
+	return b.options.Codec.Encode(msg)
 }
 
-func (b *baseConnection) encode(msg interface{}) (bin []byte, err error) {
-	if b.codec == nil {
-		err = ErrCodecIsNil
-		return
-	}
-	bin, err = b.codec.Encode(msg)
-	if err != nil {
-		return
-	}
-	if len(bin) <= 0 {
-		err = ErrBinLengthIsZero
-		return
-	}
-	return
+func (b *baseConn) onConnect(connection IConnection) error {
+	return b.options.Handler.OnConnect(connection)
 }
 
-func (b *baseConnection) onConnect(connection IConnection) error {
-	if b.handler == nil {
-		glog.Error("连接回调错误", zap.Int64("connectionId", connection.ID()), zap.Error(ErrHandlerIsNil))
-		return ErrHandlerIsNil
-	}
-	if err := b.handler.OnConnect(connection); err != nil {
-		glog.Error("连接回调错误", zap.Int64("connectionId", connection.ID()), zap.Error(err))
-		return err
-	}
-	glog.Debug("连接回调成功", zap.Int64("connectionId", connection.ID()))
-	return nil
+func (b *baseConn) OnMessage(conn IConnection, msg interface{}) error {
+	return b.options.Handler.OnMessage(conn, msg)
+}
+
+func (b *baseConn) OnClose(conn IConnection, err error) {
+	b.options.Handler.OnClose(conn, err)
 }
 
 // Send 发送消息（线程安全）
-func (b *baseConnection) Send(msg interface{}) error {
+func (b *baseConn) Send(msg interface{}) error {
 	if b.IsStop() {
 		return ErrConnectionClosed
 	}
@@ -159,7 +144,6 @@ func (b *baseConnection) Send(msg interface{}) error {
 	select {
 	case b.sendChan <- msg:
 	default:
-		glog.Error("发送消息失败channel已满", zap.Int64("connectionId", b.ID()))
 		return ErrSendQueueFull
 	}
 	return nil
@@ -167,73 +151,51 @@ func (b *baseConnection) Send(msg interface{}) error {
 
 // write 批量写入多个消息到指定的 Writer
 // 将多个消息编码后合并写入，用于批量发送场景
-func (b *baseConnection) write(c io.Writer, msgList ...interface{}) error {
-	if c == nil {
-		return errors.New("writer is nil")
-	}
+func (b *baseConn) write(c io.Writer, msgList ...interface{}) error {
 	if len(msgList) == 0 {
 		return nil // 没有消息需要写入，直接返回
 	}
-	// 使用缓冲区合并多个消息
-	buf := buffer.New(4096)
 	for _, msg := range msgList {
 		if msg == nil {
 			continue
 		}
-		// 使用 encode 方法，保持与 Send 方法的一致性
 		bytes, err := b.encode(msg)
 		if err != nil {
-			glog.Error("批量写入消息编码失败", zap.Int64("connectionId", b.ID()), zap.Error(err))
 			return err
 		}
-		// 写入缓冲区
-		if _, err := buf.Write(bytes); err != nil {
-			glog.Error("批量写入消息到缓冲区失败", zap.Int64("connectionId", b.ID()), zap.Error(err))
+		// write buffer
+		if _, err = b.writeBuffer.Write(bytes); err != nil {
 			return err
 		}
 	}
-	// 一次性写入所有数据
-	if _, err := c.Write(buf.Bytes()); err != nil {
-		if err != io.EOF {
-			glog.Error("批量写入消息失败", zap.Int64("connectionId", b.ID()), zap.Error(err))
+	// write socket
+	for b.writeBuffer.Len() > 0 {
+		n, err := c.Write(b.writeBuffer.Bytes())
+		if err != nil {
+			return err
 		}
-		return err
+		_ = b.writeBuffer.Skip(n)
 	}
 	return nil
 }
 
-func (b *baseConnection) process(connection IConnection, data []byte) (int, error) {
-	b.updateLastActive()
-	codec := b.codec
-	if codec == nil {
-		return 0, ErrCodecIsNil
-	}
-	msg, n, err := codec.Decode(data)
+func (b *baseConn) process(connection IConnection, data []byte) (int, error) {
+	b.lastActive = time.Now()
+	_, _ = b.readBuffer.Write(data)
+	msg, n, err := b.options.Codec.Decode(b.readBuffer.Bytes())
 	if err != nil {
 		return n, err
 	}
-	handler := b.handler
-	if handler == nil {
-		return n, ErrHandlerIsNil
-	}
-	return n, handler.OnMessage(connection, msg)
+	_ = b.readBuffer.Skip(n)
+	return n, b.OnMessage(connection, msg)
 }
 
-func (b *baseConnection) Close(connection IConnection, err error) {
-	if b.handler != nil {
-		b.handler.OnClose(connection, err)
+func (b *baseConn) Close(connection IConnection, err error) {
+	if !b.Stop() {
+		return
 	}
-
-	if b.timeoutTicker != nil {
-		b.timeoutTicker.Stop()
-		b.timeoutTicker = nil
-	}
-
-	if connection != nil {
-		RemoveConnection(connection)
-	}
-
+	b.OnClose(connection, err)
+	RemoveConnection(connection)
 	b.cancel()
-
 	return
 }

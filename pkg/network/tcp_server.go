@@ -3,10 +3,11 @@ package network
 import (
 	"context"
 	"errors"
+	"net"
+
 	"github.com/dzm2020/gas/pkg/glog"
 	"github.com/dzm2020/gas/pkg/lib/grs"
 	"github.com/dzm2020/gas/pkg/lib/netutil"
-	"net"
 
 	"go.uber.org/zap"
 )
@@ -82,6 +83,12 @@ func (s *TCPServer) newTcpCon(conn net.Conn) {
 		connection.writeLoop()
 		s.waitGroup.Done()
 		glog.Debug("TCP连接写协程关闭", zap.Int64("connectionId", connection.ID()))
+	})
+
+	s.waitGroup.Add(1)
+	grs.Go(func(ctx context.Context) {
+		connection.heartLoop(connection)
+		s.waitGroup.Done()
 	})
 }
 
