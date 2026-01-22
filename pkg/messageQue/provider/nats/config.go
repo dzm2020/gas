@@ -21,6 +21,7 @@ type Config struct {
 	Token                string        `json:"token"`                // Token 认证
 	DisableNoEcho        bool          `json:"disableNoEcho"`        // 禁用 NoEcho
 	RetryOnFailedConnect bool          `json:"retryOnFailedConnect"` // 连接失败时重试
+	PoolSize             int           `json:"poolSize"`             // 连接池大小，默认 10
 }
 
 // defaultConfig 返回默认配置
@@ -35,6 +36,7 @@ func defaultConfig() *Config {
 		MaxPingsOut:          2,
 		AllowReconnect:       true,
 		RetryOnFailedConnect: false,
+		PoolSize:             10, // 默认连接池大小为 10
 	}
 }
 

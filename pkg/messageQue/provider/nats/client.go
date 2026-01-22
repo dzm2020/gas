@@ -2,17 +2,16 @@ package nats
 
 import (
 	"context"
+	"time"
+
+	"github.com/dzm2020/gas/pkg/lib/stopper"
 	"github.com/dzm2020/gas/pkg/lib/xerror"
 	"github.com/dzm2020/gas/pkg/messageQue"
 	"github.com/dzm2020/gas/pkg/messageQue/iface"
-	"strings"
-	"time"
 
 	"github.com/nats-io/nats.go"
 	"github.com/spf13/viper"
 )
-
-// todo 增加连接池
 
 func init() {
 	_ = messageQue.GetFactoryMgr().Register("nats", func(args ...any) (iface.IMessageQue, error) {
@@ -38,19 +37,21 @@ func New(cfg *Config) *Client {
 }
 
 type Client struct {
-	cfg *Config
-	*nats.Conn
+	stopper.Stopper
+	cfg     *Config
+	pool    *ConnPool  // 连接池，用于 Publish 和 Request
+	subConn *nats.Conn // 专门的订阅连接
 }
 
 func (n *Client) Run(ctx context.Context) (err error) {
-	servers := n.cfg.Servers
-	natsOpts := toOptions(n.cfg)
-	n.Conn, err = nats.Connect(strings.Join(servers, ","), natsOpts...)
+	n.pool = NewPool(n.cfg)
+	n.subConn, err = n.pool.get()
 	return
 }
 
 func (n *Client) Subscribe(subject string, subscriber iface.ISubscriber) (iface.ISubscription, error) {
-	return n.Conn.Subscribe(subject, func(m *nats.Msg) {
+	conn := n.subConn
+	return conn.Subscribe(subject, func(m *nats.Msg) {
 		response := func(data []byte) error {
 			if m.Reply == "" {
 				return nil
@@ -61,8 +62,24 @@ func (n *Client) Subscribe(subject string, subscriber iface.ISubscriber) (iface.
 	})
 }
 
+func (n *Client) Publish(subject string, data []byte) error {
+	conn, err := n.pool.get()
+	if err != nil {
+		return xerror.Wrapf(err, "从连接池获取连接失败, subject:%s", subject)
+	}
+	defer n.pool.put(conn)
+
+	return conn.Publish(subject, data)
+}
+
 func (n *Client) Request(subject string, data []byte, timeout time.Duration) ([]byte, error) {
-	ret, err := n.Conn.Request(subject, data, timeout)
+	conn, err := n.pool.get()
+	if err != nil {
+		return nil, xerror.Wrapf(err, "从连接池获取连接失败, subject:%s", subject)
+	}
+	defer n.pool.put(conn)
+
+	ret, err := conn.Request(subject, data, timeout)
 	if err != nil {
 		return nil, xerror.Wrapf(err, "subject:%s", subject)
 	}
@@ -70,6 +87,16 @@ func (n *Client) Request(subject string, data []byte, timeout time.Duration) ([]
 }
 
 func (n *Client) Shutdown(ctx context.Context) error {
-	n.Close()
+	if !n.Stop() {
+		return nil
+	}
+	if n.subConn != nil && !n.subConn.IsClosed() {
+		n.subConn.Close()
+		n.subConn = nil
+	}
+	// 关闭连接池
+	if n.pool != nil {
+		n.pool.close()
+	}
 	return nil
 }
