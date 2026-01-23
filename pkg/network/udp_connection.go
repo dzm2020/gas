@@ -6,7 +6,6 @@ import (
 	"net"
 
 	"github.com/dzm2020/gas/pkg/glog"
-
 	"go.uber.org/zap"
 )
 
@@ -46,6 +45,7 @@ func (c *UDPConnection) Send(msg interface{}) error {
 	if data == nil {
 		return nil
 	}
+	//  todo 这里是不是处理下 不需要remoteAddr
 	ch := c.server.getSendChan()
 	select {
 	case ch <- &udpPacket{data: data, remoteAddr: c.remoteAddr}:
@@ -78,6 +78,11 @@ func (c *UDPConnection) readLoop() {
 	}
 }
 
+func (c *UDPConnection) Write(p []byte) (n int, err error) {
+	_, err = c.conn.WriteTo(p, c.remoteAddr)
+	return len(p), err
+}
+
 func (c *UDPConnection) writeRcvChan(data []byte) {
 	select {
 	case c.rcvChan <- data:
@@ -91,10 +96,9 @@ func (c *UDPConnection) Close(err error) (w error) {
 		return ErrConnectionClosed
 	}
 
-	glog.Info("UDP连接断开", zap.Int64("connectionId", c.ID()), zap.Error(err))
-
 	RemoveUDPConnection(c.RemoteAddr())
-
 	c.baseConn.Close(c, err)
+
+	glog.Info("UDP连接断开", zap.Int64("connectionId", c.ID()), zap.Error(err))
 	return
 }

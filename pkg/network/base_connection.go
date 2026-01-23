@@ -10,7 +10,6 @@ import (
 	"github.com/dzm2020/gas/pkg/lib/buffer"
 	"github.com/dzm2020/gas/pkg/lib/netutil"
 	"github.com/dzm2020/gas/pkg/lib/stopper"
-
 	"go.uber.org/zap"
 )
 

@@ -59,6 +59,7 @@ func (s *WebSocketServer) Start() error {
 		Addr:    s.address,
 		Handler: mux,
 	}
+
 	s.waitGroup.Add(1)
 	grs.Go(func(ctx context.Context) {
 		defer s.waitGroup.Done()
@@ -68,6 +69,7 @@ func (s *WebSocketServer) Start() error {
 			return
 		}
 	})
+
 	return nil
 }
 

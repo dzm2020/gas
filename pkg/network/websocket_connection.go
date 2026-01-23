@@ -23,10 +23,6 @@ func newWebSocketConnection(ctx context.Context, conn *websocket.Conn, typ ConnT
 	}
 }
 
-// Send 发送消息（线程安全）
-// 注意：WebSocketConnection 使用基类的 Send 方法，不在此处编码
-// 编码在 writeLoop 中进行，保持与其他连接类型的一致性
-
 func (c *WebSocketConnection) readLoop() {
 	var err error
 	defer func() {
