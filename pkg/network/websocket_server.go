@@ -17,12 +17,12 @@ import (
 // ------------------------------ WebSocket服务器 ------------------------------
 
 var (
-	// 默认 WebSocket 升级器
+	// 默认 WebSocket 升级器（仅用于未配置 CheckOrigin 时的默认行为）
 	defaultUpgrader = websocket.Upgrader{
 		ReadBufferSize:  4096,
 		WriteBufferSize: 4096,
 		CheckOrigin: func(r *http.Request) bool {
-			return true
+			return true // 默认允许所有 Origin（生产环境应配置 CheckOrigin）
 		},
 	}
 )
@@ -43,6 +43,10 @@ func NewWebSocketServer(base *baseServer, path string) *WebSocketServer {
 	}
 	if base.options.SendBufferSize > 0 {
 		upgrader.WriteBufferSize = base.options.SendBufferSize
+	}
+	// 如果配置了 CheckOrigin，使用配置的函数
+	if base.options.CheckOrigin != nil {
+		upgrader.CheckOrigin = base.options.CheckOrigin
 	}
 	return &WebSocketServer{
 		baseServer: base,

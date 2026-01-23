@@ -2,6 +2,7 @@ package network
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net"
 
@@ -38,6 +39,14 @@ func (c *TCPConnection) readLoop() {
 	for !c.IsStop() {
 		n, err = c.conn.Read(c.tmpBuf)
 		if err != nil {
+			// 区分 EOF 和其他错误
+			if err == io.EOF {
+				return
+			}
+			// 对于其他错误，记录日志后返回
+			if !errors.Is(err, net.ErrClosed) {
+				glog.Error("TCP连接读取错误", zap.Int64("connectionId", c.ID()), zap.Error(err))
+			}
 			return
 		}
 		if n == 0 {
@@ -63,7 +72,11 @@ func (c *TCPConnection) writeLoop() {
 		select {
 		case <-c.ctx.Done():
 			return
-		case msg := <-c.sendChan:
+		case msg, ok := <-c.sendChan:
+			if !ok {
+				// channel 已关闭
+				return
+			}
 			if err = c.batchWriteMsg(msg); err != nil {
 				return
 			}
@@ -72,10 +85,17 @@ func (c *TCPConnection) writeLoop() {
 }
 
 func (c *TCPConnection) batchWriteMsg(msg interface{}) error {
+	const maxBatchSize = 100 // 限制批量写入的最大消息数，避免内存占用过高
 	var msgList = []interface{}{msg}
-	for i := 0; i < len(c.sendChan); i++ {
-		msg = <-c.sendChan
-		msgList = append(msgList, msg)
+	batchCount := 0
+	for len(c.sendChan) > 0 && batchCount < maxBatchSize-1 {
+		select {
+		case msg := <-c.sendChan:
+			msgList = append(msgList, msg)
+			batchCount++
+		default:
+			break
+		}
 	}
 	return c.write(c.conn, msgList...)
 }
@@ -85,8 +105,8 @@ func (c *TCPConnection) Close(err error) (w error) {
 		return ErrConnectionClosed
 	}
 
-	glog.Info("TCP连接断开", zap.Int64("connectionId", c.ID()), zap.Error(err))
-
 	c.baseConn.Close(c, err)
+
+	glog.Info("TCP连接断开", zap.Int64("connectionId", c.ID()), zap.Error(err))
 	return
 }

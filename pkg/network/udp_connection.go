@@ -15,6 +15,7 @@ type UDPConnection struct {
 	*baseConn  // 嵌入基类
 	remoteAddr *net.UDPAddr
 	conn       *net.UDPConn // 底层UDP连接（全局共享）
+	connKey    string       // 连接键值（用于从管理器中移除）
 	rcvChan    chan []byte
 	sendChan   chan<- *udpPacket
 }
@@ -22,10 +23,12 @@ type UDPConnection struct {
 func newUDPConnection(ctx context.Context, conn *net.UDPConn, typ ConnType, remoteAddr *net.UDPAddr, server *UDPServer) *UDPConnection {
 	base := newBaseConn(ctx, "udp", typ, conn, remoteAddr, server.options)
 
+	connKey := remoteAddr.String()
 	udpConn := &UDPConnection{
 		baseConn:   base,
 		remoteAddr: remoteAddr,
 		conn:       conn,
+		connKey:    connKey,
 		rcvChan:    make(chan []byte, server.options.UdpRcvChanSize),
 		sendChan:   server.sendChan,
 	}
@@ -63,7 +66,11 @@ func (c *UDPConnection) readLoop() {
 		select {
 		case <-c.ctx.Done():
 			return
-		case data := <-c.rcvChan:
+		case data, ok := <-c.rcvChan:
+			if !ok {
+				// channel 已关闭
+				return
+			}
 			_, err = c.process(c, data)
 			if err != nil {
 				return
@@ -85,7 +92,7 @@ func (c *UDPConnection) Close(err error) (w error) {
 		return ErrConnectionClosed
 	}
 
-	RemoveUDPConnection(c.RemoteAddr())
+	RemoveUDPConnection(c.connKey)
 	c.baseConn.Close(c, err)
 
 	glog.Info("UDP连接断开", zap.Int64("connectionId", c.ID()), zap.Error(err))

@@ -59,7 +59,11 @@ func (c *WebSocketConnection) writeLoop() {
 		select {
 		case <-c.ctx.Done():
 			return
-		case msg, _ := <-c.sendChan:
+		case msg, ok := <-c.sendChan:
+			if !ok {
+				// channel 已关闭
+				return
+			}
 			if err = c.write(c, msg); err != nil {
 				return
 			}

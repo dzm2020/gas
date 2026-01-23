@@ -3,6 +3,7 @@ package network
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 
 	"github.com/duke-git/lancet/v2/convertor"
@@ -67,9 +68,13 @@ func (s *UDPServer) listen() (err error) {
 		return err
 	}
 
-	udpConn, _ := ln.(*net.UDPConn)
+	udpConn, ok := ln.(*net.UDPConn)
+	if !ok {
+		_ = ln.Close()
+		return fmt.Errorf("failed to convert PacketConn to UDPConn")
+	}
 	s.conn = udpConn
-	return err
+	return nil
 }
 
 func (s *UDPServer) readLoop() {
@@ -87,6 +92,10 @@ func (s *UDPServer) readLoop() {
 		}
 
 		remoteAddrCopy := convertor.DeepClone(remoteAddr)
+		if remoteAddrCopy == nil {
+			glog.Error("UDP DeepClone失败", zap.String("address", s.Addr()), zap.String("remoteAddr", remoteAddr.String()))
+			continue
+		}
 
 		connKey := remoteAddrCopy.String()
 		udpConn, exists := GetUDPConnection(connKey)
@@ -101,8 +110,12 @@ func (s *UDPServer) writeLoop() {
 	for !s.IsStop() {
 		select {
 		case <-s.ctx.Done():
-			continue
-		case packet, _ := <-s.sendChan:
+			return
+		case packet, ok := <-s.sendChan:
+			if !ok {
+				// channel 已关闭
+				return
+			}
 			_, err := s.conn.WriteToUDP(packet.data, packet.remoteAddr)
 			if err != nil {
 				if !errors.Is(err, net.ErrClosed) {

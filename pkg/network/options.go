@@ -1,22 +1,24 @@
 package network
 
 import (
+	"net/http"
 	"time"
 )
 
 type Option func(*Options)
 type Options struct {
-	Handler        IHandler      // 业务回调
-	Codec          ICodec        // 协议编解码器
-	HeartTimeout   time.Duration // 心跳超时（0表示不检测超时）
-	SendBufferSize int           // 发送队列缓冲大小
-	ReadBufSize    int           // 读缓冲区大小
-	TLSCertFile    string        // TLS 证书文件路径
-	TLSKeyFile     string        // TLS 私钥文件路径
-	ReusePort      bool          // 是否启用 SO_REUSEPORT（仅 Linux 支持）
-	ReuseAddr      bool          // 是否启用 SO_REUSEADDR
+	Handler        IHandler                      // 业务回调
+	Codec          ICodec                        // 协议编解码器
+	HeartTimeout   time.Duration                 // 心跳超时（0表示不检测超时）
+	SendBufferSize int                           // 发送队列缓冲大小
+	ReadBufSize    int                           // 读缓冲区大小
+	TLSCertFile    string                        // TLS 证书文件路径
+	TLSKeyFile     string                        // TLS 私钥文件路径
+	ReusePort      bool                          // 是否启用 SO_REUSEPORT（仅 Linux 支持）
+	ReuseAddr      bool                          // 是否启用 SO_REUSEADDR
 	SendChanSize   int
 	UdpRcvChanSize int
+	CheckOrigin    func(r *http.Request) bool    // WebSocket Origin 检查函数（nil 表示不检查）
 }
 
 func loadOptions(options ...Option) *Options {
@@ -112,5 +114,13 @@ func WithSendChanSize(sendChanSize int) Option {
 func WithUdpRcvChanSize(udpRcvChanSize int) Option {
 	return func(opts *Options) {
 		opts.UdpRcvChanSize = udpRcvChanSize
+	}
+}
+
+// WithCheckOrigin 设置 WebSocket Origin 检查函数
+// 如果为 nil，则使用默认行为（允许所有 Origin，不推荐用于生产环境）
+func WithCheckOrigin(checkOrigin func(r *http.Request) bool) Option {
+	return func(opts *Options) {
+		opts.CheckOrigin = checkOrigin
 	}
 }

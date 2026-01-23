@@ -14,7 +14,8 @@ import (
 )
 
 // newBaseConn 初始化基类连接
-func newBaseConn(ctx context.Context, network string, typ ConnType, conn net.Conn, remoteAddr net.Addr, options *Options) *baseConn {
+func newBaseConn(ctx context.Context, network string, typ ConnType,
+	conn net.Conn, remoteAddr net.Addr, options *Options) *baseConn {
 	bc := &baseConn{
 		id:          generateConnID(),
 		network:     network,
@@ -100,7 +101,9 @@ func (b *baseConn) heartLoop(connection IConnection) {
 	ticker := time.NewTicker(timeout / 2)
 	defer func() {
 		ticker.Stop()
-		_ = connection.Close(err)
+		if closeErr := connection.Close(err); closeErr != nil && closeErr != ErrConnectionClosed {
+			glog.Error("心跳循环关闭连接时出错", zap.Int64("connectionId", connection.ID()), zap.Error(closeErr))
+		}
 	}()
 
 	for !b.IsStop() {
