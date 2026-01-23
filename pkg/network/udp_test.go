@@ -105,8 +105,7 @@ func (m *mockUDPHandler) OnClose(conn IConnection, err error) {
 func TestUDPServer_Listen(t *testing.T) {
 	glog.SetLogLevel(zap.DebugLevel)
 
-	server, err := NewServer(context.Background(), "udp", "127.0.0.1:9989",
-		WithHandler(udpHandler),
+	server, err := NewServer(udpHandler, "udp://127.0.0.1:9989",
 		WithCodec(udpCodec),
 		WithUdpRcvChanSize(1024))
 	if err != nil {
@@ -126,8 +125,7 @@ func TestUDPServer_Listen(t *testing.T) {
 func TestUDPServer_Close(t *testing.T) {
 	glog.SetLogLevel(zap.DebugLevel)
 
-	server, err := NewServer(context.Background(), "udp", "127.0.0.1:9990",
-		WithHandler(udpHandler),
+	server, err := NewServer(udpHandler, "udp://127.0.0.1:9990",
 		WithCodec(udpCodec),
 		WithUdpRcvChanSize(1024))
 	if err != nil {
@@ -170,8 +168,7 @@ func TestUDPServer_Close(t *testing.T) {
 func TestUDPServer_MultipleClients(t *testing.T) {
 	glog.SetLogLevel(zap.DebugLevel)
 
-	server, err := NewServer(context.Background(), "udp", "127.0.0.1:9991",
-		WithHandler(udpHandler),
+	server, err := NewServer(udpHandler, "udp://127.0.0.1:9991",
 		WithCodec(udpCodec),
 		WithUdpRcvChanSize(1024))
 	if err != nil {

@@ -104,6 +104,8 @@ func (s *WebSocketServer) handleWebSocket(w http.ResponseWriter, r *http.Request
 	}
 
 	wsConn := newWebSocketConnection(s.ctx, conn, Accept, s.options)
+	wsConn.SetHandler(s.handler)
+
 	AddConnection(wsConn)
 
 	s.waitGroup.Add(1)

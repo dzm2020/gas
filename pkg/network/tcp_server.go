@@ -70,6 +70,7 @@ func (s *TCPServer) newTcpCon(conn net.Conn) {
 		return
 	}
 	connection := newTCPConnection(s.ctx, tcpCon, Accept, s.options)
+	connection.SetHandler(s.handler)
 	AddConnection(connection)
 
 	s.waitGroup.Add(1)

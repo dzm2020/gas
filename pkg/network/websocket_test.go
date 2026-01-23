@@ -2,10 +2,11 @@ package network
 
 import (
 	"context"
-	"github.com/dzm2020/gas/pkg/glog"
 	"net/url"
 	"testing"
 	"time"
+
+	"github.com/dzm2020/gas/pkg/glog"
 
 	"github.com/gorilla/websocket"
 	"go.uber.org/zap"
@@ -104,8 +105,7 @@ func (m *mockWSHandler) OnClose(conn IConnection, err error) {
 func TestWebSocketServer_Listen(t *testing.T) {
 	glog.SetLogLevel(zap.DebugLevel)
 
-	server, err := NewServer(context.Background(), "ws", "127.0.0.1:9992/ws",
-		WithHandler(wsHandler),
+	server, err := NewServer(wsHandler, "ws://127.0.0.1:9992/ws",
 		WithCodec(wsCodec))
 	if err != nil {
 		t.Fatalf("创建WebSocket服务器失败: %v", err)
@@ -124,8 +124,7 @@ func TestWebSocketServer_Listen(t *testing.T) {
 func TestWebSocketServer_Close(t *testing.T) {
 	glog.SetLogLevel(zap.DebugLevel)
 
-	server, err := NewServer(context.Background(), "ws", "127.0.0.1:9993/ws",
-		WithHandler(wsHandler),
+	server, err := NewServer(wsHandler, "ws://127.0.0.1:9993/ws",
 		WithCodec(wsCodec))
 	if err != nil {
 		t.Fatalf("创建WebSocket服务器失败: %v", err)
@@ -167,8 +166,7 @@ func TestWebSocketServer_Close(t *testing.T) {
 func TestWebSocketServer_MultipleClients(t *testing.T) {
 	glog.SetLogLevel(zap.DebugLevel)
 
-	server, err := NewServer(context.Background(), "ws", "127.0.0.1:9994/ws",
-		WithHandler(wsHandler),
+	server, err := NewServer(wsHandler, "ws://127.0.0.1:9994/ws",
 		WithCodec(wsCodec))
 	if err != nil {
 		t.Fatalf("创建WebSocket服务器失败: %v", err)
@@ -211,8 +209,7 @@ func TestWebSocketServer_MultipleClients(t *testing.T) {
 func TestWebSocketServer_CustomPath(t *testing.T) {
 	glog.SetLogLevel(zap.DebugLevel)
 
-	server, err := NewServer(context.Background(), "ws", "127.0.0.1:9995/chat",
-		WithHandler(wsHandler),
+	server, err := NewServer(wsHandler, "ws://127.0.0.1:9995/chat",
 		WithCodec(wsCodec))
 	if err != nil {
 		t.Fatalf("创建WebSocket服务器失败: %v", err)

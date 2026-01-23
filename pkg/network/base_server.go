@@ -9,20 +9,22 @@ import (
 	"github.com/dzm2020/gas/pkg/lib/stopper"
 )
 
-func newBaseServer(ctx context.Context, network, address string, option ...Option) *baseServer {
+func newBaseServer(network, address string, handler IHandler, option ...Option) *baseServer {
 	server := &baseServer{
 		options:      loadOptions(option...),
 		network:      network,
 		address:      address,
 		protoAddress: fmt.Sprintf("%s:%s", network, address),
+		handler:      handler,
 	}
-	server.ctx, server.cancel = context.WithCancel(ctx)
+	server.ctx, server.cancel = context.WithCancel(context.Background())
 	return server
 }
 
 type baseServer struct {
 	stopper.Stopper
 	options          *Options
+	handler          IHandler
 	network, address string // 监听地址（如 ":8080"）
 	protoAddress     string
 	waitGroup        sync.WaitGroup

@@ -126,7 +126,7 @@ func (m *mockHandler) OnClose(conn IConnection, err error) {
 func TestTCPServer_Listen(t *testing.T) {
 	glog.SetLogLevel(zap.DebugLevel)
 
-	server, err := NewServer(context.Background(), "tcp", "127.0.0.1:9988", WithHandler(handler), WithCodec(codec))
+	server, err := NewServer(handler, "tcp://127.0.0.1:9988", WithCodec(codec))
 	if err != nil {
 		t.Fatalf("创建服务器失败: %v", err)
 	}

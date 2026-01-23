@@ -2,6 +2,7 @@ package network
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -12,8 +13,8 @@ var (
 	connIDCounter atomic.Int64
 )
 
-// generateConnID 生成连接ID（当 snowflake 未初始化时使用）
-func generateConnID() int64 {
+// genConnID 生成连接ID（当 snowflake 未初始化时使用）
+func genConnID() int64 {
 	return connIDCounter.Add(1)
 }
 
@@ -102,9 +103,14 @@ func (e *EmptyCodec) Decode(b []byte) (interface{}, int, error) {
 	return nil, 0, nil
 }
 
-func NewServer(ctx context.Context, network, address string, option ...Option) (IServer, error) {
+func NewServer(handler IHandler, protoAddr string, option ...Option) (IServer, error) {
+	if handler == nil {
+		return nil, errors.New("handler is nil")
+	}
+
+	network, address := parseProtoAddr(protoAddr)
 	path, address := parseWsAddr(address)
-	base := newBaseServer(ctx, network, address, option...)
+	base := newBaseServer(network, address, handler, option...)
 	switch network {
 	case "tcp", "tcp4", "tcp6":
 		return NewTCPServer(base), nil
@@ -125,4 +131,12 @@ func parseWsAddr(address string) (string, string) {
 		address = address[:idx]
 	}
 	return path, address
+}
+
+func parseProtoAddr(addr string) (string, string) {
+	data := strings.Split(addr, "://")
+	if len(data) != 2 {
+		return "", ""
+	}
+	return data[0], data[1]
 }

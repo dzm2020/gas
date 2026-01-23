@@ -7,11 +7,9 @@ import (
 
 // 连接相关错误
 var (
-	ErrConnectionClosed    = errors.New("connection closed")
-	ErrSendQueueFull       = errors.New("send queue full")
-	ErrConnectionKeepAlive = errors.New("connection keepAlive")
-	ErrListenerIsNil       = errors.New("listener is nil")
-	ErrConnHeartTimeout    = errors.New("heart timeout")
+	ErrConnectionClosed = errors.New("connection closed")
+	ErrChannelFull      = errors.New("channel full")
+	ErrConnHeartTimeout = errors.New("heart timeout")
 )
 
 // ErrUnsupportedProtocol 不支持的协议错误

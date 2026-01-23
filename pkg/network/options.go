@@ -7,23 +7,22 @@ import (
 
 type Option func(*Options)
 type Options struct {
-	Handler        IHandler                      // 业务回调
-	Codec          ICodec                        // 协议编解码器
-	HeartTimeout   time.Duration                 // 心跳超时（0表示不检测超时）
-	SendBufferSize int                           // 发送队列缓冲大小
-	ReadBufSize    int                           // 读缓冲区大小
-	TLSCertFile    string                        // TLS 证书文件路径
-	TLSKeyFile     string                        // TLS 私钥文件路径
-	ReusePort      bool                          // 是否启用 SO_REUSEPORT（仅 Linux 支持）
-	ReuseAddr      bool                          // 是否启用 SO_REUSEADDR
+	TLSCertFile string                     // TLS 证书文件路径
+	TLSKeyFile  string                     // TLS 私钥文件路径
+	ReusePort   bool                       // 是否启用 SO_REUSEPORT（仅 Linux 支持）
+	ReuseAddr   bool                       // 是否启用 SO_REUSEADDR
+	CheckOrigin func(r *http.Request) bool // WebSocket Origin 检查函数（nil 表示不检查）
+
+	Codec          ICodec        // 协议编解码器
+	HeartTimeout   time.Duration // 心跳超时（0表示不检测超时）
+	SendBufferSize int           // 发送队列缓冲大小
+	ReadBufSize    int           // 读缓冲区大小
 	SendChanSize   int
 	UdpRcvChanSize int
-	CheckOrigin    func(r *http.Request) bool    // WebSocket Origin 检查函数（nil 表示不检查）
 }
 
 func loadOptions(options ...Option) *Options {
 	opts := &Options{
-		Handler:        &EmptyHandler{},
 		Codec:          &EmptyCodec{},
 		HeartTimeout:   5 * time.Second,
 		SendBufferSize: 1024 * 4,
@@ -50,16 +49,6 @@ func WithSendBufferSize(size int) Option {
 func WithReadBufSize(size int) Option {
 	return func(opts *Options) {
 		opts.ReadBufSize = size
-	}
-}
-
-// WithHandler 设置业务回调处理器
-func WithHandler(handler IHandler) Option {
-	return func(opts *Options) {
-		if handler == nil {
-			return
-		}
-		opts.Handler = handler
 	}
 }
 

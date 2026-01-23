@@ -141,7 +141,7 @@ func (s *UDPServer) addConnection(connKey string, remoteAddr *net.UDPAddr) *UDPC
 	if !added {
 		return existingConn
 	}
-
+	udpConn.SetHandler(s.handler)
 	AddConnection(udpConn)
 
 	// 只有成功添加后才启动 goroutine

@@ -2,6 +2,7 @@ package network
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net"
 	"time"
@@ -14,10 +15,10 @@ import (
 )
 
 // newBaseConn 初始化基类连接
-func newBaseConn(ctx context.Context, network string, typ ConnType,
-	conn net.Conn, remoteAddr net.Addr, options *Options) *baseConn {
+func newBaseConn(ctx context.Context, network string,
+	typ ConnType, conn net.Conn, remoteAddr net.Addr, options *Options) *baseConn {
 	bc := &baseConn{
-		id:          generateConnID(),
+		id:          genConnID(),
 		network:     network,
 		options:     options,
 		conn:        conn,
@@ -42,6 +43,7 @@ type baseConn struct {
 	stopper.Stopper
 	id          int64 // 连接唯一ID
 	network     string
+	handler     IHandler
 	options     *Options  // 选项
 	conn        net.Conn  // 原生连接
 	lastActive  time.Time // 最后活动时间（用于超时检测）
@@ -94,6 +96,9 @@ func (b *baseConn) SetNoDelay(noDelay bool) error {
 func (b *baseConn) SetTCPKeepAlive(enable bool, period time.Duration) error {
 	return netutil.SetTCPKeepAlive(b.conn, enable, period)
 }
+func (b *baseConn) SetHandler(handler IHandler) {
+	b.handler = handler
+}
 
 func (b *baseConn) heartLoop(connection IConnection) {
 	var err error
@@ -101,7 +106,7 @@ func (b *baseConn) heartLoop(connection IConnection) {
 	ticker := time.NewTicker(timeout / 2)
 	defer func() {
 		ticker.Stop()
-		if closeErr := connection.Close(err); closeErr != nil && closeErr != ErrConnectionClosed {
+		if closeErr := connection.Close(err); closeErr != nil && !errors.Is(closeErr, ErrConnectionClosed) {
 			glog.Error("心跳循环关闭连接时出错", zap.Int64("connectionId", connection.ID()), zap.Error(closeErr))
 		}
 	}()
@@ -124,15 +129,15 @@ func (b *baseConn) encode(msg interface{}) (bin []byte, err error) {
 }
 
 func (b *baseConn) onConnect(connection IConnection) error {
-	return b.options.Handler.OnConnect(connection)
+	return b.handler.OnConnect(connection)
 }
 
 func (b *baseConn) OnMessage(conn IConnection, msg interface{}) error {
-	return b.options.Handler.OnMessage(conn, msg)
+	return b.handler.OnMessage(conn, msg)
 }
 
 func (b *baseConn) OnClose(conn IConnection, err error) {
-	b.options.Handler.OnClose(conn, err)
+	b.handler.OnClose(conn, err)
 }
 
 // Send 发送消息（线程安全）
@@ -146,7 +151,7 @@ func (b *baseConn) Send(msg interface{}) error {
 	select {
 	case b.sendChan <- msg:
 	default:
-		return ErrSendQueueFull
+		return ErrChannelFull
 	}
 	return nil
 }

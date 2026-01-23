@@ -2,7 +2,6 @@ package network
 
 import (
 	"context"
-	"errors"
 	"net"
 
 	"github.com/dzm2020/gas/pkg/glog"
@@ -47,7 +46,7 @@ func (c *UDPConnection) Send(msg interface{}) error {
 	select {
 	case c.sendChan <- &udpPacket{data: data, remoteAddr: c.remoteAddr}:
 	default:
-		return errors.New("channel is full")
+		return ErrChannelFull
 	}
 	return nil
 }
