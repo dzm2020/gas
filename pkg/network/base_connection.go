@@ -14,16 +14,16 @@ import (
 )
 
 // newBaseConn 初始化基类连接
-func newBaseConn(ctx context.Context, network string, typ ConnType, conn net.Conn, options *Options) *baseConn {
+func newBaseConn(ctx context.Context, network string, typ ConnType, conn net.Conn, remoteAddr net.Addr, options *Options) *baseConn {
 	bc := &baseConn{
 		id:          generateConnID(),
 		network:     network,
 		options:     options,
 		conn:        conn,
-		remoteAddr:  conn.RemoteAddr(),
+		remoteAddr:  remoteAddr,
 		lastActive:  time.Now(),
 		typ:         typ,
-		sendChan:    make(chan interface{}, options.SendBufferSize),
+		sendChan:    make(chan interface{}, options.SendChanSize),
 		writeBuffer: buffer.New(options.SendBufferSize),
 		readBuffer:  buffer.New(options.ReadBufSize),
 	}

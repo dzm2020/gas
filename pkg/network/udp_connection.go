@@ -14,22 +14,20 @@ import (
 type UDPConnection struct {
 	*baseConn  // 嵌入基类
 	remoteAddr *net.UDPAddr
-	server     *UDPServer   // 所属服务器
 	conn       *net.UDPConn // 底层UDP连接（全局共享）
 	rcvChan    chan []byte
+	sendChan   chan<- *udpPacket
 }
 
 func newUDPConnection(ctx context.Context, conn *net.UDPConn, typ ConnType, remoteAddr *net.UDPAddr, server *UDPServer) *UDPConnection {
-	base := newBaseConn(ctx, "udp", typ, conn, server.options)
-	base.remoteAddr = remoteAddr
+	base := newBaseConn(ctx, "udp", typ, conn, remoteAddr, server.options)
 
-	rcvChanSize := server.options.UdpRcvChanSize
 	udpConn := &UDPConnection{
 		baseConn:   base,
 		remoteAddr: remoteAddr,
 		conn:       conn,
-		server:     server,
-		rcvChan:    make(chan []byte, rcvChanSize),
+		rcvChan:    make(chan []byte, server.options.UdpRcvChanSize),
+		sendChan:   server.sendChan,
 	}
 	return udpConn
 }
@@ -42,13 +40,9 @@ func (c *UDPConnection) Send(msg interface{}) error {
 	if err != nil {
 		return err
 	}
-	if data == nil {
-		return nil
-	}
-	//  todo 这里是不是处理下 不需要remoteAddr
-	ch := c.server.getSendChan()
+
 	select {
-	case ch <- &udpPacket{data: data, remoteAddr: c.remoteAddr}:
+	case c.sendChan <- &udpPacket{data: data, remoteAddr: c.remoteAddr}:
 	default:
 		return errors.New("channel is full")
 	}
@@ -76,11 +70,6 @@ func (c *UDPConnection) readLoop() {
 			}
 		}
 	}
-}
-
-func (c *UDPConnection) Write(p []byte) (n int, err error) {
-	_, err = c.conn.WriteTo(p, c.remoteAddr)
-	return len(p), err
 }
 
 func (c *UDPConnection) writeRcvChan(data []byte) {

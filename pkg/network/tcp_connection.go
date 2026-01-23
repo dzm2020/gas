@@ -16,7 +16,7 @@ type TCPConnection struct {
 }
 
 func newTCPConnection(ctx context.Context, conn *net.TCPConn, typ ConnType, options *Options) *TCPConnection {
-	base := newBaseConn(ctx, "tcp", typ, conn, options)
+	base := newBaseConn(ctx, "tcp", typ, conn, conn.RemoteAddr(), options)
 	tcpConn := &TCPConnection{
 		baseConn: base,
 		tmpBuf:   make([]byte, options.ReadBufSize),

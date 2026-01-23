@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/dzm2020/gas/pkg/glog"
-
 	"github.com/gorilla/websocket"
 	"go.uber.org/zap"
 )
@@ -16,7 +15,7 @@ type WebSocketConnection struct {
 }
 
 func newWebSocketConnection(ctx context.Context, conn *websocket.Conn, typ ConnType, options *Options) *WebSocketConnection {
-	base := newBaseConn(ctx, "ws", typ, conn.NetConn(), options)
+	base := newBaseConn(ctx, "ws", typ, conn.NetConn(), conn.RemoteAddr(), options)
 	return &WebSocketConnection{
 		baseConn: base,
 		conn:     conn,
@@ -78,13 +77,13 @@ func (c *WebSocketConnection) Close(err error) (w error) {
 		return ErrConnectionClosed
 	}
 
-	glog.Info("WebSocket连接断开", zap.Int64("connectionId", c.ID()), zap.Error(err))
-
 	// 优雅关闭连接（发送关闭帧，避免1006）
 	timeout := time.Now().Add(1 * time.Second)
 	_ = c.conn.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""), timeout)
 	_ = c.conn.Close()
 
 	c.baseConn.Close(c, err)
+
+	glog.Info("WebSocket连接断开", zap.Int64("connectionId", c.ID()), zap.Error(err))
 	return
 }

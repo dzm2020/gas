@@ -5,11 +5,11 @@ import (
 	"errors"
 	"net"
 
+	"github.com/duke-git/lancet/v2/convertor"
 	"github.com/dzm2020/gas/pkg/glog"
 	"github.com/dzm2020/gas/pkg/lib/grs"
 	"github.com/dzm2020/gas/pkg/lib/netutil"
 
-	"github.com/duke-git/lancet/v2/convertor"
 	"go.uber.org/zap"
 )
 
@@ -24,21 +24,15 @@ type udpPacket struct {
 func NewUDPServer(base *baseServer) *UDPServer {
 	server := &UDPServer{
 		baseServer: base,
-		sendChan:   make(chan *udpPacket, base.options.UdpSendChanSize),
-		tmpBuf:     make([]byte, base.options.ReadBufSize),
+		sendChan:   make(chan *udpPacket, base.options.SendChanSize),
 	}
 	return server
 }
 
 type UDPServer struct {
 	*baseServer
-	tmpBuf   []byte
 	conn     *net.UDPConn // UDP监听连接
 	sendChan chan *udpPacket
-}
-
-func (s *UDPServer) getSendChan() chan<- *udpPacket {
-	return s.sendChan
 }
 
 func (s *UDPServer) Start() error {
@@ -73,68 +67,49 @@ func (s *UDPServer) listen() (err error) {
 		return err
 	}
 
-	udpConn, ok := ln.(*net.UDPConn)
-	if !ok {
-		return errors.New("listener is not *net.UDPConn")
-	}
-
+	udpConn, _ := ln.(*net.UDPConn)
 	s.conn = udpConn
 	return err
 }
 
 func (s *UDPServer) readLoop() {
 	for !s.IsStop() {
-		grs.Try(func() {
-			s.read()
-		}, nil)
-	}
-}
-
-func (s *UDPServer) read() {
-	n, remoteAddr, err := s.conn.ReadFromUDP(s.tmpBuf)
-	if err != nil {
-		if !errors.Is(err, net.ErrClosed) {
-			glog.Error("UDP服务器读取数据包异常", zap.String("address", s.Addr()), zap.Any("err", err))
+		buf := make([]byte, s.options.ReadBufSize)
+		n, remoteAddr, err := s.conn.ReadFromUDP(buf)
+		if err != nil {
+			if !errors.Is(err, net.ErrClosed) {
+				glog.Error("UDP服务器读取数据包异常", zap.String("address", s.Addr()), zap.Any("err", err))
+			}
+			continue
 		}
-		return
-	}
-	if n == 0 {
-		return
-	}
-	remoteAddrCopy := convertor.DeepClone(remoteAddr)
-	s.handlePacket(remoteAddrCopy, s.tmpBuf[:n])
-	return
-}
+		if n == 0 {
+			continue
+		}
 
-// handlePacket 处理UDP数据包
-func (s *UDPServer) handlePacket(remoteAddr *net.UDPAddr, buf []byte) {
-	connKey := remoteAddr.String()
-	udpConn, exists := GetUDPConnection(connKey)
-	if !exists {
-		udpConn = s.addConnection(connKey, remoteAddr)
+		remoteAddrCopy := convertor.DeepClone(remoteAddr)
+
+		connKey := remoteAddrCopy.String()
+		udpConn, exists := GetUDPConnection(connKey)
+		if !exists {
+			udpConn = s.addConnection(connKey, remoteAddrCopy)
+		}
+		udpConn.writeRcvChan(buf[:n])
 	}
-	udpConn.writeRcvChan(buf)
 }
 
 func (s *UDPServer) writeLoop() {
 	for !s.IsStop() {
-		grs.Try(func() {
-			s.write()
-		}, nil)
-	}
-}
-
-func (s *UDPServer) write() {
-	select {
-	case <-s.ctx.Done():
-		return
-	case packet, _ := <-s.sendChan:
-		_, err := s.conn.WriteToUDP(packet.data, packet.remoteAddr)
-		if err != nil {
-			if !errors.Is(err, net.ErrClosed) {
-				glog.Error("UDP服务器写入失败", zap.String("address", s.Addr()), zap.Error(err))
+		select {
+		case <-s.ctx.Done():
+			continue
+		case packet, _ := <-s.sendChan:
+			_, err := s.conn.WriteToUDP(packet.data, packet.remoteAddr)
+			if err != nil {
+				if !errors.Is(err, net.ErrClosed) {
+					glog.Error("UDP服务器写入失败", zap.String("address", s.Addr()), zap.Error(err))
+				}
+				continue
 			}
-			return
 		}
 	}
 }
@@ -177,8 +152,8 @@ func (s *UDPServer) Shutdown(ctx context.Context) {
 		return
 	}
 
-	s.baseServer.Shutdown(ctx)
 	_ = s.conn.Close()
+	s.baseServer.Shutdown(ctx)
 
 	glog.Debug("UDP服务器已关闭", zap.String("address", s.Addr()))
 	return

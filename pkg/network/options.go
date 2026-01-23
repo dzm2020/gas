@@ -6,30 +6,30 @@ import (
 
 type Option func(*Options)
 type Options struct {
-	Handler         IHandler      // 业务回调
-	Codec           ICodec        // 协议编解码器
-	HeartTimeout    time.Duration // 心跳超时（0表示不检测超时）
-	SendBufferSize  int           // 发送队列缓冲大小
-	ReadBufSize     int           // 读缓冲区大小
-	TLSCertFile     string        // TLS 证书文件路径
-	TLSKeyFile      string        // TLS 私钥文件路径
-	ReusePort       bool          // 是否启用 SO_REUSEPORT（仅 Linux 支持）
-	ReuseAddr       bool          // 是否启用 SO_REUSEADDR
-	UdpSendChanSize int
-	UdpRcvChanSize  int
+	Handler        IHandler      // 业务回调
+	Codec          ICodec        // 协议编解码器
+	HeartTimeout   time.Duration // 心跳超时（0表示不检测超时）
+	SendBufferSize int           // 发送队列缓冲大小
+	ReadBufSize    int           // 读缓冲区大小
+	TLSCertFile    string        // TLS 证书文件路径
+	TLSKeyFile     string        // TLS 私钥文件路径
+	ReusePort      bool          // 是否启用 SO_REUSEPORT（仅 Linux 支持）
+	ReuseAddr      bool          // 是否启用 SO_REUSEADDR
+	SendChanSize   int
+	UdpRcvChanSize int
 }
 
 func loadOptions(options ...Option) *Options {
 	opts := &Options{
-		Handler:         &EmptyHandler{},
-		Codec:           &EmptyCodec{},
-		HeartTimeout:    5 * time.Second,
-		SendBufferSize:  1024 * 4,
-		ReadBufSize:     1024 * 4,
-		UdpRcvChanSize:  1024,
-		UdpSendChanSize: 1024,
-		ReuseAddr:       true,
-		ReusePort:       false,
+		Handler:        &EmptyHandler{},
+		Codec:          &EmptyCodec{},
+		HeartTimeout:   5 * time.Second,
+		SendBufferSize: 1024 * 4,
+		ReadBufSize:    1024 * 4,
+		UdpRcvChanSize: 1024,
+		SendChanSize:   1024,
+		ReuseAddr:      true,
+		ReusePort:      false,
 	}
 	for _, option := range options {
 		option(opts)
@@ -103,9 +103,9 @@ func WithReuseAddr(enable bool) Option {
 	}
 }
 
-func WithUdpSendChanSize(udpSendChanSize int) Option {
+func WithSendChanSize(sendChanSize int) Option {
 	return func(opts *Options) {
-		opts.UdpSendChanSize = udpSendChanSize
+		opts.SendChanSize = sendChanSize
 	}
 }
 

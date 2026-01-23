@@ -125,9 +125,8 @@ func (s *WebSocketServer) Shutdown(ctx context.Context) {
 	if !s.Stop() {
 		return
 	}
-
-	s.baseServer.Shutdown(ctx)
 	_ = s.httpServer.Shutdown(ctx)
+	s.baseServer.Shutdown(ctx)
 
 	glog.Info("WebSocket服务器关闭", zap.String("addr", s.Addr()), zap.String("path", s.path))
 	return

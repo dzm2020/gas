@@ -2,10 +2,11 @@ package network
 
 import (
 	"context"
-	"github.com/dzm2020/gas/pkg/glog"
 	"net"
 	"testing"
 	"time"
+
+	"github.com/dzm2020/gas/pkg/glog"
 
 	"go.uber.org/zap"
 )
@@ -107,8 +108,7 @@ func TestUDPServer_Listen(t *testing.T) {
 	server, err := NewServer(context.Background(), "udp", "127.0.0.1:9989",
 		WithHandler(udpHandler),
 		WithCodec(udpCodec),
-		WithUdpRcvChanSize(1024),
-		WithUdpSendChanSize(1024))
+		WithUdpRcvChanSize(1024))
 	if err != nil {
 		t.Fatalf("创建UDP服务器失败: %v", err)
 	}
@@ -129,8 +129,7 @@ func TestUDPServer_Close(t *testing.T) {
 	server, err := NewServer(context.Background(), "udp", "127.0.0.1:9990",
 		WithHandler(udpHandler),
 		WithCodec(udpCodec),
-		WithUdpRcvChanSize(1024),
-		WithUdpSendChanSize(1024))
+		WithUdpRcvChanSize(1024))
 	if err != nil {
 		t.Fatalf("创建UDP服务器失败: %v", err)
 	}
@@ -174,8 +173,7 @@ func TestUDPServer_MultipleClients(t *testing.T) {
 	server, err := NewServer(context.Background(), "udp", "127.0.0.1:9991",
 		WithHandler(udpHandler),
 		WithCodec(udpCodec),
-		WithUdpRcvChanSize(1024),
-		WithUdpSendChanSize(1024))
+		WithUdpRcvChanSize(1024))
 	if err != nil {
 		t.Fatalf("创建UDP服务器失败: %v", err)
 	}

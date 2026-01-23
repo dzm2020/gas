@@ -98,8 +98,8 @@ func (s *TCPServer) Shutdown(ctx context.Context) {
 		return
 	}
 
-	s.baseServer.Shutdown(ctx)
 	_ = s.listener.Close()
+	s.baseServer.Shutdown(ctx)
 
 	glog.Debug("TCP服务器关闭", zap.String("address", s.Addr()))
 	return
