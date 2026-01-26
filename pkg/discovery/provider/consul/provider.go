@@ -57,6 +57,7 @@ func (c *Provider) Run(ctx context.Context) error {
 	}
 
 	c.discovery = newDiscovery(c.ctx, &c.wg, c.Client, c.config)
+	c.discovery.run()
 	c.registrar = newRegistrar(c.ctx, &c.wg, c.Client, c.config)
 
 	return nil

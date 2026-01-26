@@ -35,7 +35,7 @@ type discovery struct {
 
 // newDiscovery 创建服务列表监听器
 func newDiscovery(ctx context.Context, wg *sync.WaitGroup, client *api.Client, config *Config) *discovery {
-	s := &discovery{
+	d := &discovery{
 		client:    client,
 		config:    config,
 		wg:        wg,
@@ -43,14 +43,17 @@ func newDiscovery(ctx context.Context, wg *sync.WaitGroup, client *api.Client, c
 		watchers:  make(map[string]*Watcher),
 	}
 
-	s.ctx, s.cancel = context.WithCancel(ctx)
+	d.ctx, d.cancel = context.WithCancel(ctx)
 
-	s.wg.Add(1)
+	return d
+}
+
+func (d *discovery) run() {
+	d.wg.Add(1)
 	grs.Go(func(ctx context.Context) {
-		s.watch()
-		s.wg.Done()
+		d.watch()
+		d.wg.Done()
 	})
-	return s
 }
 
 // watch 持续监听服务列表变化
