@@ -2,9 +2,12 @@ package consul
 
 import (
 	"context"
+	"sync"
+
 	discoveryApi "github.com/dzm2020/gas/pkg/discovery"
 	"github.com/dzm2020/gas/pkg/discovery/iface"
-	"sync"
+	"github.com/dzm2020/gas/pkg/lib/grs"
+	"github.com/dzm2020/gas/pkg/lib/stopper"
 
 	"github.com/hashicorp/consul/api"
 	"github.com/spf13/viper"
@@ -26,33 +29,35 @@ func init() {
 var _ iface.IDiscovery = (*Provider)(nil)
 
 func New(config *Config) *Provider {
-	return &Provider{
+	provider := &Provider{
 		config: config,
 	}
+	provider.ctx, provider.cancel = context.WithCancel(context.Background())
+	return provider
 }
 
 type Provider struct {
+	stopper.Stopper
 	*api.Client
 	config *Config
 
 	*discovery // 集群监控
 	*registrar // 注册
 
-	stopOnce sync.Once
-
 	ctx    context.Context
 	cancel context.CancelFunc
+
+	wg sync.WaitGroup
 }
 
 func (c *Provider) Run(ctx context.Context) error {
-	c.ctx, c.cancel = context.WithCancel(ctx)
 
 	if err := c.connect(); err != nil {
 		return err
 	}
 
-	c.discovery = newDiscovery(c)
-	c.registrar = newRegistrar(c)
+	c.discovery = newDiscovery(c.ctx, &c.wg, c.Client, c.config)
+	c.registrar = newRegistrar(c.ctx, &c.wg, c.Client, c.config)
 
 	return nil
 }
@@ -72,11 +77,12 @@ func (c *Provider) connect() error {
 }
 
 func (c *Provider) Shutdown(ctx context.Context) error {
-	c.stopOnce.Do(func() {
-		if c.cancel != nil {
-			c.cancel()
-		}
-		c.shutdown()
-	})
+	if !c.Stop() {
+		return nil
+	}
+
+	c.cancel()
+
+	grs.WaitWithContext(ctx, &c.wg)
 	return nil
 }

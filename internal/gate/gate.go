@@ -3,6 +3,7 @@ package gate
 import (
 	"context"
 	"errors"
+
 	"github.com/dzm2020/gas/internal/gate/codec"
 	"github.com/dzm2020/gas/internal/gate/protocol"
 	"github.com/dzm2020/gas/internal/iface"
@@ -27,8 +28,8 @@ type Gate struct {
 }
 
 func (g *Gate) Start(ctx context.Context) (err error) {
-	options := append(g.Options, network.WithHandler(g), network.WithCodec(codec.New()))
-	g.server, err = network.NewServer(g.Address, options...)
+	options := append(g.Options, network.WithCodec(codec.New()))
+	g.server, err = network.NewServer(g, g.Address, options...)
 	if err != nil {
 		return
 	}
@@ -80,15 +81,15 @@ func (g *Gate) OnMessage(entity network.IConnection, clientMsg interface{}) erro
 	return system.Send(message)
 }
 
-func (g *Gate) OnClose(entity network.IConnection, wrong error) error {
+func (g *Gate) OnClose(entity network.IConnection, wrong error) {
 	g.count.Add(-1)
 
 	s := g.getSession(entity)
 	system := g.node.System()
 
 	message := g.makeActorMessage(s, "OnConnectionClose", nil)
-
-	return system.Send(message)
+	_ = system.Send(message)
+	return
 }
 
 func (g *Gate) makeActorMessage(session *session.Session, method string, data []byte) *iface.ActorMessage {
@@ -109,5 +110,6 @@ func (g *Gate) Stop(ctx context.Context) error {
 	if g.server == nil {
 		return nil
 	}
-	return g.server.Shutdown()
+	g.server.Shutdown(ctx)
+	return nil
 }

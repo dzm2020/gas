@@ -38,6 +38,6 @@ func (s *baseServer) Addr() string {
 
 func (s *baseServer) Shutdown(ctx context.Context) {
 	s.cancel()
-	grs.GroupWaitWithContext(ctx, &s.waitGroup)
+	grs.WaitWithContext(ctx, &s.waitGroup)
 	return
 }

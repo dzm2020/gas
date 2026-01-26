@@ -88,7 +88,7 @@ func Shutdown(ctx context.Context) error {
 	return nil
 }
 
-func GroupWaitWithContext(ctx context.Context, group *sync.WaitGroup) {
+func WaitWithContext(ctx context.Context, group *sync.WaitGroup) {
 	done := make(chan struct{})
 	go func() {
 		group.Wait()

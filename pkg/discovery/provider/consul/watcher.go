@@ -3,37 +3,50 @@ package consul
 import (
 	"context"
 	"errors"
+	"sync"
+	"sync/atomic"
+	"time"
+
 	"github.com/dzm2020/gas/pkg/discovery/iface"
 	"github.com/dzm2020/gas/pkg/glog"
 	"github.com/dzm2020/gas/pkg/lib/event"
 	"github.com/dzm2020/gas/pkg/lib/grs"
-	"sync/atomic"
-	"time"
+	"github.com/dzm2020/gas/pkg/lib/stopper"
 
 	"github.com/duke-git/lancet/v2/convertor"
 	"github.com/hashicorp/consul/api"
 	"go.uber.org/zap"
 )
 
-func newWatcher(provider *Provider, kind string) *Watcher {
+func newWatcher(ctx context.Context, wg *sync.WaitGroup, client *api.Client, config *Config, kind string) *Watcher {
 	watcher := &Watcher{
-		provider:  provider,
+		client:    client,
+		config:    config,
+		wg:        wg,
 		waitIndex: 0,
 		listener:  event.NewListener[*iface.Topology](),
 		kind:      kind,
 	}
 	watcher.list.Store(iface.NewMemberList(nil))
-	watcher.ctx, watcher.cancel = context.WithCancel(provider.ctx)
+	watcher.ctx, watcher.cancel = context.WithCancel(ctx)
+
+	watcher.wg.Add(1)
 	grs.Go(func(ctx context.Context) {
 		glog.Debug("服务监控协程运行", zap.String("service", kind))
 		watcher.loop()
+		watcher.wg.Done()
 		glog.Debug("服务监控协程退出", zap.String("service", kind))
 	})
 	return watcher
 }
 
 type Watcher struct {
-	provider  *Provider
+	stopper.Stopper
+
+	client *api.Client
+	config *Config
+
+	wg        *sync.WaitGroup
 	listener  *event.Listener[*iface.Topology]
 	waitIndex uint64
 	list      atomic.Pointer[iface.MemberList] // 并发读写
@@ -44,7 +57,7 @@ type Watcher struct {
 
 func (w *Watcher) loop() {
 	ctx := w.ctx
-	for {
+	for !w.IsStop() {
 		select {
 		case <-ctx.Done():
 			return
@@ -61,16 +74,15 @@ func (w *Watcher) loop() {
 }
 
 func (w *Watcher) fetch() error {
-	config := w.provider.config
 	ctx := w.ctx
 
 	kind := w.kind
 	options := &api.QueryOptions{
 		WaitIndex: w.waitIndex,
-		WaitTime:  config.WatchWaitTime,
+		WaitTime:  w.config.WatchWaitTime,
 	}
 	options = options.WithContext(ctx)
-	services, meta, err := w.provider.Health().Service(kind, "", true, options)
+	services, meta, err := w.client.Health().Service(kind, "", true, options)
 	if err != nil {
 		if !errors.Is(err, context.Canceled) {
 			glog.Error("Consul获取服务失败", zap.String("service", kind), zap.Error(err))

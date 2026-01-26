@@ -209,8 +209,7 @@ func TestWebSocketServer_MultipleClients(t *testing.T) {
 func TestWebSocketServer_CustomPath(t *testing.T) {
 	glog.SetLogLevel(zap.DebugLevel)
 
-	server, err := NewServer(wsHandler, "ws://127.0.0.1:9995/chat",
-		WithCodec(wsCodec))
+	server, err := NewServer(wsHandler, "ws://127.0.0.1:9995/chat", WithCodec(wsCodec))
 	if err != nil {
 		t.Fatalf("创建WebSocket服务器失败: %v", err)
 	}

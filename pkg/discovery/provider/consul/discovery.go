@@ -3,11 +3,13 @@ package consul
 import (
 	"context"
 	"errors"
+	"sync"
+	"time"
+
 	"github.com/dzm2020/gas/pkg/discovery/iface"
 	"github.com/dzm2020/gas/pkg/glog"
 	"github.com/dzm2020/gas/pkg/lib/grs"
-	"sync"
-	"time"
+	"github.com/dzm2020/gas/pkg/lib/stopper"
 
 	"github.com/duke-git/lancet/v2/maputil"
 	"github.com/hashicorp/consul/api"
@@ -16,42 +18,51 @@ import (
 
 // discovery 服务列表监听器，负责监听 Consul 服务列表变化并管理 watchers
 type discovery struct {
-	provider  *Provider
+	stopper.Stopper
+
+	client *api.Client
+	config *Config
+
 	waitIndex uint64
 	mu        sync.RWMutex
 	watchers  map[string]*Watcher
 
 	ctx    context.Context
 	cancel context.CancelFunc
+
+	wg *sync.WaitGroup
 }
 
 // newDiscovery 创建服务列表监听器
-func newDiscovery(provider *Provider) *discovery {
+func newDiscovery(ctx context.Context, wg *sync.WaitGroup, client *api.Client, config *Config) *discovery {
 	s := &discovery{
-		provider:  provider,
+		client:    client,
+		config:    config,
+		wg:        wg,
 		waitIndex: 0,
 		watchers:  make(map[string]*Watcher),
 	}
-	s.ctx, s.cancel = context.WithCancel(provider.ctx)
+
+	s.ctx, s.cancel = context.WithCancel(ctx)
+
+	s.wg.Add(1)
 	grs.Go(func(ctx context.Context) {
-		glog.Debug("集群监控协程运行")
 		s.watch()
-		glog.Debug("集群监控协程退出")
+		s.wg.Done()
 	})
 	return s
 }
 
 // watch 持续监听服务列表变化
 func (d *discovery) watch() {
-	ctx := d.ctx
-	for {
+	for !d.Stop() {
 		select {
-		case <-ctx.Done():
+		case <-d.ctx.Done():
 			return
 		default:
 			if err := d.fetch(); err != nil {
 				select {
-				case <-ctx.Done():
+				case <-d.ctx.Done():
 					return
 				case <-time.After(time.Second):
 				}
@@ -62,14 +73,13 @@ func (d *discovery) watch() {
 
 // fetch 获取服务列表并更新 watchers
 func (d *discovery) fetch() error {
-	config := d.provider.config
-	ctx := d.provider.ctx
 	options := &api.QueryOptions{
 		WaitIndex: d.waitIndex,
-		WaitTime:  config.WatchWaitTime,
+		WaitTime:  d.config.WatchWaitTime,
 	}
-	options = options.WithContext(ctx)
-	services, meta, err := d.provider.Catalog().Services(options)
+	options = options.WithContext(d.ctx)
+
+	services, meta, err := d.client.Catalog().Services(options)
 	if err != nil {
 		if !errors.Is(err, context.Canceled) {
 			glog.Error("consul获取服务列表失败", zap.Error(err))
@@ -130,7 +140,7 @@ func (d *discovery) getOrCreateWatcher(name string) *Watcher {
 		return watcher
 	}
 
-	watcher = newWatcher(d.provider, name)
+	watcher = newWatcher(d.ctx, d.wg, d.client, d.config, name)
 	d.watchers[name] = watcher
 	return watcher
 }
@@ -172,4 +182,12 @@ func (d *discovery) GetById(memberId uint64) *iface.Member {
 		return result == nil
 	})
 	return result
+}
+
+func (d *discovery) Shutdown() error {
+	if !d.Stop() {
+		return nil
+	}
+	d.cancel()
+	return nil
 }

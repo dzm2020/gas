@@ -1,21 +1,37 @@
 package consul
 
 import (
-	"github.com/dzm2020/gas/pkg/discovery/iface"
+	"context"
 	"sync"
+
+	"github.com/dzm2020/gas/pkg/discovery/iface"
+	"github.com/hashicorp/consul/api"
 )
 
 type registrar struct {
-	provider *Provider
-	mu       sync.RWMutex
-	dict     map[uint64]*healthKeeper
+	client *api.Client
+	config *Config
+
+	wg *sync.WaitGroup
+
+	ctx    context.Context
+	cancel context.CancelFunc
+
+	mu   sync.RWMutex
+	dict map[uint64]*healthKeeper
 }
 
-func newRegistrar(provider *Provider) *registrar {
-	return &registrar{
-		provider: provider,
-		dict:     make(map[uint64]*healthKeeper),
+func newRegistrar(ctx context.Context, wg *sync.WaitGroup,
+	client *api.Client, config *Config) *registrar {
+	r := &registrar{
+		wg:     wg,
+		client: client,
+		config: config,
+		dict:   make(map[uint64]*healthKeeper),
 	}
+
+	r.ctx, r.cancel = context.WithCancel(ctx)
+	return r
 }
 
 func (r *registrar) Register(member *iface.Member) error {
@@ -58,16 +74,14 @@ func (r *registrar) getOrCreate(member *iface.Member) *healthKeeper {
 		return m
 	}
 
-	m = newHealthKeeper(r.provider, member)
+	m = newHealthKeeper(r.ctx, r.wg, r.client, r.config, member)
 	r.dict[member.GetID()] = m
 	return m
 }
 
-func (r *registrar) shutdown() {
+func (r *registrar) Shutdown() {
+	r.cancel()
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	for _, m := range r.dict {
-		_ = m.deregister()
-	}
 	r.dict = make(map[uint64]*healthKeeper)
 }
