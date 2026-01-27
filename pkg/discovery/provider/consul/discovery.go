@@ -56,7 +56,7 @@ func (d *discovery) run() {
 // watch 持续监听服务列表变化
 func (d *discovery) watch() {
 	defer func() {
-		_ = d.Shutdown()
+		d.shutdown()
 	}()
 	for !d.Stop() {
 		select {
@@ -186,9 +186,9 @@ func (d *discovery) GetById(memberId uint64) *iface.Member {
 	return result
 }
 
-func (d *discovery) Shutdown() error {
+func (d *discovery) shutdown() {
 	if !d.Stop() {
-		return nil
+		return
 	}
 
 	d.cancel()
@@ -196,6 +196,5 @@ func (d *discovery) Shutdown() error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.watchers = make(map[string]*Watcher)
-
-	return nil
+	return
 }

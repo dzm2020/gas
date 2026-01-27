@@ -81,6 +81,9 @@ func TestRegistrar(t *testing.T) {
 func TestRegistrarConcurrency(t *testing.T) {
 	provider := New(DefaultConfig())
 	provider.Run(context.Background())
+
+	defer provider.Shutdown(context.Background())
+
 	var genId atomic.Uint64
 
 	for i := 0; i < 10; i++ {
@@ -92,13 +95,14 @@ func TestRegistrarConcurrency(t *testing.T) {
 			}
 		}()
 	}
-	provider.Shutdown(context.Background())
-	time.Sleep(time.Second * 3)
+	time.Sleep(time.Second * 10)
 }
 
 func BenchmarkDiscovery(b *testing.B) {
 	provider := New(DefaultConfig())
 	provider.Run(context.Background())
+
+	defer provider.Shutdown(context.Background())
 
 	var genId atomic.Uint64
 	for i := 0; i < b.N; i++ {
@@ -106,14 +110,13 @@ func BenchmarkDiscovery(b *testing.B) {
 		member.Id = genId.Add(1)
 		provider.Register(member)
 	}
-
-	provider.Shutdown(context.Background())
 }
 
 func BenchmarkGet(b *testing.B) {
 	provider := New(DefaultConfig())
 	_ = provider.Run(context.Background())
 	defer provider.Shutdown(context.Background())
+
 	for i := uint64(0); i < 100; i++ {
 		member := &iface.Member{Id: 1, Kind: "test", Address: "127.0.0.1", Port: 8080}
 		member.Id += i

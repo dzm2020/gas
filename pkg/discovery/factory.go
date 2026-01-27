@@ -2,6 +2,7 @@ package discovery
 
 import (
 	"errors"
+
 	"github.com/dzm2020/gas/pkg/discovery/iface"
 	"github.com/dzm2020/gas/pkg/lib/factory"
 )

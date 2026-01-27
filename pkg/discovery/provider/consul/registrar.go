@@ -93,7 +93,7 @@ func (r *registrar) getOrCreate(member *iface.Member) *healthKeeper {
 	return keeper
 }
 
-func (r *registrar) Shutdown() {
+func (r *registrar) shutdown() {
 	if !r.Stop() {
 		return
 	}

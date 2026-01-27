@@ -90,8 +90,8 @@ func (c *Provider) Shutdown(ctx context.Context) error {
 	}
 
 	c.cancel()
-	c.registrar.Shutdown()
-
+	c.registrar.shutdown()
+	c.discovery.shutdown()
 	grs.WaitWithContext(ctx, &c.wg)
 	return nil
 }
