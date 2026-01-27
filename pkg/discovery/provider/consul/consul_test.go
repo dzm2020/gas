@@ -2,22 +2,24 @@ package consul
 
 import (
 	"context"
-	"github.com/dzm2020/gas/pkg/discovery/iface"
-	"github.com/dzm2020/gas/pkg/glog"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/dzm2020/gas/pkg/discovery/iface"
+	"github.com/dzm2020/gas/pkg/glog"
+	"go.uber.org/zap"
 
 	"go.uber.org/zap/zapcore"
 )
 
 func onNodeChangeHandler(topology *iface.Topology) {
-	glog.Infof("节点发生变化 topology:%+v", topology)
+	glog.Info("节点发生变化", zap.Any("topology", topology))
 }
 
 // TestDefaultConfig 测试默认配置
 func TestDefaultConfig(t *testing.T) {
-	cfg := defaultConfig()
+	cfg := DefaultConfig()
 	if cfg.Address != "127.0.0.1:8500" || cfg.WatchWaitTime != 1*time.Second {
 		t.Error("默认配置值不正确")
 	}
@@ -25,8 +27,8 @@ func TestDefaultConfig(t *testing.T) {
 
 // TestRegistrar 测试注册器
 func TestRegistrar(t *testing.T) {
-	glog.SetLogLevel(zapcore.InfoLevel)
-	provider := New(defaultConfig())
+	glog.SetLogLevel(zapcore.DebugLevel)
+	provider := New(DefaultConfig())
 	provider.Run(context.Background())
 	defer func() {
 		provider.Shutdown(context.Background())
@@ -47,7 +49,7 @@ func TestRegistrar(t *testing.T) {
 	}
 	//  更新服务
 	member.Port = 8081
-	if err := provider.Register(member); err != nil {
+	if err := provider.Update(member); err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(time.Second)
@@ -77,7 +79,7 @@ func TestRegistrar(t *testing.T) {
 }
 
 func TestRegistrarConcurrency(t *testing.T) {
-	provider := New(defaultConfig())
+	provider := New(DefaultConfig())
 	provider.Run(context.Background())
 	var genId atomic.Uint64
 
@@ -95,7 +97,7 @@ func TestRegistrarConcurrency(t *testing.T) {
 }
 
 func BenchmarkDiscovery(b *testing.B) {
-	provider := New(defaultConfig())
+	provider := New(DefaultConfig())
 	provider.Run(context.Background())
 
 	var genId atomic.Uint64
@@ -109,7 +111,7 @@ func BenchmarkDiscovery(b *testing.B) {
 }
 
 func BenchmarkGet(b *testing.B) {
-	provider := New(defaultConfig())
+	provider := New(DefaultConfig())
 	_ = provider.Run(context.Background())
 	defer provider.Shutdown(context.Background())
 	for i := uint64(0); i < 100; i++ {

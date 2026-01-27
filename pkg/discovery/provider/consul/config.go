@@ -11,7 +11,7 @@ type Config struct {
 	DeregisterInterval time.Duration `json:"deregisterInterval" mapstruct:"deregisterInterval"`
 }
 
-func defaultConfig() *Config {
+func DefaultConfig() *Config {
 	return &Config{
 		Address:            "127.0.0.1:8500",
 		WatchWaitTime:      1 * time.Second,

@@ -2,18 +2,21 @@ package consul
 
 import (
 	"context"
+	"errors"
 	"sync"
 
 	"github.com/dzm2020/gas/pkg/discovery/iface"
+	"github.com/dzm2020/gas/pkg/lib/stopper"
 	"github.com/hashicorp/consul/api"
 )
 
 type registrar struct {
+	stopper.Stopper
+
 	client *api.Client
 	config *Config
 
-	wg *sync.WaitGroup
-
+	wg     *sync.WaitGroup
 	ctx    context.Context
 	cancel context.CancelFunc
 
@@ -34,23 +37,34 @@ func newRegistrar(ctx context.Context, wg *sync.WaitGroup,
 	return r
 }
 
+func (r *registrar) run() {
+}
+
 func (r *registrar) Register(member *iface.Member) error {
-	m := r.get(member.GetID())
-	if m == nil {
-		m = r.getOrCreate(member)
+	keeper := r.get(member.GetID())
+	if keeper == nil {
+		keeper = r.getOrCreate(member)
 	}
-	return m.Register()
+	return keeper.Register()
+}
+
+func (r *registrar) Update(member *iface.Member) error {
+	keeper := r.get(member.GetID())
+	if keeper == nil {
+		return errors.New("member is not registered")
+	}
+	return keeper.Update(member)
 }
 
 func (r *registrar) Deregister(memberId uint64) error {
-	m := r.get(memberId)
-	if m == nil {
+	keeper := r.get(memberId)
+	if keeper == nil {
 		return nil
 	}
 
 	r.delete(memberId)
 
-	return m.deregister()
+	return keeper.shutdown()
 }
 
 func (r *registrar) get(memberId uint64) *healthKeeper {
@@ -69,17 +83,20 @@ func (r *registrar) getOrCreate(member *iface.Member) *healthKeeper {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	m, ok := r.dict[member.GetID()]
+	keeper, ok := r.dict[member.GetID()]
 	if ok {
-		return m
+		return keeper
 	}
 
-	m = newHealthKeeper(r.ctx, r.wg, r.client, r.config, member)
-	r.dict[member.GetID()] = m
-	return m
+	keeper = newHealthKeeper(r.ctx, r.wg, r.client, r.config, member)
+	r.dict[member.GetID()] = keeper
+	return keeper
 }
 
 func (r *registrar) Shutdown() {
+	if !r.Stop() {
+		return
+	}
 	r.cancel()
 	r.mu.Lock()
 	defer r.mu.Unlock()

@@ -2,6 +2,8 @@ package consul
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"sync"
 
 	discoveryApi "github.com/dzm2020/gas/pkg/discovery"
@@ -15,12 +17,18 @@ import (
 
 func init() {
 	_ = discoveryApi.GetFactoryMgr().Register("consul", func(args ...any) (iface.IDiscovery, error) {
-		config := args[0].(map[string]interface{})
-		consulCfg := defaultConfig()
+		if len(args) == 0 {
+			return nil, errors.New("consul provider: config is required")
+		}
+		config, ok := args[0].(map[string]interface{})
+		if !ok {
+			return nil, fmt.Errorf("consul provider: config must be map[string]interface{}, got %T", args[0])
+		}
+		consulCfg := DefaultConfig()
 		vp := viper.New()
 		vp.Set("", config)
 		if err := vp.UnmarshalKey("", consulCfg); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("consul provider: failed to unmarshal config: %w", err)
 		}
 		return New(consulCfg), nil
 	})
@@ -38,7 +46,9 @@ func New(config *Config) *Provider {
 
 type Provider struct {
 	stopper.Stopper
-	*api.Client
+
+	client *api.Client
+
 	config *Config
 
 	*discovery // 集群监控
@@ -46,19 +56,19 @@ type Provider struct {
 
 	ctx    context.Context
 	cancel context.CancelFunc
-
-	wg sync.WaitGroup
+	wg     sync.WaitGroup
 }
 
 func (c *Provider) Run(ctx context.Context) error {
-
 	if err := c.connect(); err != nil {
 		return err
 	}
 
-	c.discovery = newDiscovery(c.ctx, &c.wg, c.Client, c.config)
+	c.discovery = newDiscovery(c.ctx, &c.wg, c.client, c.config)
 	c.discovery.run()
-	c.registrar = newRegistrar(c.ctx, &c.wg, c.Client, c.config)
+
+	c.registrar = newRegistrar(c.ctx, &c.wg, c.client, c.config)
+	c.registrar.run()
 
 	return nil
 }
@@ -70,10 +80,7 @@ func (c *Provider) connect() error {
 	if err != nil {
 		return err
 	}
-	if _, err = client.Status().Leader(); err != nil {
-		return err
-	}
-	c.Client = client
+	c.client = client
 	return nil
 }
 
@@ -83,6 +90,7 @@ func (c *Provider) Shutdown(ctx context.Context) error {
 	}
 
 	c.cancel()
+	c.registrar.Shutdown()
 
 	grs.WaitWithContext(ctx, &c.wg)
 	return nil

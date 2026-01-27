@@ -29,8 +29,7 @@ type discovery struct {
 
 	ctx    context.Context
 	cancel context.CancelFunc
-
-	wg *sync.WaitGroup
+	wg     *sync.WaitGroup
 }
 
 // newDiscovery 创建服务列表监听器
@@ -42,9 +41,7 @@ func newDiscovery(ctx context.Context, wg *sync.WaitGroup, client *api.Client, c
 		waitIndex: 0,
 		watchers:  make(map[string]*Watcher),
 	}
-
 	d.ctx, d.cancel = context.WithCancel(ctx)
-
 	return d
 }
 
@@ -58,6 +55,9 @@ func (d *discovery) run() {
 
 // watch 持续监听服务列表变化
 func (d *discovery) watch() {
+	defer func() {
+		_ = d.Shutdown()
+	}()
 	for !d.Stop() {
 		select {
 		case <-d.ctx.Done():
@@ -131,7 +131,6 @@ func (d *discovery) rangeWatcher(f func(watcher *Watcher) bool) {
 }
 
 func (d *discovery) getOrCreateWatcher(name string) *Watcher {
-	var ok bool
 	watcher := d.getWatcher(name)
 	if watcher != nil {
 		return watcher
@@ -139,7 +138,7 @@ func (d *discovery) getOrCreateWatcher(name string) *Watcher {
 
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	if watcher, ok = d.watchers[name]; ok {
+	if watcher, ok := d.watchers[name]; ok {
 		return watcher
 	}
 
@@ -191,6 +190,12 @@ func (d *discovery) Shutdown() error {
 	if !d.Stop() {
 		return nil
 	}
+
 	d.cancel()
+
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.watchers = make(map[string]*Watcher)
+
 	return nil
 }
