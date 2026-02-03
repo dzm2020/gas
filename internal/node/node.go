@@ -2,21 +2,22 @@ package node
 
 import (
 	"context"
+	"os"
+	"os/signal"
+	"runtime/debug"
+	"syscall"
+	"time"
+
 	"github.com/dzm2020/gas/internal/actor"
-	"github.com/dzm2020/gas/internal/cluster"
 	"github.com/dzm2020/gas/internal/iface"
 	"github.com/dzm2020/gas/internal/logger"
+	component2 "github.com/dzm2020/gas/internal/node/component"
 	"github.com/dzm2020/gas/internal/profile"
 	"github.com/dzm2020/gas/pkg/glog"
 	"github.com/dzm2020/gas/pkg/lib"
 	"github.com/dzm2020/gas/pkg/lib/component"
 	"github.com/dzm2020/gas/pkg/lib/grs"
 	"github.com/dzm2020/gas/pkg/lib/xerror"
-	"os"
-	"os/signal"
-	"runtime/debug"
-	"syscall"
-	"time"
 
 	_ "github.com/dzm2020/gas/pkg/discovery/provider/consul"
 	_ "github.com/dzm2020/gas/pkg/messageQue/provider/nats"
@@ -122,7 +123,7 @@ func (n *Node) Startup(comps ...component.IComponent[iface.INode]) (err error) {
 	components := []component.IComponent[iface.INode]{
 		logger.NewComponent(n.panicHook),
 		actor.NewComponent(),
-		cluster.NewComponent(),
+		component2.NewComponent(),
 	}
 
 	components = append(components, comps...)

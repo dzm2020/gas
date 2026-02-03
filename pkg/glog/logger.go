@@ -7,6 +7,7 @@ import (
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
+	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 var (
@@ -40,8 +41,14 @@ func Init(cfg *Config) {
 		EncodeCaller:   zapcore.ShortCallerEncoder,
 	}
 
-	// 创建文件写入器
-	loggerWriter := newWriter(cfg.Path, cfg.File)
+	loggerWriter := &lumberjack.Logger{
+		Filename:   cfg.Path,
+		MaxSize:    cfg.MaxSize,
+		MaxBackups: cfg.MaxBackups,
+		MaxAge:     cfg.MaxAge,
+		LocalTime:  cfg.LocalTime,
+		Compress:   cfg.Compress,
+	}
 
 	cores := make([]zapcore.Core, 0, 2)
 	cores = append(cores, zapcore.NewCore(zapcore.NewJSONEncoder(encoderConfig), zapcore.AddSync(loggerWriter), atomicLevel))
@@ -59,6 +66,26 @@ func Init(cfg *Config) {
 
 	loggerValue.Store(logger)
 	sugaredValue.Store(sugaredLogger)
+}
+
+// getLogger 获取当前 logger
+func getLogger() *zap.Logger {
+	if v := loggerValue.Load(); v != nil {
+		if l, ok := v.(*zap.Logger); ok {
+			return l
+		}
+	}
+	return nil
+}
+
+// getSugaredLogger 获取当前 sugared logger
+func getSugaredLogger() *zap.SugaredLogger {
+	if v := sugaredValue.Load(); v != nil {
+		if sl, ok := v.(*zap.SugaredLogger); ok {
+			return sl
+		}
+	}
+	return nil
 }
 
 // Stop 停止 logger，同步所有缓冲的日志
@@ -96,26 +123,6 @@ func WithOptions(opts ...zap.Option) {
 		loggerValue.Store(newLogger)
 		sugaredValue.Store(newLogger.Sugar())
 	}
-}
-
-// getLogger 获取当前 logger
-func getLogger() *zap.Logger {
-	if v := loggerValue.Load(); v != nil {
-		if l, ok := v.(*zap.Logger); ok {
-			return l
-		}
-	}
-	return nil
-}
-
-// getSugaredLogger 获取当前 sugared logger
-func getSugaredLogger() *zap.SugaredLogger {
-	if v := sugaredValue.Load(); v != nil {
-		if sl, ok := v.(*zap.SugaredLogger); ok {
-			return sl
-		}
-	}
-	return nil
 }
 
 // Debug 输出 Debug 级别日志
@@ -217,6 +224,6 @@ func Fatalf(template string, args ...interface{}) {
 		sl.Fatalf(template, args...)
 	} else {
 		// 如果 logger 未初始化，仍然退出程序
-		os.Exit(1)
+		panic(fmt.Sprintf(template, args...))
 	}
 }

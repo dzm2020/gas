@@ -2,13 +2,14 @@ package actor
 
 import (
 	"errors"
+	"sync/atomic"
+	"time"
+
 	"github.com/dzm2020/gas/internal/iface"
 	discovery "github.com/dzm2020/gas/pkg/discovery/iface"
 	"github.com/dzm2020/gas/pkg/glog"
 	"github.com/dzm2020/gas/pkg/lib"
 	"github.com/dzm2020/gas/pkg/lib/xerror"
-	"sync/atomic"
-	"time"
 
 	"github.com/duke-git/lancet/v2/maputil"
 	"go.uber.org/zap"
@@ -256,7 +257,7 @@ func (s *System) Call(message *iface.ActorMessage) ([]byte, error) {
 
 // localCall 本地同步调用
 func (s *System) localCall(message *iface.ActorMessage) (data []byte, err error) {
-	timeout := lib.NowDelay(message.GetDeadline(), 0)
+	timeout := lib.DeadlineToTimeout(message.GetDeadline(), 0)
 	waiter := lib.NewChanWaiter[[]byte](timeout)
 	message.SetResponse(func(bin []byte, e error) {
 		waiter.Done(bin, e)

@@ -2,6 +2,7 @@ package logger
 
 import (
 	"context"
+
 	"github.com/dzm2020/gas/internal/iface"
 	"github.com/dzm2020/gas/internal/profile"
 	logger "github.com/dzm2020/gas/pkg/glog"
@@ -53,7 +54,7 @@ func (c *Component) Start(ctx context.Context, node iface.INode) error {
 		return err
 	}
 	// 使用节点配置中的 glog 配置初始化
-	if err := logger.InitFromConfig(conf); err != nil {
+	if err := logger.Init(conf); err != nil {
 		return err
 	}
 	options := []zap.Option{

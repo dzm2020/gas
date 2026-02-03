@@ -186,6 +186,16 @@ func (d *discovery) GetById(memberId uint64) *iface.Member {
 	return result
 }
 
+func (d *discovery) GetByTag(tag string) []*iface.Member {
+	var result []*iface.Member
+	d.rangeWatcher(func(watcher *Watcher) bool {
+		list := watcher.GetByTag(tag)
+		result = append(result, list...)
+		return true
+	})
+	return result
+}
+
 func (d *discovery) shutdown() {
 	if !d.Stop() {
 		return

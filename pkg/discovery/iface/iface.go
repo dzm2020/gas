@@ -13,6 +13,7 @@ type (
 		GetById(memberId uint64) *Member
 		GetByKind(kind string) map[uint64]*Member
 		GetAll() map[uint64]*Member
+		GetByTag(tag string) []*Member
 		Watch(kind string, handler ServiceChangeHandler)
 		Unwatch(kind string, handler ServiceChangeHandler)
 		Shutdown(ctx context.Context) error

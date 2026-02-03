@@ -47,7 +47,9 @@ type Watcher struct {
 	listener  *event.Listener[*iface.Topology]
 	waitIndex uint64
 	list      atomic.Pointer[iface.MemberList] // 并发读写
-	kind      string
+	tagDict   atomic.Pointer[map[string][]*iface.Member]
+
+	kind string
 
 	ctx    context.Context
 	cancel context.CancelFunc
@@ -90,14 +92,15 @@ func (w *Watcher) fetch() error {
 
 	w.waitIndex = meta.LastIndex
 
-	nodeDict := make(map[uint64]*iface.Member, len(services))
+	tagDict := make(map[string][]*iface.Member)
+	memberDict := make(map[uint64]*iface.Member, len(services))
 	for _, s := range services {
 		id, wrong := convertor.ToInt(s.Service.ID)
 		if wrong != nil {
 			glog.Warn("Consul服务ID无效，跳过该服务", zap.String("service", w.kind), zap.Error(wrong))
 			continue
 		}
-		nodeDict[uint64(id)] = &iface.Member{
+		member := &iface.Member{
 			Id:      uint64(id),
 			Kind:    s.Service.Service,
 			Address: s.Service.Address,
@@ -105,16 +108,21 @@ func (w *Watcher) fetch() error {
 			Tags:    s.Service.Tags,
 			Meta:    s.Service.Meta,
 		}
+		memberDict[uint64(id)] = member
+		for _, tag := range s.Service.Tags {
+			tagDict[tag] = append(tagDict[tag], member)
+		}
 	}
 
-	glog.Debug("consul watch fetch", zap.Any("nodeDict", nodeDict))
+	glog.Debug("consul watch fetch", zap.Any("memberDict", memberDict))
 
-	list := iface.NewMemberList(nodeDict)
+	list := iface.NewMemberList(memberDict)
 
 	old := w.list.Load()
 	topology := list.UpdateTopology(old)
 
 	w.list.Store(list)
+	w.tagDict.Store(&tagDict)
 
 	if topology.IsChange() {
 		w.listener.Notify(topology)
@@ -137,6 +145,15 @@ func (w *Watcher) GetById(id uint64) *iface.Member {
 		return nil
 	}
 	return old.Dict[id]
+}
+
+func (w *Watcher) GetByTag(tag string) []*iface.Member {
+	tagDict := w.tagDict.Load()
+	if tagDict == nil {
+		return nil
+	}
+	list, _ := (*tagDict)[tag]
+	return list
 }
 
 func (w *Watcher) shutdown() {

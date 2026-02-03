@@ -14,12 +14,6 @@ type Config struct {
 	Level string `json:"level" yaml:"level"`
 	// PrintConsole 是否同时输出到控制台
 	PrintConsole bool `json:"printConsole" yaml:"printConsole"`
-	// File 文件日志配置
-	File FileConfig `json:"file" yaml:"file"`
-}
-
-// FileConfig 文件日志配置（lumberjack 配置）
-type FileConfig struct {
 	// MaxSize 单个日志文件最大大小（MB），超过则切割
 	MaxSize int `json:"maxSize" yaml:"maxSize"`
 	// MaxBackups 最大文件保留数，超过就删除最老的日志文件
@@ -38,13 +32,11 @@ func DefaultConfig() *Config {
 		Path:         "./logs/app.log",
 		Level:        "info",
 		PrintConsole: true,
-		File: FileConfig{
-			MaxSize:    500,
-			MaxBackups: 100,
-			MaxAge:     30,
-			Compress:   false,
-			LocalTime:  true,
-		},
+		MaxSize:      500,
+		MaxBackups:   100,
+		MaxAge:       30,
+		Compress:     false,
+		LocalTime:    true,
 	}
 }
 
@@ -68,10 +60,4 @@ func parseLevel(level string) zapcore.Level {
 	default:
 		return zapcore.InfoLevel
 	}
-}
-
-// InitFromConfig 根据配置初始化 glog
-func InitFromConfig(cfg *Config) error {
-	Init(cfg)
-	return nil
 }
