@@ -23,11 +23,12 @@ type Gate struct {
 	Options []network.Option
 	Factory Factory
 	server  network.IServer
-	maxConn int64
+	MaxConn int64
 	count   atomic.Int64
 }
 
-func (g *Gate) Start(ctx context.Context) (err error) {
+func (g *Gate) Start(ctx context.Context, node iface.INode) (err error) {
+	g.node = node
 	options := append(g.Options, network.WithCodec(codec.New()))
 	g.server, err = network.NewServer(g, g.Address, options...)
 	if err != nil {
@@ -55,7 +56,7 @@ func (g *Gate) getSession(entity network.IConnection) *session.Session {
 }
 
 func (g *Gate) OnConnect(entity network.IConnection) error {
-	if g.count.Load() > g.maxConn {
+	if g.count.Load() > g.MaxConn {
 		return errors.New("too many connections")
 	}
 	g.count.Add(1)

@@ -23,7 +23,7 @@ var (
 )
 
 type ICluster interface {
-	Start(ctx context.Context) error
+	Run(ctx context.Context) error
 
 	Send(nodeId uint64, message interface{}) (err error)
 	Call(nodeId uint64, message interface{}, timeout time.Duration) (data []byte, err error)

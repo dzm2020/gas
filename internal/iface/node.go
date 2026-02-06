@@ -1,6 +1,7 @@
 package iface
 
 import (
+	"github.com/dzm2020/gas/pkg/cluster"
 	discovery "github.com/dzm2020/gas/pkg/discovery/iface"
 	"github.com/dzm2020/gas/pkg/lib"
 	"github.com/dzm2020/gas/pkg/lib/component"
@@ -26,8 +27,8 @@ type (
 		SetSerializer(ser lib.ISerializer)
 		System() ISystem
 		SetSystem(system ISystem)
-		Cluster() ICluster
-		SetCluster(ICluster)
+		Cluster() cluster.ICluster
 		Startup(comps ...component.IComponent[INode]) error
+		Serializer() lib.ISerializer
 	}
 )

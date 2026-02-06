@@ -10,9 +10,9 @@ import (
 
 	"github.com/dzm2020/gas/internal/actor"
 	"github.com/dzm2020/gas/internal/iface"
-	"github.com/dzm2020/gas/internal/logger"
-	component2 "github.com/dzm2020/gas/internal/node/component"
+	com "github.com/dzm2020/gas/internal/node/component"
 	"github.com/dzm2020/gas/internal/profile"
+	"github.com/dzm2020/gas/pkg/cluster"
 	"github.com/dzm2020/gas/pkg/glog"
 	"github.com/dzm2020/gas/pkg/lib"
 	"github.com/dzm2020/gas/pkg/lib/component"
@@ -44,7 +44,7 @@ type Node struct {
 	component.IManager[iface.INode]
 	path       string
 	system     iface.ISystem
-	cluster    iface.ICluster
+	cluster    cluster.ICluster
 	serializer lib.ISerializer
 	panicHook  func(entry zapcore.Entry)
 	viper      *viper.Viper
@@ -60,11 +60,12 @@ func (n *Node) System() iface.ISystem {
 	return n.system
 }
 
-func (n *Node) SetCluster(cluster iface.ICluster) {
-	n.cluster = cluster
-}
-func (n *Node) Cluster() iface.ICluster {
-	return n.cluster
+func (n *Node) Cluster() cluster.ICluster {
+	c := n.GetComponent(com.Cluster)
+	if c == nil {
+		return nil
+	}
+	return c.(cluster.ICluster)
 }
 
 // SetSerializer 设置序列化器
@@ -121,9 +122,9 @@ func (n *Node) Startup(comps ...component.IComponent[iface.INode]) (err error) {
 
 	// 注册组件
 	components := []component.IComponent[iface.INode]{
-		logger.NewComponent(n.panicHook),
+		com.NewLoggerComponent(n.panicHook),
 		actor.NewComponent(),
-		component2.NewComponent(),
+		com.NewClusterComponent(),
 	}
 
 	components = append(components, comps...)

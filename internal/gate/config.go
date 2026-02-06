@@ -6,8 +6,8 @@ import (
 	"github.com/dzm2020/gas/pkg/network"
 )
 
-// defaultConfig 生成默认网关配置
-func defaultConfig() *Config {
+// DefaultConfig 生成默认网关配置
+func DefaultConfig() *Config {
 	return &Config{
 		Address:      "tcp://127.0.0.1:9000",
 		KeepAlive:    5, // 5秒
@@ -27,7 +27,7 @@ type Config struct {
 	// ReadBufSize 读缓冲区大小
 	ReadBufSize int `json:"readBufSize,omitempty" yaml:"readBufSize,omitempty"`
 	// MaxConn 最大连接数
-	MaxConn int `json:"maxConn,omitempty" yaml:"maxConn,omitempty"`
+	MaxConn int `json:"MaxConn,omitempty" yaml:"MaxConn,omitempty"`
 	// TLS 证书文件路径
 	TlsCertFile string `json:"tlsCertFile,omitempty" yaml:"tlsCertFile,omitempty"`
 	// TLS 私钥文件路径
