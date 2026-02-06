@@ -58,7 +58,7 @@ func (d *discovery) watch() {
 	defer func() {
 		d.shutdown()
 	}()
-	for !d.Stop() {
+	for !d.IsStop() {
 		select {
 		case <-d.ctx.Done():
 			return

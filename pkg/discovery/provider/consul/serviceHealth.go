@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync/atomic"
 
 	"github.com/dzm2020/gas/pkg/discovery/iface"
 	"github.com/dzm2020/gas/pkg/lib/stopper"
@@ -31,16 +32,16 @@ func newHealthKeeper(ctx context.Context, wg *sync.WaitGroup,
 		wg:      wg,
 		client:  client,
 		config:  config,
-		Member:  clonedMember,
 		checkId: fmt.Sprintf("service:%d", member.GetID()),
 	}
+	keeper.member.Store(clonedMember)
 	keeper.ctx, keeper.cancel = context.WithCancel(ctx)
 	return keeper
 }
 
 type healthKeeper struct {
 	stopper.Stopper
-	*iface.Member
+	member atomic.Pointer[iface.Member]
 
 	client *api.Client
 	config *Config
@@ -70,23 +71,25 @@ func (keeper *healthKeeper) Register() error {
 }
 
 func (keeper *healthKeeper) Update(member *iface.Member) error {
-	keeper.Member = member
+	keeper.member.Store(member)
 	return keeper.register()
 }
 
 func (keeper *healthKeeper) register() error {
+	member := keeper.member.Load()
 	config := keeper.config
 	registration := &api.AgentServiceRegistration{
-		ID:      convertor.ToString(keeper.GetID()),
-		Name:    keeper.GetKind(),
-		Address: keeper.GetAddress(),
-		Port:    keeper.GetPort(),
-		Tags:    keeper.GetTags(),
-		Meta:    keeper.GetMeta(),
+		ID:      convertor.ToString(member.GetID()),
+		Name:    member.GetKind(),
+		Address: member.GetAddress(),
+		Port:    member.GetPort(),
+		Tags:    member.GetTags(),
+		Meta:    member.GetMeta(),
 		Check: &api.AgentServiceCheck{
 			CheckID:                        keeper.checkId,
 			TTL:                            config.HealthTTL.String(),
 			DeregisterCriticalServiceAfter: config.DeregisterInterval.String(),
+			Status:                         member.GetStatus(),
 		},
 	}
 	return keeper.client.Agent().ServiceRegister(registration)
@@ -110,19 +113,22 @@ func (keeper *healthKeeper) updateTTLLoop() {
 }
 
 func (keeper *healthKeeper) updateTTL() {
+	member := keeper.member.Load()
 	options := &api.QueryOptions{}
 	options = options.WithContext(keeper.ctx)
-	if err := keeper.client.Agent().UpdateTTLOpts(keeper.checkId, "", "pass", options); err != nil {
+	if err := keeper.client.Agent().UpdateTTLOpts(keeper.checkId, "", member.GetStatus(), options); err != nil {
 		if !errors.Is(err, context.Canceled) {
-			glog.Error("定时更新TTL失败", zap.Uint64("memberId", keeper.GetID()), zap.Error(err))
+			glog.Error("定时更新TTL失败", zap.Uint64("memberId", member.GetID()), zap.Error(err))
 		}
 	}
+	glog.Debug("定时更新TTL", zap.Uint64("memberId", member.GetID()))
 }
 
 func (keeper *healthKeeper) deregister() error {
-	err := keeper.client.Agent().ServiceDeregister(convertor.ToString(keeper.GetID()))
+	member := keeper.member.Load()
+	err := keeper.client.Agent().ServiceDeregister(convertor.ToString(member.GetID()))
 	if err != nil {
-		glog.Error("注销服务失败", zap.Uint64("memberId", keeper.GetID()), zap.Error(err))
+		glog.Error("注销服务失败", zap.Uint64("memberId", member.GetID()), zap.Error(err))
 		return err
 	}
 	return nil

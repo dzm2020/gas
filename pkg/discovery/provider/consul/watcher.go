@@ -107,6 +107,7 @@ func (w *Watcher) fetch() error {
 			Port:    s.Service.Port,
 			Tags:    s.Service.Tags,
 			Meta:    s.Service.Meta,
+			Status:  "passing",
 		}
 		memberDict[uint64(id)] = member
 		for _, tag := range s.Service.Tags {

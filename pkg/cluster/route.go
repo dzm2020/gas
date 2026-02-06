@@ -1,15 +1,17 @@
-package iface
+package cluster
 
 import (
 	"math/rand"
 	"sync/atomic"
+
+	"github.com/dzm2020/gas/pkg/discovery/iface"
 )
 
 // RouteStrategy 路由策略函数，从节点列表中选择一个节点
-type RouteStrategy func(members []*Member) *Member
+type RouteStrategy func(members []*iface.Member) *iface.Member
 
 // RouteRandom 随机路由策略
-func RouteRandom(members []*Member) *Member {
+func RouteRandom(members []*iface.Member) *iface.Member {
 	if len(members) == 0 {
 		return nil
 	}
@@ -18,7 +20,7 @@ func RouteRandom(members []*Member) *Member {
 
 // RouteRoundRobin 轮询路由策略（需要外部维护状态）
 func RouteRoundRobin(counter *uint64) RouteStrategy {
-	return func(members []*Member) *Member {
+	return func(members []*iface.Member) *iface.Member {
 		if len(members) == 0 {
 			return nil
 		}
@@ -28,7 +30,7 @@ func RouteRoundRobin(counter *uint64) RouteStrategy {
 }
 
 // RouteFirst 选择第一个节点
-func RouteFirst(members []*Member) *Member {
+func RouteFirst(members []*iface.Member) *iface.Member {
 	if len(members) == 0 {
 		return nil
 	}

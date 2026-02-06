@@ -3,9 +3,9 @@ package cluster
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
+	"github.com/duke-git/lancet/v2/convertor"
 	dis "github.com/dzm2020/gas/pkg/discovery"
 	discovery "github.com/dzm2020/gas/pkg/discovery/iface"
 	"github.com/dzm2020/gas/pkg/glog"
@@ -29,7 +29,7 @@ type ICluster interface {
 	Call(nodeId uint64, message interface{}, timeout time.Duration) (data []byte, err error)
 	Subscribe(nodeId uint64, subscriber messageQue.ISubscriber) (messageQue.ISubscription, error)
 
-	Select(name string, strategy discovery.RouteStrategy) (uint64, error)
+	Select(name string, strategy RouteStrategy) (uint64, error)
 	Register(member *discovery.Member) error
 	Update(member *discovery.Member) error
 	Deregister(memberId uint64) error
@@ -53,7 +53,6 @@ func New(config *Config, serializer lib.ISerializer) (c *Cluster, err error) {
 	c = &Cluster{
 		serializer: serializer,
 	}
-	c.name = conf.Name
 	// 创建服务发现实例
 	c.IDiscovery, err = dis.NewFromConfig(*conf.Discovery)
 	if err != nil {
@@ -69,7 +68,6 @@ func New(config *Config, serializer lib.ISerializer) (c *Cluster, err error) {
 
 type Cluster struct {
 	stopper.Stopper
-	name       string
 	serializer lib.ISerializer
 	discovery.IDiscovery
 	mq messageQue.IMessageQue
@@ -88,11 +86,8 @@ func (r *Cluster) Start(ctx context.Context) error {
 }
 
 func (r *Cluster) Subscribe(nodeId uint64, subscriber messageQue.ISubscriber) (messageQue.ISubscription, error) {
-	return r.mq.Subscribe(r.makeSubject(nodeId), subscriber)
-}
-
-func (r *Cluster) makeSubject(nodeId uint64) string {
-	return fmt.Sprintf("%s.%d", r.name, nodeId)
+	subject := convertor.ToString(nodeId)
+	return r.mq.Subscribe(subject, subscriber)
 }
 
 // Send 发送消息到集群节点
@@ -105,7 +100,7 @@ func (r *Cluster) Send(nodeId uint64, message interface{}) (err error) {
 		return mErr
 	}
 
-	subject := r.makeSubject(nodeId)
+	subject := convertor.ToString(nodeId)
 
 	return r.mq.Publish(subject, bytes)
 }
@@ -119,13 +114,13 @@ func (r *Cluster) Call(nodeId uint64, message interface{}, timeout time.Duration
 	if marshalErr != nil {
 		return nil, marshalErr
 	}
-	subject := r.makeSubject(nodeId)
+	subject := convertor.ToString(nodeId)
 	return r.mq.Request(subject, data, timeout)
 }
 
-func (r *Cluster) Select(tag string, strategy discovery.RouteStrategy) (uint64, error) {
+func (r *Cluster) Select(tag string, strategy RouteStrategy) (uint64, error) {
 	if strategy == nil {
-		strategy = discovery.RouteRandom
+		strategy = RouteRandom
 	}
 	// 通过服务发现获取节点列表
 	members := r.IDiscovery.GetByTag(tag)

@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/dzm2020/gas/internal/iface"
-	discovery "github.com/dzm2020/gas/pkg/discovery/iface"
+	discovery "github.com/dzm2020/gas/pkg/cluster"
 	"github.com/dzm2020/gas/pkg/glog"
 	"github.com/dzm2020/gas/pkg/lib"
 	"github.com/dzm2020/gas/pkg/lib/xerror"

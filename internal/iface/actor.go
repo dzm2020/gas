@@ -1,9 +1,10 @@
 package iface
 
 import (
-	discovery "github.com/dzm2020/gas/pkg/discovery/iface"
-	"github.com/dzm2020/gas/pkg/lib"
 	"time"
+
+	discovery "github.com/dzm2020/gas/pkg/cluster"
+	"github.com/dzm2020/gas/pkg/lib"
 )
 
 type (

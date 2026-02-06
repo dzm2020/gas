@@ -7,9 +7,11 @@ import (
 
 	dis "github.com/dzm2020/gas/pkg/discovery"
 	discovery "github.com/dzm2020/gas/pkg/discovery/iface"
+	"github.com/dzm2020/gas/pkg/glog"
 	"github.com/dzm2020/gas/pkg/lib"
 	mq "github.com/dzm2020/gas/pkg/messageQue"
 	messageQue "github.com/dzm2020/gas/pkg/messageQue/iface"
+	"go.uber.org/zap/zapcore"
 
 	_ "github.com/dzm2020/gas/pkg/discovery/provider/consul"
 	_ "github.com/dzm2020/gas/pkg/messageQue/provider/nats"
@@ -21,10 +23,10 @@ func testConfig() *Config {
 		Discovery: &dis.Config{
 			Type: "consul",
 			Config: map[string]interface{}{
-				"address":             "127.0.0.1:8500",
-				"watchWaitTime":       "1s",
-				"healthTTL":           "1s",
-				"deregisterInterval":  "3s",
+				"address":            "127.0.0.1:8500",
+				"watchWaitTime":      "1s",
+				"healthTTL":          "1s",
+				"deregisterInterval": "3s",
 			},
 		},
 		MessageQueue: &mq.Config{
@@ -62,6 +64,7 @@ func TestErrNotFoundMember(t *testing.T) {
 }
 
 func TestNew_WithRealConfig(t *testing.T) {
+	glog.SetLogLevel(zapcore.DebugLevel)
 	c, err := New(testConfig(), lib.Json)
 	if err != nil {
 		t.Skipf("New: %v (consul/nats 可能未启动)", err)
@@ -78,23 +81,15 @@ func TestNew_WithRealConfig(t *testing.T) {
 	}
 }
 
-func TestCluster_Start(t *testing.T) {
-	c, cleanup := createCluster(t)
-	defer cleanup()
-	// Start 已在 createCluster 中执行，此处仅校验 c 可用
-	if c == nil {
-		t.Fatal("createCluster returned nil")
-	}
-}
-
 func TestCluster_Send(t *testing.T) {
+	glog.SetLogLevel(zapcore.DebugLevel)
 	c, cleanup := createCluster(t)
 	defer cleanup()
 	// 节点不存在应报错
 	if err := c.Send(999999, "msg"); err == nil {
 		t.Fatal("Send 不存在的节点应返回错误")
 	}
-	mem := &discovery.Member{Id: 1, Kind: "cluster-test-svc", Address: "127.0.0.1", Port: 8080}
+	mem := &discovery.Member{Id: 1, Kind: "cluster-test-svc", Address: "127.0.0.1", Port: 8080, Status: "passing"}
 	if err := c.Register(mem); err != nil {
 		t.Fatalf("Register: %v", err)
 	}
@@ -118,7 +113,7 @@ func TestCluster_Call(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Subscribe: %v", err)
 	}
-	mem := &discovery.Member{Id: 1, Kind: "cluster-test-call", Address: "127.0.0.1", Port: 8081}
+	mem := &discovery.Member{Id: 1, Kind: "cluster-test-call", Address: "127.0.0.1", Port: 8081, Status: "passing"}
 	if err := c.Register(mem); err != nil {
 		t.Fatalf("Register: %v", err)
 	}
@@ -165,8 +160,8 @@ func TestCluster_Select(t *testing.T) {
 	if err != ErrNotFoundMember {
 		t.Errorf("Select 无成员时应返回 ErrNotFoundMember, 得到 %v", err)
 	}
-	m1 := &discovery.Member{Id: 10, Kind: "cluster-test-select", Address: "127.0.0.1", Port: 9010, Tags: []string{"tag1"}}
-	m2 := &discovery.Member{Id: 20, Kind: "cluster-test-select", Address: "127.0.0.1", Port: 9020, Tags: []string{"tag1"}}
+	m1 := &discovery.Member{Id: 10, Kind: "cluster-test-select", Address: "127.0.0.1", Port: 9010, Tags: []string{"tag1"}, Status: "passing"}
+	m2 := &discovery.Member{Id: 20, Kind: "cluster-test-select", Address: "127.0.0.1", Port: 9020, Tags: []string{"tag1"}, Status: "passing"}
 	_ = c.Register(m1)
 	_ = c.Register(m2)
 	waitSync(t)
@@ -177,7 +172,7 @@ func TestCluster_Select(t *testing.T) {
 	if id != 10 && id != 20 {
 		t.Errorf("Select 期望 10 或 20, 得到 %d", id)
 	}
-	id, err = c.Select("tag1", discovery.RouteFirst)
+	id, err = c.Select("tag1", RouteFirst)
 	if err != nil || (id != 10 && id != 20) {
 		t.Errorf("Select RouteFirst: id=%d err=%v", id, err)
 	}
@@ -188,7 +183,7 @@ func TestCluster_Select(t *testing.T) {
 func TestCluster_Register_Update_Deregister(t *testing.T) {
 	c, cleanup := createCluster(t)
 	defer cleanup()
-	mem := &discovery.Member{Id: 100, Kind: "cluster-test-reg", Address: "0.0.0.0", Port: 9100, Tags: []string{"t1"}}
+	mem := &discovery.Member{Id: 100, Kind: "cluster-test-reg", Address: "127.0.0.1", Port: 9100, Tags: []string{"t1"}, Status: "passing"}
 	if err := c.Register(mem); err != nil {
 		t.Fatalf("Register: %v", err)
 	}
@@ -196,7 +191,7 @@ func TestCluster_Register_Update_Deregister(t *testing.T) {
 	if c.GetById(100) == nil {
 		t.Error("GetById(100) 应有已注册的 member")
 	}
-	mem2 := &discovery.Member{Id: 100, Kind: "cluster-test-reg", Address: "0.0.0.0", Port: 9101, Tags: []string{"t1"}}
+	mem2 := &discovery.Member{Id: 100, Kind: "cluster-test-reg", Address: "127.0.0.1", Port: 9101, Tags: []string{"t1"}, Status: "warning"}
 	if err := c.Update(mem2); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
@@ -212,9 +207,9 @@ func TestCluster_Register_Update_Deregister(t *testing.T) {
 func TestCluster_GetByKind_GetByTag_GetAll(t *testing.T) {
 	c, cleanup := createCluster(t)
 	defer cleanup()
-	m1 := &discovery.Member{Id: 201, Kind: "cluster-test-get", Address: "127.0.0.1", Port: 9201, Tags: []string{"tagA"}}
-	m2 := &discovery.Member{Id: 202, Kind: "cluster-test-get", Address: "127.0.0.1", Port: 9202, Tags: []string{"tagA"}}
-	m3 := &discovery.Member{Id: 203, Kind: "cluster-test-get2", Address: "127.0.0.1", Port: 9203, Tags: []string{"tagB"}}
+	m1 := &discovery.Member{Id: 201, Kind: "cluster-test-get", Address: "127.0.0.1", Port: 9201, Tags: []string{"tagA"}, Status: "passing"}
+	m2 := &discovery.Member{Id: 202, Kind: "cluster-test-get", Address: "127.0.0.1", Port: 9202, Tags: []string{"tagA"}, Status: "passing"}
+	m3 := &discovery.Member{Id: 203, Kind: "cluster-test-get2", Address: "127.0.0.1", Port: 9203, Tags: []string{"tagB"}, Status: "passing"}
 	_ = c.Register(m1)
 	_ = c.Register(m2)
 	_ = c.Register(m3)
@@ -243,7 +238,7 @@ func TestCluster_Watch_Unwatch(t *testing.T) {
 	handler := func(_ *discovery.Topology) { called = true }
 	c.Watch("cluster-test-watch", handler)
 	// 注册一个成员触发 topology 变更
-	mem := &discovery.Member{Id: 301, Kind: "cluster-test-watch", Address: "127.0.0.1", Port: 9301}
+	mem := &discovery.Member{Id: 301, Kind: "cluster-test-watch", Address: "127.0.0.1", Port: 9301, Status: "passing"}
 	_ = c.Register(mem)
 	waitSync(t)
 	c.Unwatch("cluster-test-watch", handler)

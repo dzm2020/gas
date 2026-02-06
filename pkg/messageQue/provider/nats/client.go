@@ -4,10 +4,12 @@ import (
 	"context"
 	"time"
 
+	"github.com/dzm2020/gas/pkg/glog"
 	"github.com/dzm2020/gas/pkg/lib/stopper"
 	"github.com/dzm2020/gas/pkg/lib/xerror"
 	"github.com/dzm2020/gas/pkg/messageQue"
 	"github.com/dzm2020/gas/pkg/messageQue/iface"
+	"go.uber.org/zap"
 
 	"github.com/nats-io/nats.go"
 	"github.com/spf13/viper"
@@ -46,6 +48,7 @@ type Client struct {
 func (n *Client) Run(ctx context.Context) (err error) {
 	n.pool = NewPool(n.cfg)
 	n.subConn, err = n.pool.get()
+	glog.Debug("NATS启动成功", zap.Strings("address", n.cfg.Servers))
 	return
 }
 
@@ -98,5 +101,7 @@ func (n *Client) Shutdown(ctx context.Context) error {
 	if n.pool != nil {
 		n.pool.close()
 	}
+
+	glog.Debug("NATS关闭", zap.Strings("address", n.cfg.Servers))
 	return nil
 }

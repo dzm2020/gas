@@ -8,8 +8,10 @@ import (
 
 	discoveryApi "github.com/dzm2020/gas/pkg/discovery"
 	"github.com/dzm2020/gas/pkg/discovery/iface"
+	"github.com/dzm2020/gas/pkg/glog"
 	"github.com/dzm2020/gas/pkg/lib/grs"
 	"github.com/dzm2020/gas/pkg/lib/stopper"
+	"go.uber.org/zap"
 
 	"github.com/hashicorp/consul/api"
 	"github.com/spf13/viper"
@@ -70,6 +72,7 @@ func (c *Provider) Run(ctx context.Context) error {
 	c.registrar = newRegistrar(c.ctx, &c.wg, c.client, c.config)
 	c.registrar.run()
 
+	glog.Debug("CONSUL启动成功", zap.String("address", c.config.Address))
 	return nil
 }
 
@@ -93,5 +96,7 @@ func (c *Provider) Shutdown(ctx context.Context) error {
 	c.registrar.shutdown()
 	c.discovery.shutdown()
 	grs.WaitWithContext(ctx, &c.wg)
+
+	glog.Debug("CONSUL关闭", zap.String("address", c.config.Address))
 	return nil
 }

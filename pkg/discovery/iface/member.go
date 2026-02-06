@@ -7,6 +7,7 @@ type Member struct {
 	Port    int               `json:"port" yaml:"port"`       // 节点端口
 	Tags    []string          `json:"tags" yaml:"tags"`       // 节点标签
 	Meta    map[string]string `json:"meta" yaml:"meta"`       // 节点元数据
+	Status  string            `json:"status" yaml:"status"`   // 'passing', 'warning', 'critical'
 }
 
 func (b *Member) GetKind() string {
@@ -26,6 +27,9 @@ func (b *Member) GetTags() []string {
 }
 func (b *Member) GetMeta() map[string]string {
 	return b.Meta
+}
+func (b *Member) GetStatus() string {
+	return b.Status
 }
 
 // Equal 比较两个 Member 是否相等
