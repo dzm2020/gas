@@ -18,13 +18,14 @@ import (
 
 type Gate struct {
 	network.EmptyHandler
-	Address string
-	Options []network.Option
-	Factory Factory
-	server  network.IServer
-	MaxConn int64
-	count   atomic.Int64
-	system  iface.ISystem
+	Address     string
+	Options     []network.Option
+	Factory     Factory
+	Middlewares []Middleware // Decode 后 / Encode 前 按顺序执行
+	server      network.IServer
+	MaxConn     int64
+	count       atomic.Int64
+	system      iface.ISystem
 }
 
 func (g *Gate) Start(ctx context.Context, system iface.ISystem) (err error) {
@@ -36,41 +37,23 @@ func (g *Gate) Start(ctx context.Context, system iface.ISystem) (err error) {
 	return g.server.Start()
 }
 
-func (g *Gate) getOrCreateSession(entity network.IConnection) *session.Session {
-	s, ok := entity.Context().(*session.Session)
-	if !ok || s == nil {
-		//  创建agent
-		agent := g.Factory()
-		system := g.system
-		pid := system.Spawn(agent)
-		//  绑定
-		s = session.New(entity.ID(), pid)
-		entity.SetContext(s)
-
-		glog.Debug("网关:创建Agent", zap.Int64("entityId", entity.ID()), zap.Any("pid", pid))
-	}
-	return s
-}
-
-// submitToAgent 封装「取 session → 向 agent 投递任务」的公共逻辑
-func (g *Gate) submitToAgent(entity network.IConnection, fn func(ctx iface.IContext, agent IAgent, s *session.Session) error) error {
-	s := g.getOrCreateSession(entity)
-	system := g.system
-
-	return system.SubmitTask(s.GetAgent(), func(ctx iface.IContext) error {
-		agent := ctx.Actor().(IAgent)
-		return fn(ctx, agent, s)
-	})
-}
-
 func (g *Gate) OnConnect(entity network.IConnection) error {
 	if g.count.Load() > g.MaxConn {
 		return errors.New("too many connections")
 	}
 	g.count.Add(1)
-	return g.submitToAgent(entity, func(ctx iface.IContext, agent IAgent, s *session.Session) error {
-		return agent.OnOpen(ctx, s)
-	})
+
+	//  创建agent
+	agent := g.Factory()
+	agent.SetMiddleware(g.Middlewares)
+	system := g.system
+	pid := system.Spawn(agent)
+	//  绑定
+	s := session.New(entity.ID(), pid)
+	entity.SetContext(s)
+
+	glog.Debug("网关:创建Agent", zap.Int64("entityId", entity.ID()), zap.Any("pid", pid))
+	return nil
 }
 
 func (g *Gate) OnMessage(entity network.IConnection, data []byte) (n int, err error) {
@@ -87,12 +70,13 @@ func (g *Gate) OnMessage(entity network.IConnection, data []byte) (n int, err er
 		n += processN
 		data = data[processN:]
 
-		err = g.submitToAgent(entity, func(ctx iface.IContext, agent IAgent, s *session.Session) error {
-			ss := convertor.DeepClone(s)
-			ss.Cmd = uint32(msg.Cmd)
-			ss.Act = uint32(msg.Act)
-			ss.Index = msg.Index
-			return agent.OnData(ctx, ss, msg.Data)
+		//  提交到agent actor处理
+		s := entity.Context().(*session.Session)
+		if s.GetAgent() == nil {
+			return
+		}
+		err = g.system.SubmitTask(s.GetAgent(), func(ctx iface.IContext) error {
+			return g.onData(ctx, msg, s)
 		})
 		if err != nil {
 			return
@@ -101,11 +85,32 @@ func (g *Gate) OnMessage(entity network.IConnection, data []byte) (n int, err er
 	return
 }
 
+func (g *Gate) onData(ctx iface.IContext, msg *protocol.Message, s *session.Session) error {
+	var err error
+	agent := ctx.Actor().(IAgent)
+	if len(g.Middlewares) > 0 {
+		msg, err = RunAfterDecode(g.Middlewares, msg)
+		if err != nil {
+			return err
+		}
+		if msg == nil {
+			return nil
+		}
+	}
+	ss := convertor.DeepClone(s)
+	ss.Cmd = uint32(msg.Cmd)
+	ss.Act = uint32(msg.Act)
+	ss.Index = msg.Index
+	return agent.OnData(ctx, ss, msg.Data)
+}
+
 func (g *Gate) OnClose(entity network.IConnection, wrong error) {
 	g.count.Add(-1)
-	_ = g.submitToAgent(entity, func(ctx iface.IContext, agent IAgent, s *session.Session) error {
-		return agent.OnClose(ctx, s)
-	})
+	s := entity.Context().(*session.Session)
+	if s.GetAgent() == nil {
+		return
+	}
+	g.system.ShutdownProcess(s.GetAgent())
 }
 
 func (g *Gate) Stop(ctx context.Context) error {

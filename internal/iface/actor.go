@@ -35,6 +35,7 @@ type (
 		SubmitTaskAndWait(pid *Pid, task Task, timeout time.Duration) (err error)
 		Send(message *ActorMessage) (err error)
 		Call(message *ActorMessage) (data []byte, err error)
+		ShutdownProcess(pid *Pid)
 		Shutdown() error
 		Select(name string, strategy discovery.RouteStrategy) *Pid
 	}

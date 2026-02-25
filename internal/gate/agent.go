@@ -24,9 +24,7 @@ var (
 type Factory func() IAgent
 
 type IAgentHandler interface {
-	OnOpen(ctx iface.IContext, s *session.Session) error
 	OnData(ctx iface.IContext, s *session.Session, data []byte) error
-	OnClose(ctx iface.IContext, s *session.Session) error
 }
 
 var _ IAgentHandler = (*AgentHandler)(nil)
@@ -34,19 +32,14 @@ var _ IAgentHandler = (*AgentHandler)(nil)
 type AgentHandler struct {
 }
 
-func (a *AgentHandler) OnOpen(ctx iface.IContext, s *session.Session) error {
-	return nil
-}
 func (a *AgentHandler) OnData(ctx iface.IContext, s *session.Session, data []byte) error {
-	return nil
-}
-func (a *AgentHandler) OnClose(ctx iface.IContext, s *session.Session) error {
 	return nil
 }
 
 type IAgent interface {
 	iface.IActor
 	IAgentHandler
+	SetMiddleware(middlewares []Middleware)
 	Push(ctx iface.IContext, s *session.Session, data []byte) error
 	Shutdown(ctx iface.IContext, s *session.Session) error
 }
@@ -56,9 +49,16 @@ var _ IAgent = (*Agent)(nil)
 type Agent struct {
 	iface.Actor
 	AgentHandler
+	// middlewares 由 Gate 在创建 session 时注入，Encode 前按顺序执行
+	middlewares []Middleware
+}
+
+func (agent *Agent) SetMiddleware(middlewares []Middleware) {
+	agent.middlewares = middlewares
 }
 
 func (agent *Agent) Push(ctx iface.IContext, s *session.Session, data []byte) error {
+	var err error
 	entity := network.GetConnection(s.GetEntityId())
 	if entity == nil {
 		return xerror.Wrapf(ErrNotFoundEntity, "entity:%d", s.GetEntityId())
@@ -68,9 +68,20 @@ func (agent *Agent) Push(ctx iface.IContext, s *session.Session, data []byte) er
 	msg.Index = s.GetIndex()
 	msg.Error = uint16(s.GetCode())
 
+	if len(agent.middlewares) > 0 {
+		msg, err = RunBeforeEncode(agent.middlewares, msg)
+		if err != nil {
+			return xerror.Wrapf(err, "middleware BeforeEncode")
+		}
+		if msg == nil {
+			return nil
+		}
+	}
+
 	glog.Debug("发送消息到客户端", zap.Int64("entityId", s.GetEntityId()), zap.Any("msg", msg))
 
-	bytes, err := codec.Encode(msg)
+	var bytes []byte
+	bytes, err = codec.Encode(msg)
 	if err != nil {
 		return xerror.Wrapf(err, "codec:%d", s.GetCode())
 	}

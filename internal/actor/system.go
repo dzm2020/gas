@@ -335,6 +335,11 @@ func (s *System) Select(name string, strategy discovery.RouteStrategy) *iface.Pi
 	}
 }
 
+func (s *System) ShutdownProcess(pid *iface.Pid) error {
+	process := s.GetProcess(pid)
+	return process.Shutdown()
+}
+
 // ==================== 系统关闭 ====================
 
 // checkShuttingDown 检查系统是否正在关闭
