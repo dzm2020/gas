@@ -26,6 +26,12 @@ func newTCPConnection(ctx context.Context, conn *net.TCPConn, typ ConnType, opti
 	return tcpConn
 }
 
+// NewTCPConnection 从已有的 *net.TCPConn 创建 TCPConnection，供测试或自定义 listener 集成使用。
+// 调用方如需完整读写需自行启动 readLoop/writeLoop；仅用于回调测试时可只调用 OnConnect/OnMessage/OnClose。
+func NewTCPConnection(ctx context.Context, conn *net.TCPConn, typ ConnType, opts ...Option) *TCPConnection {
+	return newTCPConnection(ctx, conn, typ, loadOptions(opts...))
+}
+
 func (c *TCPConnection) readLoop() {
 	var err error
 	var n int
@@ -84,9 +90,9 @@ func (c *TCPConnection) writeLoop() {
 	}
 }
 
-func (c *TCPConnection) batchWriteMsg(msg interface{}) error {
+func (c *TCPConnection) batchWriteMsg(msg []byte) error {
 	const maxBatchSize = 100 // 限制批量写入的最大消息数，避免内存占用过高
-	var msgList = []interface{}{msg}
+	var msgList = [][]byte{msg}
 	batchCount := 0
 	for len(c.sendChan) > 0 && batchCount < maxBatchSize-1 {
 		select {

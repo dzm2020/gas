@@ -234,6 +234,7 @@ type Session struct {
 	Cmd           uint32                 `protobuf:"varint,5,opt,name=cmd,proto3" json:"cmd,omitempty"`
 	Act           uint32                 `protobuf:"varint,6,opt,name=act,proto3" json:"act,omitempty"`
 	Code          int64                  `protobuf:"varint,7,opt,name=code,proto3" json:"code,omitempty"`
+	Values        map[string]string      `protobuf:"bytes,8,rep,name=values,proto3" json:"values,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -317,6 +318,13 @@ func (x *Session) GetCode() int64 {
 	return 0
 }
 
+func (x *Session) GetValues() map[string]string {
+	if x != nil {
+		return x.Values
+	}
+	return nil
+}
+
 var File_actor_proto protoreflect.FileDescriptor
 
 const file_actor_proto_rawDesc = "" +
@@ -338,7 +346,7 @@ const file_actor_proto_rawDesc = "" +
 	"\bdeadline\x18\a \x01(\x03R\bdeadline\"6\n" +
 	"\bResponse\x12\x12\n" +
 	"\x04data\x18\x01 \x01(\fR\x04data\x12\x16\n" +
-	"\x06errMsg\x18\x02 \x01(\tR\x06errMsg\"\xad\x01\n" +
+	"\x06errMsg\x18\x02 \x01(\tR\x06errMsg\"\x9c\x02\n" +
 	"\aSession\x12 \n" +
 	"\x05agent\x18\x01 \x01(\v2\n" +
 	".actor.PidR\x05agent\x12\x1a\n" +
@@ -347,7 +355,11 @@ const file_actor_proto_rawDesc = "" +
 	"\x05index\x18\x04 \x01(\rR\x05index\x12\x10\n" +
 	"\x03cmd\x18\x05 \x01(\rR\x03cmd\x12\x10\n" +
 	"\x03act\x18\x06 \x01(\rR\x03act\x12\x12\n" +
-	"\x04code\x18\a \x01(\x03R\x04codeB\n" +
+	"\x04code\x18\a \x01(\x03R\x04code\x122\n" +
+	"\x06values\x18\b \x03(\v2\x1a.actor.Session.ValuesEntryR\x06values\x1a9\n" +
+	"\vValuesEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\n" +
 	"Z\b./;ifaceb\x06proto3"
 
 var (
@@ -362,23 +374,25 @@ func file_actor_proto_rawDescGZIP() []byte {
 	return file_actor_proto_rawDescData
 }
 
-var file_actor_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_actor_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_actor_proto_goTypes = []any{
 	(*Pid)(nil),      // 0: actor.Pid
 	(*Message)(nil),  // 1: actor.Message
 	(*Response)(nil), // 2: actor.Response
 	(*Session)(nil),  // 3: actor.Session
+	nil,              // 4: actor.Session.ValuesEntry
 }
 var file_actor_proto_depIdxs = []int32{
 	0, // 0: actor.Message.to:type_name -> actor.Pid
 	0, // 1: actor.Message.from:type_name -> actor.Pid
 	3, // 2: actor.Message.session:type_name -> actor.Session
 	0, // 3: actor.Session.agent:type_name -> actor.Pid
-	4, // [4:4] is the sub-list for method output_type
-	4, // [4:4] is the sub-list for method input_type
-	4, // [4:4] is the sub-list for extension type_name
-	4, // [4:4] is the sub-list for extension extendee
-	0, // [0:4] is the sub-list for field type_name
+	4, // 4: actor.Session.values:type_name -> actor.Session.ValuesEntry
+	5, // [5:5] is the sub-list for method output_type
+	5, // [5:5] is the sub-list for method input_type
+	5, // [5:5] is the sub-list for extension type_name
+	5, // [5:5] is the sub-list for extension extendee
+	0, // [0:5] is the sub-list for field type_name
 }
 
 func init() { file_actor_proto_init() }
@@ -392,7 +406,7 @@ func file_actor_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_actor_proto_rawDesc), len(file_actor_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   4,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

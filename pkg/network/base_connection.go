@@ -37,7 +37,7 @@ func newBaseConn(ctx context.Context, network string,
 		remoteAddr:  remoteAddr,
 		lastActive:  time.Now(),
 		typ:         typ,
-		sendChan:    make(chan interface{}, options.SendChanSize),
+		sendChan:    make(chan []byte, options.SendChanSize),
 		writeBuffer: buffer.New(options.SendBufferSize),
 		readBuffer:  buffer.New(options.ReadBufSize),
 	}
@@ -54,21 +54,21 @@ func newBaseConn(ctx context.Context, network string,
 // 所有具体连接类型（TCP/UDP/WebSocket）都嵌入此结构体
 // 提供了连接管理、消息发送、心跳检测等通用功能
 type baseConn struct {
-	stopper.Stopper              // 提供停止状态管理
-	id          int64            // 连接唯一ID，全局唯一
-	network     string           // 网络类型（"tcp", "udp", "ws" 等）
-	handler     IHandler         // 业务处理回调接口
-	options     *Options         // 连接选项配置
-	conn        net.Conn         // 底层的原生网络连接
-	lastActive  time.Time        // 最后活动时间，用于心跳超时检测
-	typ         ConnType         // 连接类型（Accept 或 Connect）
-	user        interface{}      // 用户自定义上下文数据（通过 SetContext 设置）
-	sendChan    chan interface{} // 发送消息的通道，用于异步发送
-	ctx         context.Context  // 连接的上下文，用于控制生命周期
-	cancel      context.CancelFunc // 取消函数，用于关闭连接
-	remoteAddr  net.Addr         // 远程地址
-	writeBuffer buffer.IBuffer   // 写缓冲区，用于批量写入优化
-	readBuffer  buffer.IBuffer   // 读缓冲区，用于处理粘包
+	stopper.Stopper                    // 提供停止状态管理
+	id              int64              // 连接唯一ID，全局唯一
+	network         string             // 网络类型（"tcp", "udp", "ws" 等）
+	handler         IHandler           // 业务处理回调接口
+	options         *Options           // 连接选项配置
+	conn            net.Conn           // 底层的原生网络连接
+	lastActive      time.Time          // 最后活动时间，用于心跳超时检测
+	typ             ConnType           // 连接类型（Accept 或 Connect）
+	user            interface{}        // 用户自定义上下文数据（通过 SetContext 设置）
+	sendChan        chan []byte        // 发送消息的通道，用于异步发送
+	ctx             context.Context    // 连接的上下文，用于控制生命周期
+	cancel          context.CancelFunc // 取消函数，用于关闭连接
+	remoteAddr      net.Addr           // 远程地址
+	writeBuffer     buffer.IBuffer     // 写缓冲区，用于批量写入优化
+	readBuffer      buffer.IBuffer     // 读缓冲区，用于处理粘包
 }
 
 // ID 返回连接的唯一ID
@@ -101,11 +101,9 @@ func (b *baseConn) RemoteAddr() string {
 	return b.remoteAddr.String()
 }
 
-// Context 返回连接的上下文对象
-// 注意：这里返回的是 context.Context，不是用户自定义数据
-// 如需获取用户自定义数据，应使用其他方式
+// Context 返回通过 SetContext 设置的用户自定义数据（与 SetContext 成对使用）
 func (b *baseConn) Context() interface{} {
-	return b.ctx
+	return b.user
 }
 
 // SetContext 设置用户自定义上下文数据
@@ -114,6 +112,7 @@ func (b *baseConn) Context() interface{} {
 func (b *baseConn) SetContext(ctx interface{}) {
 	b.user = ctx
 }
+
 // SetReadBuffer 设置读缓冲区大小
 // 参数 bytes 指定缓冲区大小（字节数）
 // 仅对 TCP 连接有效，UDP 和 WebSocket 可能不支持
@@ -133,6 +132,7 @@ func (b *baseConn) SetWriteBuffer(bytes int) error {
 // 参数:
 //   - enable: 是否启用 SO_LINGER
 //   - sec: 延迟关闭时间（秒），仅在 enable=true 时有效
+//
 // 仅对 TCP 连接有效
 func (b *baseConn) SetLinger(enable bool, sec int) error {
 	return netutil.SetTCPLinger(b.conn, enable, sec)
@@ -151,6 +151,7 @@ func (b *baseConn) SetNoDelay(noDelay bool) error {
 // 参数:
 //   - enable: 是否启用 KeepAlive
 //   - period: KeepAlive 检测周期
+//
 // 仅对 TCP 连接有效
 func (b *baseConn) SetTCPKeepAlive(enable bool, period time.Duration) error {
 	return netutil.SetTCPKeepAlive(b.conn, enable, period)
@@ -171,10 +172,10 @@ func (b *baseConn) SetHandler(handler IHandler) {
 //   - connection: 连接接口，用于关闭连接
 //
 // 工作流程:
-//   1. 创建定时器，每 timeout/2 秒触发一次
-//   2. 检查距离上次活动时间是否超过 timeout
-//   3. 如果超时，设置错误并关闭连接
-//   4. 如果连接已停止或上下文取消，退出循环
+//  1. 创建定时器，每 timeout/2 秒触发一次
+//  2. 检查距离上次活动时间是否超过 timeout
+//  3. 如果超时，设置错误并关闭连接
+//  4. 如果连接已停止或上下文取消，退出循环
 func (b *baseConn) heartLoop(connection IConnection) {
 	var err error
 	timeout := b.options.HeartTimeout
@@ -199,14 +200,6 @@ func (b *baseConn) heartLoop(connection IConnection) {
 	}
 }
 
-// encode 编码消息
-// 使用配置的编解码器将业务消息编码为字节流
-// 参数 msg: 待编码的业务消息
-// 返回值: 编码后的字节流和可能的错误
-func (b *baseConn) encode(msg interface{}) (bin []byte, err error) {
-	return b.options.Codec.Encode(msg)
-}
-
 // onConnect 处理连接建立事件
 // 调用业务处理器的 OnConnect 回调
 // 参数 connection: 连接接口
@@ -220,9 +213,10 @@ func (b *baseConn) onConnect(connection IConnection) error {
 // 参数:
 //   - conn: 连接接口
 //   - msg: 已解码的业务消息
+//
 // 返回值: 如果返回错误，连接将被关闭
-func (b *baseConn) OnMessage(conn IConnection, msg interface{}) error {
-	return b.handler.OnMessage(conn, msg)
+func (b *baseConn) OnMessage(conn IConnection, data []byte) (int, error) {
+	return b.handler.OnMessage(conn, data)
 }
 
 // OnClose 处理连接关闭事件
@@ -243,13 +237,13 @@ func (b *baseConn) OnClose(conn IConnection, err error) {
 //
 // 返回值:
 //   - error: 如果连接已关闭返回 ErrConnectionClosed
-//            如果发送队列已满返回 ErrChannelFull
-//            成功返回 nil
+//     如果发送队列已满返回 ErrChannelFull
+//     成功返回 nil
 //
 // 注意:
 //   - 该方法是线程安全的，可以在多个 goroutine 中并发调用
 //   - 消息会经过编码器编码后发送
-func (b *baseConn) Send(msg interface{}) error {
+func (b *baseConn) Send(msg []byte) error {
 	if b.IsStop() {
 		return ErrConnectionClosed
 	}
@@ -268,9 +262,9 @@ func (b *baseConn) Send(msg interface{}) error {
 // 将多个消息编码后合并写入，用于批量发送场景，提高网络效率
 //
 // 工作流程:
-//   1. 遍历所有消息，逐个编码并写入写缓冲区
-//   2. 将缓冲区中的数据一次性写入底层连接
-//   3. 如果一次写入未完成，继续写入直到缓冲区为空
+//  1. 遍历所有消息，逐个编码并写入写缓冲区
+//  2. 将缓冲区中的数据一次性写入底层连接
+//  3. 如果一次写入未完成，继续写入直到缓冲区为空
 //
 // 参数:
 //   - c: 目标 Writer，通常是网络连接
@@ -282,20 +276,16 @@ func (b *baseConn) Send(msg interface{}) error {
 // 注意:
 //   - 该方法会合并多个消息的编码结果，减少系统调用次数
 //   - 如果编码失败，会立即返回错误，不会继续处理后续消息
-func (b *baseConn) write(c io.Writer, msgList ...interface{}) error {
+func (b *baseConn) write(c io.Writer, msgList ...[]byte) error {
 	if len(msgList) == 0 {
 		return nil // 没有消息需要写入，直接返回
 	}
-	for _, msg := range msgList {
-		if msg == nil {
+	for _, bytes := range msgList {
+		if bytes == nil {
 			continue
 		}
-		bytes, err := b.encode(msg)
-		if err != nil {
-			return err
-		}
 		// write buffer
-		if _, err = b.writeBuffer.Write(bytes); err != nil {
+		if _, err := b.writeBuffer.Write(bytes); err != nil {
 			return err
 		}
 	}
@@ -314,11 +304,11 @@ func (b *baseConn) write(c io.Writer, msgList ...interface{}) error {
 // 将数据写入读缓冲区，尝试解码出完整消息，并调用业务处理器
 //
 // 工作流程:
-//   1. 更新最后活动时间（用于心跳检测）
-//   2. 将数据追加到读缓冲区
-//   3. 尝试从缓冲区解码出完整消息
-//   4. 如果解码成功，移除已处理的数据，调用 OnMessage
-//   5. 如果解码失败（数据不完整），等待更多数据
+//  1. 更新最后活动时间（用于心跳检测）
+//  2. 将数据追加到读缓冲区
+//  3. 尝试从缓冲区解码出完整消息
+//  4. 如果解码成功，移除已处理的数据，调用 OnMessage
+//  5. 如果解码失败（数据不完整），等待更多数据
 //
 // 参数:
 //   - connection: 连接接口
@@ -330,12 +320,12 @@ func (b *baseConn) write(c io.Writer, msgList ...interface{}) error {
 func (b *baseConn) process(connection IConnection, data []byte) (int, error) {
 	b.lastActive = time.Now()
 	_, _ = b.readBuffer.Write(data)
-	msg, n, err := b.options.Codec.Decode(b.readBuffer.Bytes())
+	n, err := b.OnMessage(connection, b.readBuffer.Bytes())
 	if err != nil {
 		return n, err
 	}
 	_ = b.readBuffer.Skip(n)
-	return n, b.OnMessage(connection, msg)
+	return n, err
 }
 
 // Close 关闭连接（线程安全，可重复调用）
@@ -346,10 +336,10 @@ func (b *baseConn) process(connection IConnection, data []byte) (int, error) {
 //   - err: 关闭原因，可能为 nil（正常关闭）
 //
 // 工作流程:
-//   1. 尝试停止连接（如果已停止则直接返回）
-//   2. 调用业务处理器的 OnClose 回调
-//   3. 从连接管理器中移除该连接
-//   4. 取消上下文，通知所有等待的 goroutine
+//  1. 尝试停止连接（如果已停止则直接返回）
+//  2. 调用业务处理器的 OnClose 回调
+//  3. 从连接管理器中移除该连接
+//  4. 取消上下文，通知所有等待的 goroutine
 //
 // 注意:
 //   - 该方法是线程安全的，可以多次调用

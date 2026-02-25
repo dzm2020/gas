@@ -22,22 +22,22 @@ func genConnID() int64 {
 
 // ------------------------------ 核心接口 ------------------------------
 
-// ICodec 协议编解码器接口
-// 用于解耦TCP粘包处理、UDP透传、自定义协议等场景
-// 用户需要根据实际业务需求实现该接口
-type ICodec interface {
-	// Encode 编码：将业务消息转为网络字节流
-	// 参数 msg 可以是任意类型的业务消息
-	// 返回编码后的字节流和可能的错误
-	Encode(msg interface{}) ([]byte, error)
-	// Decode 解码：从网络字节流中解析出完整业务消息
-	// 参数 b 是接收到的字节流（可能包含多个消息或部分消息）
-	// 返回值：
-	//   - interface{}: 解析出的完整业务消息，如果数据不完整返回 nil
-	//   - int: 已解析的字节数，用于从缓冲区中移除已处理的数据
-	//   - error: 解析错误，如果数据不完整应该返回 nil
-	Decode(b []byte) (interface{}, int, error)
-}
+//// ICodec 协议编解码器接口
+//// 用于解耦TCP粘包处理、UDP透传、自定义协议等场景
+//// 用户需要根据实际业务需求实现该接口
+//type ICodec interface {
+//	// Encode 编码：将业务消息转为网络字节流
+//	// 参数 msg 可以是任意类型的业务消息
+//	// 返回编码后的字节流和可能的错误
+//	Encode(msg interface{}) ([]byte, error)
+//	// Decode 解码：从网络字节流中解析出完整业务消息
+//	// 参数 b 是接收到的字节流（可能包含多个消息或部分消息）
+//	// 返回值：
+//	//   - interface{}: 解析出的完整业务消息，如果数据不完整返回 nil
+//	//   - int: 已解析的字节数，用于从缓冲区中移除已处理的数据
+//	//   - error: 解析错误，如果数据不完整应该返回 nil
+//	Decode(b []byte) (interface{}, int, error)
+//}
 
 // IHandler 业务处理回调接口
 // 用户需实现该接口注入业务逻辑，处理连接的生命周期事件和消息
@@ -50,7 +50,7 @@ type IHandler interface {
 	// OnMessage 收到消息时回调
 	// 消息已经过解码器解码，msg 是完整的业务消息
 	// 如果返回错误，连接将被关闭
-	OnMessage(conn IConnection, msg interface{}) error
+	OnMessage(conn IConnection, data []byte) (int, error)
 	// OnClose 连接关闭时回调
 	// TCP：连接断开时调用
 	// UDP：超时无数据或主动关闭时调用
@@ -64,8 +64,7 @@ type IConnection interface {
 	// ID 返回连接的唯一ID
 	ID() int64
 	// Send 发送消息（线程安全）
-	// 消息会经过编码器编码后发送，如果发送队列已满会返回错误
-	Send(msg interface{}) error
+	Send(msg []byte) error
 	// Close 关闭连接（线程安全，可重复调用）
 	// 参数 err 表示关闭原因，可以为 nil
 	Close(err error) error
@@ -135,24 +134,24 @@ func (e *EmptyHandler) OnMessage(conn IConnection, msg interface{}) error { retu
 // OnClose 连接关闭时的空实现
 func (e *EmptyHandler) OnClose(conn IConnection, err error) {}
 
-// 确保 EmptyCodec 实现了 ICodec 接口
-var _ ICodec = (*EmptyCodec)(nil)
-
-// EmptyCodec 空编解码器实现
-// 所有方法都是空实现，不会进行任何编解码操作
-// 主要用于测试或不需要编解码的场景
-type EmptyCodec struct{}
-
-// Encode 编码的空实现，总是返回 nil
-func (e *EmptyCodec) Encode(msg interface{}) ([]byte, error) {
-	return nil, nil
-}
-
-// Decode 解码的空实现，总是返回 nil
-// 参数 n 表示已解析的字节数，这里返回 0
-func (e *EmptyCodec) Decode(b []byte) (interface{}, int, error) {
-	return nil, 0, nil
-}
+//// 确保 EmptyCodec 实现了 ICodec 接口
+//var _ ICodec = (*EmptyCodec)(nil)
+//
+//// EmptyCodec 空编解码器实现
+//// 所有方法都是空实现，不会进行任何编解码操作
+//// 主要用于测试或不需要编解码的场景
+//type EmptyCodec struct{}
+//
+//// Encode 编码的空实现，总是返回 nil
+//func (e *EmptyCodec) Encode(msg interface{}) ([]byte, error) {
+//	return nil, nil
+//}
+//
+//// Decode 解码的空实现，总是返回 nil
+//// 参数 n 表示已解析的字节数，这里返回 0
+//func (e *EmptyCodec) Decode(b []byte) (interface{}, int, error) {
+//	return nil, 0, nil
+//}
 
 // NewServer 创建网络服务器
 // 根据协议地址自动创建对应类型的服务器（TCP/UDP/WebSocket）

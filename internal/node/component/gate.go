@@ -39,7 +39,7 @@ func (r *GateComponent) Start(ctx context.Context, node iface.INode) error {
 	r.Gate.Options = gate.ToOptions(conf)
 	r.Gate.Address = conf.Address
 	r.Gate.MaxConn = int64(conf.MaxConn)
-	return r.Gate.Start(ctx, node)
+	return r.Gate.Start(ctx, node.System())
 }
 
 func (r *GateComponent) Stop(ctx context.Context) error {

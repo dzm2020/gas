@@ -4,8 +4,8 @@ package actor
 import (
 	"time"
 
+	"github.com/dzm2020/gas/internal/gate/session"
 	"github.com/dzm2020/gas/internal/iface"
-	"github.com/dzm2020/gas/internal/session"
 	"github.com/dzm2020/gas/pkg/glog"
 	"github.com/dzm2020/gas/pkg/lib"
 

@@ -69,6 +69,7 @@ type (
 	}
 
 	ISession interface {
+		Meta() *Session
 		SetContext(ctx IContext)
 		Response(request interface{}) error
 		ResponseCode(code int64) error

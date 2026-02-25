@@ -2,26 +2,22 @@ package codec
 
 import (
 	"encoding/binary"
-	"fmt"
+
 	"github.com/dzm2020/gas/internal/gate/protocol"
 )
 
-var (
-	ErrInvalidCodecMessageType = fmt.Errorf("invalid message type")
-)
+//var (
+//	ErrInvalidCodecMessageType = fmt.Errorf("invalid message type")
+//)
 
-func New() *Codec {
-	return new(Codec)
-}
+//func New() *Codec {
+//	return new(Codec)
+//}
+//
+//type Codec struct {
+//}
 
-type Codec struct {
-}
-
-func (*Codec) Encode(message interface{}) ([]byte, error) {
-	msg, ok := message.(*protocol.Message)
-	if !ok {
-		return nil, ErrInvalidCodecMessageType
-	}
+func Encode(msg *protocol.Message) ([]byte, error) {
 	msg.Len = uint32(len(msg.Data))
 	buf := make([]byte, protocol.HeadLen+len(msg.Data))
 	offset := 0
@@ -39,7 +35,7 @@ func (*Codec) Encode(message interface{}) ([]byte, error) {
 	return buf, nil
 }
 
-func (*Codec) Decode(buf []byte) (interface{}, int, error) {
+func Decode(buf []byte) (*protocol.Message, int, error) {
 	if len(buf) < protocol.HeadLen {
 		return nil, 0, nil
 	}

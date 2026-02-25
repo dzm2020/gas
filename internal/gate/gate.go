@@ -6,8 +6,8 @@ import (
 
 	"github.com/dzm2020/gas/internal/gate/codec"
 	"github.com/dzm2020/gas/internal/gate/protocol"
+	"github.com/dzm2020/gas/internal/gate/session"
 	"github.com/dzm2020/gas/internal/iface"
-	"github.com/dzm2020/gas/internal/session"
 	"github.com/dzm2020/gas/pkg/glog"
 	"github.com/dzm2020/gas/pkg/network"
 
@@ -18,41 +18,49 @@ import (
 
 type Gate struct {
 	network.EmptyHandler
-	node    iface.INode
 	Address string
 	Options []network.Option
 	Factory Factory
 	server  network.IServer
 	MaxConn int64
 	count   atomic.Int64
+	system  iface.ISystem
 }
 
-func (g *Gate) Start(ctx context.Context, node iface.INode) (err error) {
-	g.node = node
-	options := append(g.Options, network.WithCodec(codec.New()))
-	g.server, err = network.NewServer(g, g.Address, options...)
+func (g *Gate) Start(ctx context.Context, system iface.ISystem) (err error) {
+	g.system = system
+	g.server, err = network.NewServer(g, g.Address, g.Options...)
 	if err != nil {
 		return
 	}
 	return g.server.Start()
 }
 
-func (g *Gate) getSession(entity network.IConnection) *session.Session {
+func (g *Gate) getOrCreateSession(entity network.IConnection) *session.Session {
 	s, ok := entity.Context().(*session.Session)
 	if !ok || s == nil {
 		//  创建agent
-		system := g.node.System()
-		pid := system.Spawn(g.Factory())
+		agent := g.Factory()
+		system := g.system
+		pid := system.Spawn(agent)
 		//  绑定
-		s = session.New()
-		s.SetEntity(entity.ID())
-		s.SetPid(pid)
-
+		s = session.New(entity.ID(), pid)
 		entity.SetContext(s)
 
-		glog.Debug("网关:创建session", zap.Int64("entityId", entity.ID()), zap.Any("pid", pid))
+		glog.Debug("网关:创建Agent", zap.Int64("entityId", entity.ID()), zap.Any("pid", pid))
 	}
-	return convertor.DeepClone(s)
+	return s
+}
+
+// submitToAgent 封装「取 session → 向 agent 投递任务」的公共逻辑
+func (g *Gate) submitToAgent(entity network.IConnection, fn func(ctx iface.IContext, agent IAgent, s *session.Session) error) error {
+	s := g.getOrCreateSession(entity)
+	system := g.system
+
+	return system.SubmitTask(s.GetAgent(), func(ctx iface.IContext) error {
+		agent := ctx.Actor().(IAgent)
+		return fn(ctx, agent, s)
+	})
 }
 
 func (g *Gate) OnConnect(entity network.IConnection) error {
@@ -60,51 +68,44 @@ func (g *Gate) OnConnect(entity network.IConnection) error {
 		return errors.New("too many connections")
 	}
 	g.count.Add(1)
-
-	s := g.getSession(entity)
-	system := g.node.System()
-
-	message := g.makeActorMessage(s, "OnConnectionOpen", nil)
-
-	return system.Send(message)
+	return g.submitToAgent(entity, func(ctx iface.IContext, agent IAgent, s *session.Session) error {
+		return agent.OnOpen(ctx, s)
+	})
 }
 
-func (g *Gate) OnMessage(entity network.IConnection, clientMsg interface{}) error {
-	system := g.node.System()
-	s := g.getSession(entity)
+func (g *Gate) OnMessage(entity network.IConnection, data []byte) (n int, err error) {
+	var msg *protocol.Message
+	var processN int
+	for len(data) > 0 {
+		msg, processN, err = codec.Decode(data)
+		if err != nil {
+			return
+		}
+		if processN == 0 {
+			return
+		}
+		n += processN
+		data = data[processN:]
 
-	msg, _ := clientMsg.(*protocol.Message)
-
-	g.formatSession(s, msg)
-
-	message := g.makeActorMessage(s, "OnConnectionMessage", msg.Data)
-
-	return system.Send(message)
+		err = g.submitToAgent(entity, func(ctx iface.IContext, agent IAgent, s *session.Session) error {
+			ss := convertor.DeepClone(s)
+			ss.Cmd = uint32(msg.Cmd)
+			ss.Act = uint32(msg.Act)
+			ss.Index = msg.Index
+			return agent.OnData(ctx, ss, msg.Data)
+		})
+		if err != nil {
+			return
+		}
+	}
+	return
 }
 
 func (g *Gate) OnClose(entity network.IConnection, wrong error) {
 	g.count.Add(-1)
-
-	s := g.getSession(entity)
-	system := g.node.System()
-
-	message := g.makeActorMessage(s, "OnConnectionClose", nil)
-	_ = system.Send(message)
-	return
-}
-
-func (g *Gate) makeActorMessage(session *session.Session, method string, data []byte) *iface.ActorMessage {
-	agent := session.GetAgent()
-	message := iface.NewActorMessage(agent, agent, method, data)
-	message.Session = session.Session
-	return message
-}
-
-func (g *Gate) formatSession(s *session.Session, msg *protocol.Message) {
-	s.Cmd = uint32(msg.Cmd)
-	s.Act = uint32(msg.Act)
-	s.Index = msg.Index
-	return
+	_ = g.submitToAgent(entity, func(ctx iface.IContext, agent IAgent, s *session.Session) error {
+		return agent.OnClose(ctx, s)
+	})
 }
 
 func (g *Gate) Stop(ctx context.Context) error {

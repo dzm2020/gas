@@ -34,13 +34,9 @@ func newUDPConnection(ctx context.Context, conn *net.UDPConn, typ ConnType, remo
 	return udpConn
 }
 
-func (c *UDPConnection) Send(msg interface{}) error {
+func (c *UDPConnection) Send(data []byte) error {
 	if c.IsStop() {
 		return ErrConnectionClosed
-	}
-	data, err := c.encode(msg)
-	if err != nil {
-		return err
 	}
 
 	select {

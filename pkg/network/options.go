@@ -13,7 +13,7 @@ type Options struct {
 	ReuseAddr   bool                       // 是否启用 SO_REUSEADDR
 	CheckOrigin func(r *http.Request) bool // WebSocket Origin 检查函数（nil 表示不检查）
 
-	Codec          ICodec        // 协议编解码器
+	//Codec          ICodec        // 协议编解码器
 	HeartTimeout   time.Duration // 心跳超时（0表示不检测超时）
 	SendBufferSize int           // 发送队列缓冲大小
 	ReadBufSize    int           // 读缓冲区大小
@@ -23,7 +23,7 @@ type Options struct {
 
 func loadOptions(options ...Option) *Options {
 	opts := &Options{
-		Codec:          &EmptyCodec{},
+		//Codec:          &EmptyCodec{},
 		HeartTimeout:   5 * time.Second,
 		SendBufferSize: 1024 * 4,
 		ReadBufSize:    1024 * 4,
@@ -52,15 +52,15 @@ func WithReadBufSize(size int) Option {
 	}
 }
 
-// WithCodec 设置协议编解码器
-func WithCodec(codec ICodec) Option {
-	return func(opts *Options) {
-		if codec == nil {
-			return
-		}
-		opts.Codec = codec
-	}
-}
+//// WithCodec 设置协议编解码器
+//func WithCodec(codec ICodec) Option {
+//	return func(opts *Options) {
+//		if codec == nil {
+//			return
+//		}
+//		opts.Codec = codec
+//	}
+//}
 
 // WithKeepAlive 设置连接超时时间
 func WithKeepAlive(heartInterval time.Duration) Option {

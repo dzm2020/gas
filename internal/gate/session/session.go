@@ -7,13 +7,17 @@ import (
 )
 
 const (
-	PushMessageToClientMethod   = "PushMessage"
+	PushMessageToClientMethod   = "Push"
 	CloseClientConnectionMethod = "Shutdown"
+	SetValueMethod              = "SetValue"
 )
 
-func New() *Session {
+func New(entityId int64, pid *iface.Pid) *Session {
 	return &Session{
-		Session: &iface.Session{},
+		Session: &iface.Session{
+			EntityId: entityId,
+			Agent:    pid,
+		},
 	}
 }
 
@@ -39,7 +43,9 @@ func (a *Session) SetEntity(entityId int64) {
 func (a *Session) SetContext(ctx iface.IContext) {
 	a.ctx = ctx
 }
-
+func (a *Session) Meta() *iface.Session {
+	return a.Session
+}
 func (a *Session) Response(request interface{}) error {
 	node := a.ctx.Node()
 	bin, err := node.Marshal(request)
@@ -55,6 +61,16 @@ func (a *Session) ResponseCode(code int64) error {
 	message := iface.NewActorMessage(a.ctx.ID(), a.GetAgent(), PushMessageToClientMethod, nil)
 	message.Session = convertor.DeepClone(a.Session)
 	message.Session.Code = code
+	return a.send(message)
+}
+
+func (a *Session) SetValue(key, value string) error {
+	message := iface.NewActorMessage(a.ctx.ID(), a.GetAgent(), SetValueMethod, nil)
+	message.Session = convertor.DeepClone(a.Session)
+	if a.Session.Values == nil {
+		a.Session.Values = make(map[string]string)
+	}
+	message.Session.Values[key] = value
 	return a.send(message)
 }
 
@@ -76,8 +92,7 @@ func (a *Session) send(message *iface.ActorMessage) error {
 	if a.GetAgent() == a.ctx.ID() {
 		return a.ctx.InvokerMessage(message)
 	} else {
-		node := a.ctx.Node()
-		system := node.System()
+		system := a.ctx.Node().System()
 		return system.Send(message)
 	}
 }
