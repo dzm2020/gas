@@ -27,7 +27,7 @@ type Config struct {
 	// ReadBufSize 读缓冲区大小
 	ReadBufSize int `json:"readBufSize,omitempty" yaml:"readBufSize,omitempty"`
 	// MaxConn 最大连接数
-	MaxConn int `json:"MaxConn,omitempty" yaml:"MaxConn,omitempty"`
+	MaxConn int `json:"maxConn,omitempty" yaml:"maxConn,omitempty"`
 	// TLS 证书文件路径
 	TlsCertFile string `json:"tlsCertFile,omitempty" yaml:"tlsCertFile,omitempty"`
 	// TLS 私钥文件路径

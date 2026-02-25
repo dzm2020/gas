@@ -93,13 +93,19 @@ func (agent *Agent) SetValue(ctx iface.IContext, s *session.Session, data []byte
 	if entity == nil {
 		return nil
 	}
-	ss := entity.Context().(*session.Session)
+	ss, ok := entity.Context().(*session.Session)
+	if ss == nil || !ok {
+		return nil
+	}
 	ss.Values = s.GetValues()
 	ss.Values = maputil.Merge(s.Values, s.GetValues())
 	return nil
 }
 
 func (agent *Agent) Shutdown(ctx iface.IContext, s *session.Session) error {
+	if s == nil {
+		return nil
+	}
 	glog.Info("关闭网络连接", zap.Int64("entityId", s.GetEntityId()))
 	entity := network.GetConnection(s.GetEntityId())
 	if entity == nil {

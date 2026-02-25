@@ -7,18 +7,10 @@ import (
 	"github.com/dzm2020/gas/internal/gate/protocol"
 )
 
-func TestNew(t *testing.T) {
-	c := New()
-	if c == nil {
-		t.Fatal("New() should not return nil")
-	}
-}
-
-func TestCodec_Encode_Decode_RoundTrip(t *testing.T) {
-	c := New()
+func TestEncode_Decode_RoundTrip(t *testing.T) {
 	msg := protocol.New(10, 20, []byte("hello world"))
 
-	encoded, err := c.Encode(msg)
+	encoded, err := Encode(msg)
 	if err != nil {
 		t.Fatalf("Encode: %v", err)
 	}
@@ -26,7 +18,7 @@ func TestCodec_Encode_Decode_RoundTrip(t *testing.T) {
 		t.Errorf("encoded length want >= %d, got %d", protocol.HeadLen, len(encoded))
 	}
 
-	out, n, err := c.Decode(encoded)
+	out, n, err := Decode(encoded)
 	if err != nil {
 		t.Fatalf("Decode: %v", err)
 	}
@@ -44,53 +36,40 @@ func TestCodec_Encode_Decode_RoundTrip(t *testing.T) {
 	}
 }
 
-
-func TestCodec_Encode_InvalidType(t *testing.T) {
-	c := New()
-	_, err := c.Encode("not a message")
-	if err != ErrInvalidCodecMessageType {
-		t.Errorf("Encode invalid type want ErrInvalidCodecMessageType, got %v", err)
-	}
-}
-
-func TestCodec_Decode_ShortBuffer(t *testing.T) {
-	c := New()
-	// 少于 HeadLen 的缓冲应返回 (nil, 0, nil) 表示数据不完整
+func TestDecode_ShortBuffer(t *testing.T) {
 	short := make([]byte, protocol.HeadLen-1)
-	msg, n, err := c.Decode(short)
+	msg, n, err := Decode(short)
 	if msg != nil || n != 0 || err != nil {
 		t.Errorf("short buffer: want (nil, 0, nil), got (%v, %d, %v)", msg, n, err)
 	}
 }
 
-func TestCodec_Decode_PartialBody(t *testing.T) {
-	c := New()
-	// 头部完整但 body 长度不足
+func TestDecode_PartialBody(t *testing.T) {
 	buf := make([]byte, protocol.HeadLen+5)
-	// Len = 100，但 buf 只有 5 字节 body
 	buf[0] = 0
 	buf[1] = 0
 	buf[2] = 0
 	buf[3] = 100
-	msg, n, err := c.Decode(buf)
+	msg, n, err := Decode(buf)
 	if msg != nil || n != 0 || err != nil {
 		t.Errorf("partial body: want (nil, 0, nil), got (%v, %d, %v)", msg, n, err)
 	}
 }
 
-func TestCodec_Encode_SetsLen(t *testing.T) {
-	c := New()
+func TestEncode_DoesNotMutateMsgLen(t *testing.T) {
 	data := []byte("abc")
 	msg := protocol.New(1, 2, data)
-	msg.Len = 999 // 会被 Encode 覆盖
+	msg.Len = 999
 
-	encoded, err := c.Encode(msg)
+	encoded, err := Encode(msg)
 	if err != nil {
 		t.Fatalf("Encode: %v", err)
 	}
-	// 前 4 字节为 BigEndian Len
-	out, _, _ := c.Decode(encoded)
+	if msg.Len != 999 {
+		t.Errorf("Encode must not mutate msg.Len: want 999, got %d", msg.Len)
+	}
+	out, _, _ := Decode(encoded)
 	if out.Len != uint32(len(data)) {
-		t.Errorf("Len want %d, got %d", len(data), out.Len)
+		t.Errorf("decoded Len want %d, got %d", len(data), out.Len)
 	}
 }

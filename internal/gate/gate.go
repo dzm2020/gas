@@ -71,9 +71,9 @@ func (g *Gate) OnMessage(entity network.IConnection, data []byte) (n int, err er
 		data = data[processN:]
 
 		//  提交到agent actor处理
-		s := entity.Context().(*session.Session)
-		if s.GetAgent() == nil {
-			return
+		s, ok := entity.Context().(*session.Session)
+		if !ok || s == nil || s.GetAgent() == nil {
+			return n, nil
 		}
 		err = g.system.SubmitTask(s.GetAgent(), func(ctx iface.IContext) error {
 			return g.onData(ctx, msg, s)
@@ -106,8 +106,8 @@ func (g *Gate) onData(ctx iface.IContext, msg *protocol.Message, s *session.Sess
 
 func (g *Gate) OnClose(entity network.IConnection, wrong error) {
 	g.count.Add(-1)
-	s := entity.Context().(*session.Session)
-	if s.GetAgent() == nil {
+	s, ok := entity.Context().(*session.Session)
+	if !ok || s == nil || s.GetAgent() == nil {
 		return
 	}
 	g.system.ShutdownProcess(s.GetAgent())

@@ -2,6 +2,7 @@ package codec
 
 import (
 	"encoding/binary"
+	"errors"
 
 	"github.com/dzm2020/gas/internal/gate/protocol"
 )
@@ -10,18 +11,24 @@ import (
 //	ErrInvalidCodecMessageType = fmt.Errorf("invalid message type")
 //)
 
-//func New() *Codec {
-//	return new(Codec)
-//}
+//	func New() *Codec {
+//		return new(Codec)
+//	}
 //
-//type Codec struct {
-//}
+// type Codec struct {
+// }
+const (
+	maxMsgSize = 1024 * 1024 // 1mb
+)
 
 func Encode(msg *protocol.Message) ([]byte, error) {
-	msg.Len = uint32(len(msg.Data))
+	dataLen := uint32(len(msg.Data))
+	if dataLen >= maxMsgSize {
+		return nil, errors.New("message too large")
+	}
 	buf := make([]byte, protocol.HeadLen+len(msg.Data))
 	offset := 0
-	binary.BigEndian.PutUint32(buf[offset:], msg.Len)
+	binary.BigEndian.PutUint32(buf[offset:], dataLen)
 	offset += 4
 	buf[offset] = msg.Cmd
 	offset += 1
@@ -40,6 +47,9 @@ func Decode(buf []byte) (*protocol.Message, int, error) {
 		return nil, 0, nil
 	}
 	l := binary.BigEndian.Uint32(buf)
+	if l >= maxMsgSize {
+		return nil, 0, errors.New("message too large")
+	}
 	total := protocol.HeadLen + int(l)
 	if len(buf) < total {
 		return nil, 0, nil
