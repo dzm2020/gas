@@ -13,27 +13,27 @@ import (
 )
 
 const (
-	Logger = "logger"
+	LoggerName = "logger"
 )
 
-// LoggerComponent glog 日志组件
-type LoggerComponent struct {
+// Logger glog 日志组件
+type Logger struct {
 	component.BaseComponent[iface.INode]
 	panicHook func(entry zapcore.Entry)
 }
 
-// NewLoggerComponent 创建 glog 组件
-func NewLoggerComponent(panicHook func(entry zapcore.Entry)) *LoggerComponent {
-	return &LoggerComponent{
+// NewLogger 创建 glog 组件
+func NewLogger(panicHook func(entry zapcore.Entry)) *Logger {
+	return &Logger{
 		panicHook: panicHook,
 	}
 }
 
-func (c *LoggerComponent) Name() string {
-	return Logger
+func (c *Logger) Name() string {
+	return LoggerName
 }
 
-func (c *LoggerComponent) Start(ctx context.Context, node iface.INode) error {
+func (c *Logger) Start(ctx context.Context, node iface.INode) error {
 	conf := logger.DefaultConfig()
 	if err := profile.Get(c.Name(), conf); err != nil {
 		return err
@@ -56,7 +56,7 @@ func (c *LoggerComponent) Start(ctx context.Context, node iface.INode) error {
 	return nil
 }
 
-func (c *LoggerComponent) Stop(ctx context.Context) error {
+func (c *Logger) Stop(ctx context.Context) error {
 	if err := logger.Stop(); err != nil {
 		return err
 	}

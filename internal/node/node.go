@@ -8,7 +8,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/dzm2020/gas/internal/actor"
 	"github.com/dzm2020/gas/internal/iface"
 	com "github.com/dzm2020/gas/internal/node/component"
 	"github.com/dzm2020/gas/internal/profile"
@@ -19,10 +18,6 @@ import (
 	"github.com/dzm2020/gas/pkg/lib/grs"
 	"github.com/dzm2020/gas/pkg/lib/xerror"
 
-	_ "github.com/dzm2020/gas/pkg/discovery/provider/consul"
-	_ "github.com/dzm2020/gas/pkg/messageQue/provider/nats"
-
-	"github.com/spf13/viper"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -34,7 +29,6 @@ func New(path string) *Node {
 		serializer: lib.Json,
 		IManager:   component.NewComponentsMgr[iface.INode](),
 		path:       path,
-		viper:      viper.New(),
 	}
 	return node
 }
@@ -43,25 +37,24 @@ type Node struct {
 	*iface.Member
 	component.IManager[iface.INode]
 	path       string
-	system     iface.ISystem
-	cluster    cluster.ICluster
 	serializer lib.ISerializer
 	panicHook  func(entry zapcore.Entry)
-	viper      *viper.Viper
 }
 
 func (n *Node) Info() *iface.Member {
 	return n.Member
 }
-func (n *Node) SetSystem(system iface.ISystem) {
-	n.system = system
-}
+
 func (n *Node) System() iface.ISystem {
-	return n.system
+	c := n.GetComponent(com.SystemName)
+	if c == nil {
+		return nil
+	}
+	return c.(iface.ISystem)
 }
 
 func (n *Node) Cluster() cluster.ICluster {
-	c := n.GetComponent(com.Cluster)
+	c := n.GetComponent(com.ClusterName)
 	if c == nil {
 		return nil
 	}
@@ -122,9 +115,9 @@ func (n *Node) Startup(comps ...component.IComponent[iface.INode]) (err error) {
 
 	// 注册组件
 	components := []component.IComponent[iface.INode]{
-		com.NewLoggerComponent(n.panicHook),
-		actor.NewComponent(),
-		com.NewClusterComponent(),
+		com.NewLogger(n.panicHook),
+		com.NewSystem(),
+		com.NewCluster(),
 	}
 
 	components = append(components, comps...)

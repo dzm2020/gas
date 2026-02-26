@@ -11,26 +11,26 @@ import (
 	"go.uber.org/zap"
 )
 
-const Cluster = "cluster"
+const ClusterName = "cluster"
 
-type ClusterComponent struct {
+type Cluster struct {
 	component.BaseComponent[iface.INode]
 	cluster.ICluster
 	node iface.INode
 }
 
-func NewClusterComponent() *ClusterComponent {
-	c := &ClusterComponent{
+func NewCluster() *Cluster {
+	c := &Cluster{
 		ICluster: &cluster.Cluster{},
 	}
 	return c
 }
 
-func (r *ClusterComponent) Name() string {
-	return Cluster
+func (r *Cluster) Name() string {
+	return ClusterName
 }
 
-func (r *ClusterComponent) Start(ctx context.Context, node iface.INode) (err error) {
+func (r *Cluster) Start(ctx context.Context, node iface.INode) (err error) {
 	r.node = node
 	//  创建cluster
 	conf := cluster.DefaultConfig()
@@ -59,7 +59,7 @@ func (r *ClusterComponent) Start(ctx context.Context, node iface.INode) (err err
 	return
 }
 
-func (r *ClusterComponent) OnMessage(data []byte, response func(data []byte) error) {
+func (r *Cluster) OnMessage(data []byte, response func(data []byte) error) {
 	message := &iface.Message{}
 	var err error
 	defer func() {
@@ -92,7 +92,7 @@ func (r *ClusterComponent) OnMessage(data []byte, response func(data []byte) err
 	}
 }
 
-func (r *ClusterComponent) Stop(ctx context.Context) error {
+func (r *Cluster) Stop(ctx context.Context) error {
 	//  注销
 	_ = r.Deregister(r.node.GetID())
 	return r.ICluster.Shutdown(ctx)

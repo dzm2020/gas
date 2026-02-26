@@ -26,7 +26,6 @@ type (
 		Info() *Member
 		SetSerializer(ser lib.ISerializer)
 		System() ISystem
-		SetSystem(system ISystem)
 		Cluster() cluster.ICluster
 		Startup(comps ...component.IComponent[INode]) error
 		Serializer() lib.ISerializer
