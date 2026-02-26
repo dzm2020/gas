@@ -24,8 +24,8 @@ const (
 type Pid struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	NodeId        uint64                 `protobuf:"varint,1,opt,name=nodeId,proto3" json:"nodeId,omitempty"`
-	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	ServiceId     uint64                 `protobuf:"varint,3,opt,name=serviceId,proto3" json:"serviceId,omitempty"`
+	ActorName     string                 `protobuf:"bytes,2,opt,name=actorName,proto3" json:"actorName,omitempty"`
+	ActorId       uint64                 `protobuf:"varint,3,opt,name=actorId,proto3" json:"actorId,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -67,16 +67,16 @@ func (x *Pid) GetNodeId() uint64 {
 	return 0
 }
 
-func (x *Pid) GetName() string {
+func (x *Pid) GetActorName() string {
 	if x != nil {
-		return x.Name
+		return x.ActorName
 	}
 	return ""
 }
 
-func (x *Pid) GetServiceId() uint64 {
+func (x *Pid) GetActorId() uint64 {
 	if x != nil {
-		return x.ServiceId
+		return x.ActorId
 	}
 	return 0
 }
@@ -329,11 +329,11 @@ var File_actor_proto protoreflect.FileDescriptor
 
 const file_actor_proto_rawDesc = "" +
 	"\n" +
-	"\vactor.proto\x12\x05actor\"O\n" +
+	"\vactor.proto\x12\x05actor\"U\n" +
 	"\x03Pid\x12\x16\n" +
-	"\x06nodeId\x18\x01 \x01(\x04R\x06nodeId\x12\x12\n" +
-	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1c\n" +
-	"\tserviceId\x18\x03 \x01(\x04R\tserviceId\"\xcd\x01\n" +
+	"\x06nodeId\x18\x01 \x01(\x04R\x06nodeId\x12\x1c\n" +
+	"\tactorName\x18\x02 \x01(\tR\tactorName\x12\x18\n" +
+	"\aactorId\x18\x03 \x01(\x04R\aactorId\"\xcd\x01\n" +
 	"\aMessage\x12\x1a\n" +
 	"\x02to\x18\x01 \x01(\v2\n" +
 	".actor.PidR\x02to\x12\x1e\n" +

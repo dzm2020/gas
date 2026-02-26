@@ -25,7 +25,7 @@ type actorContext struct {
 	router  iface.IRouter
 	msg     *iface.ActorMessage
 	node    iface.INode
-	system  iface.ISystem
+	system  *System
 	timeout time.Duration
 }
 
@@ -152,7 +152,7 @@ func (a *actorContext) exit() (err error) {
 	if err = a.actor.OnStop(a); err != nil {
 		return err
 	}
-	if err = a.system.Remove(a.pid); err != nil {
+	if err = a.system.remove(a.pid); err != nil {
 		return
 	}
 	return

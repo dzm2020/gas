@@ -110,7 +110,7 @@ func (g *Gate) OnClose(entity network.IConnection, wrong error) {
 	if !ok || s == nil || s.GetAgent() == nil {
 		return
 	}
-	g.system.ShutdownProcess(s.GetAgent())
+	_ = g.system.ShutdownProcess(s.GetAgent())
 }
 
 func (g *Gate) Stop(ctx context.Context) error {

@@ -35,19 +35,19 @@ const (
 var _ iface.ISystem = (*System)(nil)
 
 type System struct {
-	uniqId       atomic.Uint64
-	processDict  *maputil.ConcurrentMap[uint64, iface.IProcess] // ID到进程的映射
-	nameDict     *maputil.ConcurrentMap[string, *iface.Pid]     // 名字到进程ID的映射
+	autoId       atomic.Uint64
+	IdDict       *maputil.ConcurrentMap[uint64, iface.IContext] // ID到进程的映射
+	nameDict     *maputil.ConcurrentMap[string, iface.IContext] // 名字到进程ID的映射
 	shuttingDown atomic.Bool
 	node         iface.INode
 }
 
 func NewSystem(node iface.INode) *System {
 	return &System{
-		node:        node,
-		uniqId:      atomic.Uint64{},
-		processDict: maputil.NewConcurrentMap[uint64, iface.IProcess](10),
-		nameDict:    maputil.NewConcurrentMap[string, *iface.Pid](10),
+		node:     node,
+		autoId:   atomic.Uint64{},
+		IdDict:   maputil.NewConcurrentMap[uint64, iface.IContext](10),
+		nameDict: maputil.NewConcurrentMap[string, iface.IContext](10),
 	}
 }
 
@@ -56,7 +56,7 @@ func NewSystem(node iface.INode) *System {
 // Spawn 创建新的 Actor 进程
 func (s *System) Spawn(actor iface.IActor, args ...interface{}) *iface.Pid {
 	node := s.node
-	pid := iface.NewPid(node.GetID(), s.uniqId.Add(1))
+	pid := iface.NewPid(node.GetID(), s.autoId.Add(1))
 
 	ctx := &actorContext{
 		process: nil,
@@ -69,11 +69,12 @@ func (s *System) Spawn(actor iface.IActor, args ...interface{}) *iface.Pid {
 	}
 
 	mailBox := NewMailbox()
-	process := NewProcess(ctx, mailBox)
+	process := NewProcess(mailBox)
 	ctx.process = process
 
 	mailBox.RegisterHandlers(ctx, NewDefaultDispatcher(DefaultDispatcherThroughput))
-	s.Add(pid, process)
+
+	s.IdDict.Set(ctx.ID().GetActorId(), ctx)
 
 	// 提交初始化任务，如果失败则记录日志但不影响进程创建
 	if err := s.SubmitTask(pid, func(ctx iface.IContext) error {
@@ -85,54 +86,49 @@ func (s *System) Spawn(actor iface.IActor, args ...interface{}) *iface.Pid {
 	return pid
 }
 
-// Add 注册进程到系统中
-func (s *System) Add(pid *iface.Pid, process iface.IProcess) {
-	s.processDict.Set(pid.GetServiceId(), process)
-}
-
-// Remove 从系统中移除进程
-func (s *System) Remove(pid *iface.Pid) error {
-	s.processDict.Delete(pid.GetServiceId())
+// remove 从系统中移除进程
+func (s *System) remove(pid *iface.Pid) error {
+	s.IdDict.Delete(pid.GetActorId())
 	// 尝试取消命名，失败不影响移除操作
 	return s.Unname(pid)
 }
 
-func (s *System) GetProcess(to *iface.Pid) iface.IProcess {
-	if to == nil {
-		return nil
+func (s *System) GetContext(ref any) iface.IContext {
+	var ctx iface.IContext
+	switch v := ref.(type) {
+	case string:
+		ctx, _ = s.nameDict.Get(v)
+	case uint64:
+		ctx, _ = s.IdDict.Get(v)
+	case *iface.Pid:
+		if v == nil {
+			return nil
+		}
+		if v.GetActorId() > 0 {
+			ctx, _ = s.IdDict.Get(v.GetActorId())
+		} else if v.GetActorName() != "" {
+			ctx, _ = s.nameDict.Get(v.GetActorName())
+		}
 	}
-	if to.GetServiceId() > 0 {
-		return s.GetProcessById(to.GetServiceId())
-	}
-	if to.GetName() != "" {
-		return s.GetProcessByName(to.GetName())
-	}
-	return nil
+	return ctx
 }
 
-// GetProcessById 根据服务ID获取进程
-func (s *System) GetProcessById(id uint64) iface.IProcess {
-	process, _ := s.processDict.Get(id)
-	return process
-}
-
-// GetProcessByName 根据名字获取进程
-func (s *System) GetProcessByName(name string) iface.IProcess {
-	if name == "" {
+// GetProcess 根据 ref 获取进程，ref 可为 string(名字)、uint64(ActorId)、*Pid
+func (s *System) GetProcess(ref any) iface.IProcess {
+	ctx := s.GetContext(ref)
+	if ctx == nil {
 		return nil
 	}
-	pid, exists := s.nameDict.Get(name)
-	if !exists || pid == nil {
-		return nil
-	}
-	return s.GetProcessById(pid.GetServiceId())
+	return ctx.Process()
 }
 
 // GetAllProcesses 获取系统中所有进程
 func (s *System) GetAllProcesses() []iface.IProcess {
 	var processes []iface.IProcess
-	s.processDict.Range(func(_ uint64, value iface.IProcess) bool {
-		processes = append(processes, value)
+	s.IdDict.Range(func(_ uint64, ctx iface.IContext) bool {
+		if ctx != nil {
+			processes = append(processes, ctx.Process())
+		}
 		return true
 	})
 	return processes
@@ -146,7 +142,7 @@ func (s *System) Named(name string, pid *iface.Pid) error {
 		return ErrNameCannotBeEmpty
 	}
 
-	if pid.GetName() != "" {
+	if pid.GetActorName() != "" {
 		return ErrNameChangeNotAllowed
 	}
 
@@ -154,8 +150,12 @@ func (s *System) Named(name string, pid *iface.Pid) error {
 		return ErrNameAlreadyRegistered
 	}
 
-	pid.Name = name
-	s.nameDict.Set(name, pid)
+	ctx, ok := s.IdDict.Get(pid.GetActorId())
+	if !ok || ctx == nil {
+		return ErrProcessNotFound
+	}
+	ctx.ID().ActorName = name
+	s.nameDict.Set(name, ctx)
 
 	if !pid.IsGlobalName() {
 		return nil
@@ -173,10 +173,7 @@ func (s *System) clusterNamed(name string) error {
 	info := s.node.Info()
 	info.Tags = append(info.Tags, name)
 
-	if err := cluster.UpdateMember(); err != nil {
-		return err
-	}
-	return nil
+	return cluster.Update(info)
 }
 
 // HasName 检查名字是否已注册
@@ -187,12 +184,16 @@ func (s *System) HasName(name string) bool {
 
 // Unname 注销进程的名字
 func (s *System) Unname(pid *iface.Pid) error {
-	if pid.GetName() == "" {
+	if pid.GetActorName() == "" {
 		return nil
 	}
 
-	name := pid.GetName()
+	name := pid.GetActorName()
 	s.nameDict.Delete(name)
+	ctx, ok := s.IdDict.Get(pid.GetActorId())
+	if ok && ctx != nil && ctx.ID() != nil {
+		ctx.ID().ActorName = ""
+	}
 
 	if !pid.IsGlobalName() {
 		return nil
@@ -212,10 +213,7 @@ func (s *System) clusterUnname(name string) error {
 		return s == name
 	})
 
-	if err := cluster.UpdateMember(); err != nil {
-		return err
-	}
-	return nil
+	return cluster.Update(info)
 }
 
 // ==================== 消息发送 ====================
@@ -233,7 +231,7 @@ func (s *System) Send(message *iface.ActorMessage) error {
 	if cluster == nil {
 		return ErrClusterIsNil
 	}
-	if err := cluster.Send(message); err != nil {
+	if err := cluster.Send(message.To.NodeId, message); err != nil {
 		return err
 	}
 	return nil
@@ -241,6 +239,7 @@ func (s *System) Send(message *iface.ActorMessage) error {
 
 // Call 同步调用 Actor，等待响应
 func (s *System) Call(message *iface.ActorMessage) ([]byte, error) {
+	timeout := lib.DeadlineToTimeout(message.GetDeadline(), 0)
 	if s.isLocalMessage(message) {
 		return s.localCall(message)
 	}
@@ -248,7 +247,7 @@ func (s *System) Call(message *iface.ActorMessage) ([]byte, error) {
 	if cluster == nil {
 		return nil, ErrClusterIsNil
 	}
-	data, err := cluster.Call(message)
+	data, err := cluster.Call(message.To.NodeId, message, timeout)
 	if err != nil {
 		return nil, err
 	}
@@ -321,17 +320,19 @@ func (s *System) sendToProcess(to *iface.Pid, msg iface.IMessage) error {
 }
 
 func (s *System) Select(name string, strategy discovery.RouteStrategy) *iface.Pid {
-	process := s.GetProcessByName(name)
-	if process != nil {
-		return process.Context().ID()
+	ctx := s.GetContext(name)
+	if ctx != nil {
+		return ctx.ID()
 	}
 	cluster := s.node.Cluster()
-	nodeId := cluster.Select(name, strategy)
-
+	nodeId, err := cluster.Select(name, strategy)
+	if err != nil {
+		return nil
+	}
 	return &iface.Pid{
 		NodeId:    nodeId,
-		Name:      name,
-		ServiceId: 0,
+		ActorName: name,
+		ActorId:   0,
 	}
 }
 

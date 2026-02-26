@@ -1,15 +1,15 @@
 package actor
 
 import (
-	"github.com/dzm2020/gas/internal/iface"
 	"sync/atomic"
+
+	"github.com/dzm2020/gas/internal/iface"
 )
 
 // NewProcess 创建新的进程实例
-func NewProcess(ctx *actorContext, mailbox IMailbox) *Process {
+func NewProcess(mailbox IMailbox) *Process {
 	process := &Process{
 		mailbox: mailbox,
-		ctx:     ctx,
 	}
 	return process
 }
@@ -18,12 +18,7 @@ var _ iface.IProcess = (*Process)(nil)
 
 type Process struct {
 	mailbox  IMailbox
-	ctx      *actorContext
 	shutdown atomic.Bool
-}
-
-func (p *Process) Context() iface.IContext {
-	return p.ctx
 }
 
 func (p *Process) checkShutdown() error {
@@ -55,7 +50,7 @@ func (p *Process) Shutdown() error {
 
 	// 创建一个退出任务，通过 mailbox 发送，确保在消息处理完成后才执行退出
 	msg := iface.NewTaskMessage(func(ctx iface.IContext) error {
-		return p.ctx.exit()
+		return ctx.(*actorContext).exit()
 	})
 
 	return p.mailbox.PostMessage(msg)
