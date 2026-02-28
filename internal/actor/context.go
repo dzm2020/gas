@@ -129,13 +129,21 @@ func (a *actorContext) Forward(to *iface.Pid, method string) error {
 
 	return a.system.Send(message)
 }
+func (a *actorContext) GetName() string {
+	return a.pid.GetActorName()
+}
 
 func (a *actorContext) Named(name string) (err error) {
-	return a.system.Named(name, a.pid)
+	a.pid.ActorName = name
+	return a.system.named(a)
 }
 
 func (a *actorContext) Unname() error {
-	return a.system.Unname(a.pid)
+	if err := a.system.unname(a); err != nil {
+		return err
+	}
+	a.pid.ActorName = ""
+	return nil
 }
 
 // AfterFunc 注册一次性定时器
@@ -152,7 +160,7 @@ func (a *actorContext) exit() (err error) {
 	if err = a.actor.OnStop(a); err != nil {
 		return err
 	}
-	if err = a.system.remove(a.pid); err != nil {
+	if err = a.system.remove(a); err != nil {
 		return
 	}
 	return

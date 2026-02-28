@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/dzm2020/gas/internal/iface"
-	discovery "github.com/dzm2020/gas/pkg/cluster"
 	"github.com/dzm2020/gas/pkg/glog"
 	"github.com/dzm2020/gas/pkg/lib"
 	"github.com/dzm2020/gas/pkg/lib/xerror"
@@ -87,10 +86,10 @@ func (s *System) Spawn(actor iface.IActor, args ...interface{}) *iface.Pid {
 }
 
 // remove 从系统中移除进程
-func (s *System) remove(pid *iface.Pid) error {
-	s.IdDict.Delete(pid.GetActorId())
+func (s *System) remove(ctx iface.IContext) error {
+	s.IdDict.Delete(ctx.ID().GetActorId())
 	// 尝试取消命名，失败不影响移除操作
-	return s.Unname(pid)
+	return s.unname(ctx)
 }
 
 func (s *System) GetContext(ref any) iface.IContext {
@@ -137,27 +136,20 @@ func (s *System) GetAllProcesses() []iface.IProcess {
 // ==================== 名字管理 ====================
 
 // Named 为进程注册名字
-func (s *System) Named(name string, pid *iface.Pid) error {
-	if len(name) == 0 {
-		return ErrNameCannotBeEmpty
-	}
-
-	if pid.GetActorName() != "" {
+func (s *System) named(ctx iface.IContext) error {
+	name := ctx.GetName()
+	if name != "" {
 		return ErrNameChangeNotAllowed
 	}
 
-	if s.HasName(name) {
+	if s.hasName(name) {
 		return ErrNameAlreadyRegistered
 	}
 
-	ctx, ok := s.IdDict.Get(pid.GetActorId())
-	if !ok || ctx == nil {
-		return ErrProcessNotFound
-	}
-	ctx.ID().ActorName = name
 	s.nameDict.Set(name, ctx)
 
-	if !pid.IsGlobalName() {
+	isGlobalName := lib.IsFirstLetterUppercase(name)
+	if !isGlobalName {
 		return nil
 	}
 
@@ -176,29 +168,25 @@ func (s *System) clusterNamed(name string) error {
 	return cluster.Update(info)
 }
 
-// HasName 检查名字是否已注册
-func (s *System) HasName(name string) bool {
+// hasName 检查名字是否已注册
+func (s *System) hasName(name string) bool {
 	_, exists := s.nameDict.Get(name)
 	return exists
 }
 
-// Unname 注销进程的名字
-func (s *System) Unname(pid *iface.Pid) error {
-	if pid.GetActorName() == "" {
+// unname 注销进程的名字
+func (s *System) unname(ctx iface.IContext) error {
+	name := ctx.GetName()
+	if name == "" {
 		return nil
 	}
 
-	name := pid.GetActorName()
 	s.nameDict.Delete(name)
-	ctx, ok := s.IdDict.Get(pid.GetActorId())
-	if ok && ctx != nil && ctx.ID() != nil {
-		ctx.ID().ActorName = ""
-	}
 
-	if !pid.IsGlobalName() {
+	isGlobalName := lib.IsFirstLetterUppercase(name)
+	if !isGlobalName {
 		return nil
 	}
-
 	return s.clusterNamed(name)
 }
 
@@ -241,7 +229,7 @@ func (s *System) Send(message *iface.ActorMessage) error {
 func (s *System) Call(message *iface.ActorMessage) ([]byte, error) {
 	timeout := lib.DeadlineToTimeout(message.GetDeadline(), 0)
 	if s.isLocalMessage(message) {
-		return s.localCall(message)
+		return s.localCall(message, timeout)
 	}
 	cluster := s.node.Cluster()
 	if cluster == nil {
@@ -255,8 +243,7 @@ func (s *System) Call(message *iface.ActorMessage) ([]byte, error) {
 }
 
 // localCall 本地同步调用
-func (s *System) localCall(message *iface.ActorMessage) (data []byte, err error) {
-	timeout := lib.DeadlineToTimeout(message.GetDeadline(), 0)
+func (s *System) localCall(message *iface.ActorMessage, timeout time.Duration) (data []byte, err error) {
 	waiter := lib.NewChanWaiter[[]byte](timeout)
 	message.SetResponse(func(bin []byte, e error) {
 		waiter.Done(bin, e)
@@ -317,23 +304,6 @@ func (s *System) sendToProcess(to *iface.Pid, msg iface.IMessage) error {
 		return xerror.Wrapf(err, "发送消息到进程失败 (pid=%v)", to)
 	}
 	return nil
-}
-
-func (s *System) Select(name string, strategy discovery.RouteStrategy) *iface.Pid {
-	ctx := s.GetContext(name)
-	if ctx != nil {
-		return ctx.ID()
-	}
-	cluster := s.node.Cluster()
-	nodeId, err := cluster.Select(name, strategy)
-	if err != nil {
-		return nil
-	}
-	return &iface.Pid{
-		NodeId:    nodeId,
-		ActorName: name,
-		ActorId:   0,
-	}
 }
 
 func (s *System) ShutdownProcess(pid *iface.Pid) error {

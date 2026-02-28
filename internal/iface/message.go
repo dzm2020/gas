@@ -3,7 +3,6 @@ package iface
 import (
 	"errors"
 	"fmt"
-	"github.com/dzm2020/gas/pkg/lib"
 )
 
 var (
@@ -111,10 +110,6 @@ func NewPidWithName(name string, nodeId uint64) *Pid {
 		Name:   name,
 		NodeId: nodeId,
 	}
-}
-
-func (p *Pid) IsGlobalName() bool {
-	return lib.IsFirstLetterUppercase(p.GetName())
 }
 
 func NewResponse(data []byte, err error) *Response {

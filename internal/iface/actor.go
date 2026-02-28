@@ -3,7 +3,6 @@ package iface
 import (
 	"time"
 
-	discovery "github.com/dzm2020/gas/pkg/cluster"
 	"github.com/dzm2020/gas/pkg/lib"
 )
 
@@ -21,9 +20,6 @@ type (
 
 	ISystem interface {
 		Spawn(actor IActor, args ...interface{}) *Pid
-		Named(name string, pid *Pid) error
-		Unname(pid *Pid) error
-		HasName(name string) bool
 		GetProcess(ref interface{}) IProcess
 		GetAllProcesses() []IProcess
 		SubmitTask(pid *Pid, task Task) (err error)
@@ -32,7 +28,6 @@ type (
 		Call(message *ActorMessage) (data []byte, err error)
 		ShutdownProcess(pid *Pid) error
 		Shutdown() error
-		Select(name string, strategy discovery.RouteStrategy) *Pid
 	}
 
 	IContext interface {
@@ -40,6 +35,7 @@ type (
 		ID() *Pid
 		Named(name string) error
 		Unname() error
+		GetName() string
 		Actor() IActor
 		SetCallTimeout(timeout time.Duration)
 		Send(to *Pid, methodName string, request interface{}) error
