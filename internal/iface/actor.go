@@ -19,8 +19,10 @@ type (
 	}
 
 	ISystem interface {
+		NodeId() uint64
 		NextID() uint64
-		Node() INode
+
+		Serializer() lib.ISerializer
 
 		Spawn(actor IActor, args ...interface{}) *Pid
 
@@ -45,6 +47,7 @@ type (
 	IContext interface {
 		IMessageInvoker
 		ID() *Pid
+		Serializer() lib.ISerializer
 		Named(name string) error
 		Unname() error
 		GetName() string
@@ -58,7 +61,6 @@ type (
 		Process() IProcess
 		System() ISystem
 		Shutdown() error
-		Node() INode // 获取节点引用，用于序列化等操作
 	}
 	IActor interface {
 		OnInit(ctx IContext, params []interface{}) error

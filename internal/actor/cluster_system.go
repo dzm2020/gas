@@ -11,9 +11,9 @@ import (
 
 // NewClusterSystem 创建集群版 Actor 系统。
 // node 为当前节点，transport 用于跨节点通信与集群元数据同步。
-func NewClusterSystem(node iface.INode, transport cluster.ICluster) *ClusterSystem {
+func NewClusterSystem(selfNodeID uint64, serializer lib.ISerializer, transport cluster.ICluster) *ClusterSystem {
 	return &ClusterSystem{
-		System:    NewSystem(node),
+		System:    NewSystem(selfNodeID, serializer),
 		transport: transport,
 	}
 }
@@ -21,7 +21,6 @@ func NewClusterSystem(node iface.INode, transport cluster.ICluster) *ClusterSyst
 // ClusterSystem 在 System 之上增加集群能力：本地消息走嵌入的 System，跨节点走 transport。
 type ClusterSystem struct {
 	*System                    // 本地 Actor 系统，负责本节点进程与消息
-	node      iface.INode      // 当前节点，用于判断消息是否发往本节点
 	transport cluster.ICluster // 集群传输，用于跨节点 Send/Call 与节点信息更新
 }
 
@@ -31,7 +30,7 @@ func (s *ClusterSystem) Spawn(actor iface.IActor, args ...interface{}) *iface.Pi
 
 // isLocalMessage 判断消息目标是否为本节点（按 NodeId 比较）。
 func (s *ClusterSystem) isLocalMessage(message *iface.ActorMessage) bool {
-	return message.GetTo().GetNodeId() == s.node.GetID()
+	return message.GetTo().GetNodeId() == s.NodeId()
 }
 
 // Send 发送消息：目标为本节点则走 System.Send，否则通过 transport 发往目标节点。

@@ -310,7 +310,7 @@ func (r *Router) handleSyncMessage(ctx iface.IContext, methodName string, data [
 
 	// 序列化响应（response 是最后一个参数）
 	responseValue := callArgs[len(callArgs)-1]
-	responseData, err := ctx.Node().Marshal(responseValue.Interface())
+	responseData, err := ctx.Serializer().Marshal(responseValue.Interface())
 	if err != nil {
 		return nil, xerror.Wrap(err, "序列化响应失败")
 	}
@@ -355,7 +355,7 @@ func (r *Router) createRequestValue(requestType reflect.Type, isByteRequest bool
 	// 其他类型（指针类型）需要反序列化
 	requestValue := reflect.New(requestType.Elem())
 
-	if err := ctx.Node().Unmarshal(data, requestValue.Interface()); err != nil {
+	if err := ctx.Serializer().Unmarshal(data, requestValue.Interface()); err != nil {
 		return reflect.Value{}, xerror.Wrapf(err, "反序列化请求参数失败 (type=%v)", requestType)
 	}
 	return requestValue, nil

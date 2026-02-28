@@ -19,22 +19,20 @@ const DefaultCallTimeout = 3 * time.Second
 var _ iface.IContext = (*actorContext)(nil)
 
 type actorContext struct {
-	process iface.IProcess // 保存自己的 process 引用
-	pid     *iface.Pid
-	actor   iface.IActor
-	router  iface.IRouter
-	msg     *iface.ActorMessage
-	node    iface.INode
-	system  iface.ISystem
-	timeout time.Duration
+	process    iface.IProcess // 保存自己的 process 引用
+	pid        *iface.Pid
+	actor      iface.IActor
+	router     iface.IRouter
+	msg        *iface.ActorMessage
+	system     iface.ISystem
+	timeout    time.Duration
+	serializer lib.ISerializer
 }
 
 func (a *actorContext) ID() *iface.Pid {
 	return a.pid
 }
-func (a *actorContext) Node() iface.INode {
-	return a.node
-}
+
 func (a *actorContext) System() iface.ISystem {
 	return a.system
 }
@@ -44,6 +42,11 @@ func (a *actorContext) Process() iface.IProcess {
 func (a *actorContext) Actor() iface.IActor {
 	return a.actor
 }
+
+func (a *actorContext) Serializer() lib.ISerializer {
+	return a.serializer
+}
+
 func (a *actorContext) GetName() string {
 	return a.pid.GetActorName()
 }
@@ -111,7 +114,7 @@ func (a *actorContext) execHandler(msg *iface.Message) ([]byte, error) {
 
 func (a *actorContext) Send(pid *iface.Pid, methodName string, request interface{}) (err error) {
 	var data []byte
-	data, err = a.node.Marshal(request)
+	data, err = a.serializer.Marshal(request)
 	if err != nil {
 		return
 	}
@@ -128,7 +131,7 @@ func (a *actorContext) SetCallTimeout(timeout time.Duration) {
 // Call 带超时的同步调用
 func (a *actorContext) Call(to *iface.Pid, methodName string, request interface{}, reply interface{}) (err error) {
 	var data []byte
-	data, err = a.node.Marshal(request)
+	data, err = a.serializer.Marshal(request)
 	if err != nil {
 		return
 	}
@@ -141,7 +144,7 @@ func (a *actorContext) Call(to *iface.Pid, methodName string, request interface{
 	if err != nil {
 		return
 	}
-	return a.node.Unmarshal(data, reply)
+	return a.serializer.Unmarshal(data, reply)
 }
 
 func (a *actorContext) Forward(to *iface.Pid, method string) error {

@@ -31,17 +31,17 @@ const (
 
 // spawn 创建并注册新 Actor 进程，投递 OnInit 任务后返回 Pid。
 func spawn(s iface.ISystem, actor iface.IActor, args ...interface{}) *iface.Pid {
-	node := s.Node()
-	pid := iface.NewPid(node.GetID(), s.NextID())
+
+	pid := iface.NewPid(s.NodeId(), s.NextID())
 
 	ctx := &actorContext{
-		process: nil,
-		pid:     pid,
-		actor:   actor,
-		router:  GetRouterForActor(actor),
-		node:    node,
-		system:  s,
-		timeout: DefaultCallTimeout,
+		process:    nil,
+		pid:        pid,
+		actor:      actor,
+		router:     GetRouterForActor(actor),
+		system:     s,
+		timeout:    DefaultCallTimeout,
+		serializer: s.Serializer(),
 	}
 
 	mailBox := NewMailbox()
@@ -63,31 +63,37 @@ func spawn(s iface.ISystem, actor iface.IActor, args ...interface{}) *iface.Pid 
 
 var _ iface.ISystem = (*System)(nil)
 
+// NewSystem 构造本节点 Actor 系统，node 用于生成 Pid 与获取节点信息。
+func NewSystem(selfNodeID uint64, serializer lib.ISerializer) *System {
+	return &System{
+		selfNodeID: selfNodeID,
+		autoId:     atomic.Uint64{},
+		serializer: serializer,
+		IdDict:     maputil.NewConcurrentMap[uint64, iface.IContext](10),
+		nameDict:   maputil.NewConcurrentMap[string, iface.IContext](10),
+	}
+}
+
 // System 单节点 Actor 系统：维护进程表与名字表，负责本节点内 Spawn/消息/任务/关闭。
 type System struct {
 	stopper.Stopper
+	selfNodeID   uint64
 	autoId       atomic.Uint64
+	serializer   lib.ISerializer
 	IdDict       *maputil.ConcurrentMap[uint64, iface.IContext] // ActorId -> IContext
 	nameDict     *maputil.ConcurrentMap[string, iface.IContext] // 名字 -> IContext
 	shuttingDown atomic.Bool
-	node         iface.INode
-}
-
-// NewSystem 构造本节点 Actor 系统，node 用于生成 Pid 与获取节点信息。
-func NewSystem(node iface.INode) *System {
-	return &System{
-		node:     node,
-		autoId:   atomic.Uint64{},
-		IdDict:   maputil.NewConcurrentMap[uint64, iface.IContext](10),
-		nameDict: maputil.NewConcurrentMap[string, iface.IContext](10),
-	}
 }
 
 func (s *System) NextID() uint64 {
 	return s.autoId.Add(1)
 }
-func (s *System) Node() iface.INode {
-	return s.node
+func (s *System) NodeId() uint64 {
+	return s.selfNodeID
+}
+
+func (s *System) Serializer() lib.ISerializer {
+	return s.serializer
 }
 
 // Spawn 创建并注册新 Actor 进程，投递 OnInit 任务后返回 Pid。
