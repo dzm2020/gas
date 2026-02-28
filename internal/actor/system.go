@@ -147,9 +147,7 @@ func (s *System) GetProcess(ref any) iface.IProcess {
 func (s *System) GetAllProcesses() []iface.IProcess {
 	var processes []iface.IProcess
 	s.IdDict.Range(func(_ uint64, ctx iface.IContext) bool {
-		if ctx != nil {
-			processes = append(processes, ctx.Process())
-		}
+		processes = append(processes, ctx.Process())
 		return true
 	})
 	return processes
