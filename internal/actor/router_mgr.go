@@ -1,10 +1,11 @@
 package actor
 
 import (
-	"github.com/dzm2020/gas/internal/iface"
-	"github.com/dzm2020/gas/pkg/glog"
 	"reflect"
 	"sync"
+
+	"github.com/dzm2020/gas/internal/iface"
+	"github.com/dzm2020/gas/pkg/glog"
 
 	"go.uber.org/zap"
 )

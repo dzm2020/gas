@@ -1,60 +1,80 @@
 package actor
 
+// Package actor cluster_system.go 提供集群版 Actor 系统（ClusterSystem），在嵌入的 System 基础上
+// 通过 transport 支持跨节点消息（Send/Call）与全局命名（Named/Unname）。
 import (
-	"time"
-
 	"github.com/dzm2020/gas/internal/iface"
 	"github.com/dzm2020/gas/pkg/cluster"
 	"github.com/dzm2020/gas/pkg/lib"
+	"golang.org/x/exp/slices"
 )
 
-type ClusterSystem struct {
-	selfNodeID string // 本节点 ID
-	transport  cluster.ICluster
+// NewClusterSystem 创建集群版 Actor 系统。
+// node 为当前节点，transport 用于跨节点通信与集群元数据同步。
+func NewClusterSystem(node iface.INode, transport cluster.ICluster) *ClusterSystem {
+	return &ClusterSystem{
+		System:    NewSystem(node),
+		transport: transport,
+	}
 }
 
-func (s *ClusterSystem) clusterNamed(name string) error {
+// ClusterSystem 在 System 之上增加集群能力：本地消息走嵌入的 System，跨节点走 transport。
+type ClusterSystem struct {
+	*System                    // 本地 Actor 系统，负责本节点进程与消息
+	node      iface.INode      // 当前节点，用于判断消息是否发往本节点
+	transport cluster.ICluster // 集群传输，用于跨节点 Send/Call 与节点信息更新
+}
+
+// isLocalMessage 判断消息目标是否为本节点（按 NodeId 比较）。
+func (s *ClusterSystem) isLocalMessage(message *iface.ActorMessage) bool {
+	return message.GetTo().GetNodeId() == s.node.GetID()
+}
+
+// Send 发送消息：目标为本节点则走 System.Send，否则通过 transport 发往目标节点。
+func (s *ClusterSystem) Send(message *iface.ActorMessage) (err error) {
+	if s.isLocalMessage(message) {
+		return s.System.Send(message)
+	}
+	return s.transport.Send(message.To.NodeId, message)
+}
+
+// Call 同步调用：目标为本节点则走 System.Call，否则通过 transport 发往目标节点并等待响应。
+func (s *ClusterSystem) Call(message *iface.ActorMessage) (data []byte, err error) {
+	timeout := lib.DeadlineToTimeout(message.GetDeadline(), 0)
+	if s.isLocalMessage(message) {
+		return s.System.Call(message)
+	}
+	return s.transport.Call(message.To.NodeId, message, timeout)
+}
+
+// Named 为进程注册名字：先在本地 System 注册，若名字首字母大写则视为全局名并同步到集群（更新节点 Tags）。
+func (s *ClusterSystem) Named(ctx iface.IContext) error {
+	if err := s.System.Named(ctx); err != nil {
+		return err
+	}
+	name := ctx.GetName()
+	isGlobalName := lib.IsFirstLetterUppercase(name)
+	if !isGlobalName {
+		return nil
+	}
 	info := s.node.Info()
 	info.Tags = append(info.Tags, name)
 	return s.transport.Update(info)
 }
 
-func (s *ClusterSystem) clusterUnname(name string) error {
-	cluster := s.node.Cluster()
-	if cluster == nil {
-		return ErrClusterIsNil
+// Unname 注销进程名字：先在本地 System 注销，若为全局名则从集群节点 Tags 中移除该名字。
+func (s *ClusterSystem) Unname(ctx iface.IContext) error {
+	if err := s.System.Unname(ctx); err != nil {
+		return err
+	}
+	name := ctx.GetName()
+	isGlobalName := lib.IsFirstLetterUppercase(name)
+	if !isGlobalName {
+		return nil
 	}
 	info := s.node.Info()
-
 	info.Tags = slices.DeleteFunc(info.Tags, func(s string) bool {
 		return s == name
 	})
-
-	return cluster.Update(info)
-}
-
-// SubmitTask 提交异步任务到指定进程
-func (s *ClusterSystem) SubmitTask(to *iface.Pid, task iface.Task) error {
-	msg := iface.NewTaskMessage(task)
-	return s.sendToProcess(to, msg)
-}
-
-// SubmitTaskAndWait 提交同步任务到指定进程，等待执行完成
-func (s *ClusterSystem) SubmitTaskAndWait(to *iface.Pid, task iface.Task, timeout time.Duration) (err error) {
-	waiter := lib.NewChanWaiter[[]byte](timeout)
-
-	syncTask := func(ctx iface.IContext) error {
-		taskErr := task(ctx)
-		waiter.Done(nil, taskErr)
-		return taskErr
-	}
-
-	msg := iface.NewTaskMessage(syncTask)
-	if err = s.sendToProcess(to, msg); err != nil {
-		waiter.Done(nil, err)
-		return err
-	}
-
-	_, err = waiter.Wait()
-	return
+	return s.transport.Update(info)
 }

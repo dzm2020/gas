@@ -116,8 +116,8 @@ func (n *Node) Startup(comps ...component.IComponent[iface.INode]) (err error) {
 	// 注册组件
 	components := []component.IComponent[iface.INode]{
 		com.NewLogger(n.panicHook),
-		com.NewSystem(),
 		com.NewCluster(),
+		com.NewSystem(),
 	}
 
 	components = append(components, comps...)

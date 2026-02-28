@@ -20,13 +20,22 @@ type (
 
 	ISystem interface {
 		Spawn(actor IActor, args ...interface{}) *Pid
-		GetProcess(ref interface{}) IProcess
-		GetAllProcesses() []IProcess
+
+		Register(ctx IContext) error
+		Unregister(ctx IContext) error
+
+		Named(ctx IContext) error
+		Unname(ctx IContext) error
+
 		SubmitTask(pid *Pid, task Task) (err error)
 		SubmitTaskAndWait(pid *Pid, task Task, timeout time.Duration) (err error)
 		Send(message *ActorMessage) (err error)
 		Call(message *ActorMessage) (data []byte, err error)
+
+		GetProcess(ref interface{}) IProcess
+		GetAllProcesses() []IProcess
 		ShutdownProcess(pid *Pid) error
+
 		Shutdown() error
 	}
 

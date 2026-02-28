@@ -2,13 +2,14 @@ package actor
 
 import (
 	"errors"
-	"github.com/dzm2020/gas/internal/iface"
-	"github.com/dzm2020/gas/internal/session"
-	"github.com/dzm2020/gas/pkg/glog"
-	"github.com/dzm2020/gas/pkg/lib/xerror"
 	"reflect"
 	"sync"
 	"unicode"
+
+	"github.com/dzm2020/gas/internal/gate/session"
+	"github.com/dzm2020/gas/internal/iface"
+	"github.com/dzm2020/gas/pkg/glog"
+	"github.com/dzm2020/gas/pkg/lib/xerror"
 
 	"go.uber.org/zap"
 )

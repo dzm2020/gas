@@ -25,7 +25,7 @@ type actorContext struct {
 	router  iface.IRouter
 	msg     *iface.ActorMessage
 	node    iface.INode
-	system  *System
+	system  iface.ISystem
 	timeout time.Duration
 }
 
@@ -135,11 +135,11 @@ func (a *actorContext) GetName() string {
 
 func (a *actorContext) Named(name string) (err error) {
 	a.pid.ActorName = name
-	return a.system.named(a)
+	return a.system.Named(a)
 }
 
 func (a *actorContext) Unname() error {
-	if err := a.system.unname(a); err != nil {
+	if err := a.system.Unname(a); err != nil {
 		return err
 	}
 	a.pid.ActorName = ""
@@ -154,16 +154,6 @@ func (a *actorContext) AfterFunc(duration time.Duration, task iface.Task) *lib.T
 			glog.Error("提交定时器任务失败", zap.Error(err))
 		}
 	})
-}
-
-func (a *actorContext) exit() (err error) {
-	if err = a.actor.OnStop(a); err != nil {
-		return err
-	}
-	if err = a.system.remove(a); err != nil {
-		return
-	}
-	return
 }
 
 func (a *actorContext) Shutdown() error {

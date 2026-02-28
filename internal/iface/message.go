@@ -81,7 +81,7 @@ func (m *ActorMessage) Validate() error {
 	}
 
 	// 验证目标进程 ID 是否有效
-	if m.GetTo().GetServiceId() == 0 && m.GetTo().GetName() == "" {
+	if m.GetTo().GetActorId() == 0 && m.GetTo().GetActorName() == "" {
 		return ErrMessageTargetInvalid
 	}
 
@@ -99,16 +99,16 @@ func (m *ActorMessage) SetResponse(f ResponseFunc) {
 	m.response = f
 }
 
-func NewPid(nodeId uint64, serviceId uint64) *Pid {
+func NewPid(nodeId uint64, actorId uint64) *Pid {
 	return &Pid{
-		NodeId:    nodeId,
-		ServiceId: serviceId,
+		NodeId:  nodeId,
+		ActorId: actorId,
 	}
 }
 func NewPidWithName(name string, nodeId uint64) *Pid {
 	return &Pid{
-		Name:   name,
-		NodeId: nodeId,
+		ActorName: name,
+		NodeId:    nodeId,
 	}
 }
 
