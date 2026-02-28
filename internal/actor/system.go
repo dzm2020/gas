@@ -1,6 +1,6 @@
-// system.go 实现单节点 Actor 系统（System）：进程创建与注册、名字管理、本地消息与任务派发、优雅关闭。
 package actor
 
+// system.go 实现单节点 Actor 系统（System）：进程创建与注册、名字管理、本地消息与任务派发、优雅关闭。
 import (
 	"errors"
 	"sync/atomic"
