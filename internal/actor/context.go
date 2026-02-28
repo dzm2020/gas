@@ -44,6 +44,32 @@ func (a *actorContext) Process() iface.IProcess {
 func (a *actorContext) Actor() iface.IActor {
 	return a.actor
 }
+func (a *actorContext) GetName() string {
+	return a.pid.GetActorName()
+}
+
+func (a *actorContext) Named(name string) (err error) {
+	a.pid.ActorName = name
+	return a.system.Named(a)
+}
+
+func (a *actorContext) Unname() error {
+	if err := a.system.Unname(a); err != nil {
+		return err
+	}
+	a.pid.ActorName = ""
+	return nil
+}
+
+// AfterFunc 注册一次性定时器
+func (a *actorContext) AfterFunc(duration time.Duration, task iface.Task) *lib.Timer {
+	return lib.AfterFunc(duration, func() {
+		msg := iface.NewTaskMessage(task)
+		if err := a.process.PostMessage(msg); err != nil {
+			glog.Error("提交定时器任务失败", zap.Error(err))
+		}
+	})
+}
 
 func (a *actorContext) Message() *iface.ActorMessage {
 	return a.msg
@@ -72,8 +98,7 @@ func (a *actorContext) handleMessage(m *iface.ActorMessage) error {
 	err := a.actor.OnMessage(a, m.Message)
 	m.Response(nil, err)
 	a.msg = nil
-
-	glog.Warn("actor没有找到消息路由,执行默认方法", zap.Any("pid", a.ID()), zap.String("method", methodName))
+	glog.Debug("actor没有找到消息路由,执行默认方法", zap.Any("pid", a.ID()), zap.String("method", methodName))
 	return err
 }
 
@@ -128,32 +153,6 @@ func (a *actorContext) Forward(to *iface.Pid, method string) error {
 	message.Method = method
 
 	return a.system.Send(message)
-}
-func (a *actorContext) GetName() string {
-	return a.pid.GetActorName()
-}
-
-func (a *actorContext) Named(name string) (err error) {
-	a.pid.ActorName = name
-	return a.system.Named(a)
-}
-
-func (a *actorContext) Unname() error {
-	if err := a.system.Unname(a); err != nil {
-		return err
-	}
-	a.pid.ActorName = ""
-	return nil
-}
-
-// AfterFunc 注册一次性定时器
-func (a *actorContext) AfterFunc(duration time.Duration, task iface.Task) *lib.Timer {
-	return lib.AfterFunc(duration, func() {
-		msg := iface.NewTaskMessage(task)
-		if err := a.process.PostMessage(msg); err != nil {
-			glog.Error("提交定时器任务失败", zap.Error(err))
-		}
-	})
 }
 
 func (a *actorContext) Shutdown() error {

@@ -29,34 +29,10 @@ const (
 	DefaultDispatcherThroughput = 1024 // 默认调度器吞吐量
 )
 
-var _ iface.ISystem = (*System)(nil)
-
-// System 单节点 Actor 系统：维护进程表与名字表，负责本节点内 Spawn/消息/任务/关闭。
-type System struct {
-	stopper.Stopper
-	autoId       atomic.Uint64
-	IdDict       *maputil.ConcurrentMap[uint64, iface.IContext] // ActorId -> IContext
-	nameDict     *maputil.ConcurrentMap[string, iface.IContext] // 名字 -> IContext
-	shuttingDown atomic.Bool
-	node         iface.INode
-}
-
-// NewSystem 构造本节点 Actor 系统，node 用于生成 Pid 与获取节点信息。
-func NewSystem(node iface.INode) *System {
-	return &System{
-		node:     node,
-		autoId:   atomic.Uint64{},
-		IdDict:   maputil.NewConcurrentMap[uint64, iface.IContext](10),
-		nameDict: maputil.NewConcurrentMap[string, iface.IContext](10),
-	}
-}
-
-// -------------------- 进程管理 --------------------
-
-// Spawn 创建并注册新 Actor 进程，投递 OnInit 任务后返回 Pid。
-func (s *System) Spawn(actor iface.IActor, args ...interface{}) *iface.Pid {
-	node := s.node
-	pid := iface.NewPid(node.GetID(), s.autoId.Add(1))
+// spawn 创建并注册新 Actor 进程，投递 OnInit 任务后返回 Pid。
+func spawn(s iface.ISystem, actor iface.IActor, args ...interface{}) *iface.Pid {
+	node := s.Node()
+	pid := iface.NewPid(node.GetID(), s.NextID())
 
 	ctx := &actorContext{
 		process: nil,
@@ -83,6 +59,40 @@ func (s *System) Spawn(actor iface.IActor, args ...interface{}) *iface.Pid {
 	}
 
 	return pid
+}
+
+var _ iface.ISystem = (*System)(nil)
+
+// System 单节点 Actor 系统：维护进程表与名字表，负责本节点内 Spawn/消息/任务/关闭。
+type System struct {
+	stopper.Stopper
+	autoId       atomic.Uint64
+	IdDict       *maputil.ConcurrentMap[uint64, iface.IContext] // ActorId -> IContext
+	nameDict     *maputil.ConcurrentMap[string, iface.IContext] // 名字 -> IContext
+	shuttingDown atomic.Bool
+	node         iface.INode
+}
+
+// NewSystem 构造本节点 Actor 系统，node 用于生成 Pid 与获取节点信息。
+func NewSystem(node iface.INode) *System {
+	return &System{
+		node:     node,
+		autoId:   atomic.Uint64{},
+		IdDict:   maputil.NewConcurrentMap[uint64, iface.IContext](10),
+		nameDict: maputil.NewConcurrentMap[string, iface.IContext](10),
+	}
+}
+
+func (s *System) NextID() uint64 {
+	return s.autoId.Add(1)
+}
+func (s *System) Node() iface.INode {
+	return s.node
+}
+
+// Spawn 创建并注册新 Actor 进程，投递 OnInit 任务后返回 Pid。
+func (s *System) Spawn(actor iface.IActor, args ...interface{}) *iface.Pid {
+	return spawn(s, actor, args...)
 }
 
 // Register 将已构建的 Context 注册到系统（写入 IdDict），调用方需保证 Pid 已设置。

@@ -9,41 +9,48 @@ import (
 
 	"github.com/dzm2020/gas/internal/iface"
 	"github.com/dzm2020/gas/pkg/cluster"
+	discovery "github.com/dzm2020/gas/pkg/discovery/iface"
 	"github.com/dzm2020/gas/pkg/lib"
 	"github.com/dzm2020/gas/pkg/lib/component"
-	discovery "github.com/dzm2020/gas/pkg/discovery/iface"
 )
+
+// 用于 Send/Call 测试的请求与响应类型（可 JSON 序列化）
+type appendReq struct{ S string }
+type emptyReq struct{}
+type getLastResp struct{ S string }
+type echoReq struct{ Msg string }
+type echoResp struct{ Msg string }
 
 // -------------------- mock INode --------------------
 
 type mockNode struct {
-	id   uint64
-	sys  iface.ISystem
-	ser  lib.ISerializer
-	mgr  component.IManager[iface.INode]
+	id  uint64
+	sys iface.ISystem
+	ser lib.ISerializer
+	mgr component.IManager[iface.INode]
 }
 
-func (m *mockNode) GetKind() string                              { return "test" }
-func (m *mockNode) GetID() uint64                               { return m.id }
-func (m *mockNode) GetAddress() string                          { return "" }
-func (m *mockNode) GetPort() int                                 { return 0 }
-func (m *mockNode) GetTags() []string                           { return nil }
-func (m *mockNode) GetMeta() map[string]string                  { return nil }
-func (m *mockNode) Marshal(msg interface{}) ([]byte, error)     { return m.ser.Marshal(msg) }
-func (m *mockNode) Unmarshal(data []byte, msg interface{}) error { return m.ser.Unmarshal(data, msg) }
-func (m *mockNode) Info() *discovery.Member                     { return &discovery.Member{Id: m.id} }
-func (m *mockNode) SetSerializer(ser lib.ISerializer)           { m.ser = ser }
-func (m *mockNode) System() iface.ISystem                        { return m.sys }
-func (m *mockNode) Cluster() cluster.ICluster                   { return nil }
-func (m *mockNode) Serializer() lib.ISerializer                  { return m.ser }
-func (m *mockNode) Startup(comps ...component.IComponent[iface.INode]) error { return nil }
-func (m *mockNode) Init(t iface.INode) error                    { return nil }
-func (m *mockNode) Start(ctx context.Context, t iface.INode) error { return nil }
-func (m *mockNode) Stop(ctx context.Context) error               { return nil }
-func (m *mockNode) ComponentCount() int                          { return 0 }
+func (m *mockNode) GetKind() string                                            { return "test" }
+func (m *mockNode) GetID() uint64                                              { return m.id }
+func (m *mockNode) GetAddress() string                                         { return "" }
+func (m *mockNode) GetPort() int                                               { return 0 }
+func (m *mockNode) GetTags() []string                                          { return nil }
+func (m *mockNode) GetMeta() map[string]string                                 { return nil }
+func (m *mockNode) Marshal(msg interface{}) ([]byte, error)                    { return m.ser.Marshal(msg) }
+func (m *mockNode) Unmarshal(data []byte, msg interface{}) error               { return m.ser.Unmarshal(data, msg) }
+func (m *mockNode) Info() *discovery.Member                                    { return &discovery.Member{Id: m.id} }
+func (m *mockNode) SetSerializer(ser lib.ISerializer)                          { m.ser = ser }
+func (m *mockNode) System() iface.ISystem                                      { return m.sys }
+func (m *mockNode) Cluster() cluster.ICluster                                  { return nil }
+func (m *mockNode) Serializer() lib.ISerializer                                { return m.ser }
+func (m *mockNode) Startup(comps ...component.IComponent[iface.INode]) error   { return nil }
+func (m *mockNode) Init(t iface.INode) error                                   { return nil }
+func (m *mockNode) Start(ctx context.Context, t iface.INode) error             { return nil }
+func (m *mockNode) Stop(ctx context.Context) error                             { return nil }
+func (m *mockNode) ComponentCount() int                                        { return 0 }
 func (m *mockNode) GetComponent(name string) component.IComponent[iface.INode] { return nil }
-func (m *mockNode) GetComponentNames() []string                 { return nil }
-func (m *mockNode) Register(c component.IComponent[iface.INode]) error { return nil }
+func (m *mockNode) GetComponentNames() []string                                { return nil }
+func (m *mockNode) Register(c component.IComponent[iface.INode]) error         { return nil }
 
 var _ iface.INode = (*mockNode)(nil)
 
@@ -51,9 +58,38 @@ var _ iface.INode = (*mockNode)(nil)
 
 type testActor struct{ iface.Actor }
 
-func (a *testActor) OnInit(ctx iface.IContext, _ []interface{}) error { return nil }
+func (a *testActor) OnInit(ctx iface.IContext, _ []interface{}) error  { return nil }
 func (a *testActor) OnMessage(ctx iface.IContext, _ interface{}) error { return nil }
-func (a *testActor) OnStop(ctx iface.IContext) error                  { return nil }
+func (a *testActor) OnStop(ctx iface.IContext) error                   { return nil }
+
+// sendCallTestActor 用于测试 Send：异步 Append 写入，同步 GetLast 读出。
+type sendCallTestActor struct {
+	iface.Actor
+	last string
+}
+
+func (a *sendCallTestActor) OnInit(ctx iface.IContext, _ []interface{}) error  { return nil }
+func (a *sendCallTestActor) OnMessage(ctx iface.IContext, _ interface{}) error { return nil }
+func (a *sendCallTestActor) OnStop(ctx iface.IContext) error                   { return nil }
+func (a *sendCallTestActor) Append(ctx iface.IContext, req *appendReq) error {
+	a.last = req.S
+	return nil
+}
+func (a *sendCallTestActor) GetLast(ctx iface.IContext, _ *emptyReq, resp *getLastResp) error {
+	resp.S = a.last
+	return nil
+}
+
+// echoActor 用于测试 Call：同步 Echo 回显请求内容。
+type echoActor struct{ iface.Actor }
+
+func (a *echoActor) OnInit(ctx iface.IContext, _ []interface{}) error  { return nil }
+func (a *echoActor) OnMessage(ctx iface.IContext, _ interface{}) error { return nil }
+func (a *echoActor) OnStop(ctx iface.IContext) error                   { return nil }
+func (a *echoActor) Echo(ctx iface.IContext, req *echoReq, resp *echoResp) error {
+	resp.Msg = req.Msg
+	return nil
+}
 
 // -------------------- System 构造与进程查找 --------------------
 
@@ -328,5 +364,73 @@ func TestSystem_sendToProcess_processNotFound(t *testing.T) {
 	}
 	if !errors.Is(err, ErrProcessNotFound) {
 		t.Errorf("SubmitTask err = %v, want ErrProcessNotFound", err)
+	}
+}
+
+func TestSystem_Send(t *testing.T) {
+	node := &mockNode{id: 1, ser: lib.Json}
+	sys := NewSystem(node)
+	node.sys = sys
+
+	pid := sys.Spawn(&sendCallTestActor{})
+	if pid == nil {
+		t.Fatal("Spawn returned nil")
+	}
+
+	data, err := node.Marshal(&appendReq{S: "hello"})
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	msg := iface.NewActorMessage(nil, pid, "Append", data)
+	if err := sys.Send(msg); err != nil {
+		t.Fatalf("Send: %v", err)
+	}
+	// 等待 mailbox 处理完 Append
+	_ = sys.SubmitTaskAndWait(pid, func(iface.IContext) error { return nil }, 2*time.Second)
+
+	// 通过 Call GetLast 校验异步 Append 已生效
+	emptyData, _ := node.Marshal(&emptyReq{})
+	callMsg := iface.NewActorMessage(nil, pid, "GetLast", emptyData)
+	callMsg.Deadline = time.Now().Add(3 * time.Second).Unix()
+	reply, err := sys.Call(callMsg)
+	if err != nil {
+		t.Fatalf("Call GetLast: %v", err)
+	}
+	var resp getLastResp
+	if err := node.Unmarshal(reply, &resp); err != nil {
+		t.Fatalf("Unmarshal GetLast response: %v", err)
+	}
+	if resp.S != "hello" {
+		t.Errorf("GetLast after Append want S=hello, got S=%q", resp.S)
+	}
+}
+
+func TestSystem_Call(t *testing.T) {
+	node := &mockNode{id: 1, ser: lib.Json}
+	sys := NewSystem(node)
+	node.sys = sys
+
+	pid := sys.Spawn(&echoActor{})
+	if pid == nil {
+		t.Fatal("Spawn returned nil")
+	}
+
+	req := &echoReq{Msg: "ping"}
+	data, err := node.Marshal(req)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	msg := iface.NewActorMessage(nil, pid, "Echo", data)
+	msg.Deadline = time.Now().Add(3 * time.Second).Unix()
+	reply, err := sys.Call(msg)
+	if err != nil {
+		t.Fatalf("Call Echo: %v", err)
+	}
+	var resp echoResp
+	if err := node.Unmarshal(reply, &resp); err != nil {
+		t.Fatalf("Unmarshal Echo response: %v", err)
+	}
+	if resp.Msg != "ping" {
+		t.Errorf("Call Echo want Msg=ping, got Msg=%q", resp.Msg)
 	}
 }

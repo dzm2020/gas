@@ -25,6 +25,10 @@ type ClusterSystem struct {
 	transport cluster.ICluster // 集群传输，用于跨节点 Send/Call 与节点信息更新
 }
 
+func (s *ClusterSystem) Spawn(actor iface.IActor, args ...interface{}) *iface.Pid {
+	return spawn(s, actor, args...)
+}
+
 // isLocalMessage 判断消息目标是否为本节点（按 NodeId 比较）。
 func (s *ClusterSystem) isLocalMessage(message *iface.ActorMessage) bool {
 	return message.GetTo().GetNodeId() == s.node.GetID()

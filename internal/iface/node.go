@@ -28,6 +28,5 @@ type (
 		System() ISystem
 		Cluster() cluster.ICluster
 		Startup(comps ...component.IComponent[INode]) error
-		Serializer() lib.ISerializer
 	}
 )

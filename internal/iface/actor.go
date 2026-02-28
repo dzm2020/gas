@@ -19,6 +19,9 @@ type (
 	}
 
 	ISystem interface {
+		NextID() uint64
+		Node() INode
+
 		Spawn(actor IActor, args ...interface{}) *Pid
 
 		Register(ctx IContext) error
