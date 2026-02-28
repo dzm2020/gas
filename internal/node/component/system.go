@@ -27,7 +27,7 @@ func (c *System) Name() string {
 }
 
 func (c *System) Start(ctx context.Context, node iface.INode) error {
-	c.System = actor.NewSystem(node)
+	c.System = actor.NewSystem(node.GetID(), node.Serializer())
 	return nil
 }
 

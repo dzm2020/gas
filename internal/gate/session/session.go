@@ -47,8 +47,7 @@ func (a *Session) Meta() *iface.Session {
 	return a.Session
 }
 func (a *Session) Response(request interface{}) error {
-	node := a.ctx.Node()
-	bin, err := node.Marshal(request)
+	bin, err := a.ctx.Serializer().Marshal(request)
 	if err != nil {
 		return err
 	}
@@ -75,8 +74,7 @@ func (a *Session) SetValue(key, value string) error {
 }
 
 func (a *Session) Push(cmd, act uint16, request interface{}) error {
-	node := a.ctx.Node()
-	bin, err := node.Marshal(request)
+	bin, err := a.ctx.Serializer().Marshal(request)
 	if err != nil {
 		return err
 	}
@@ -91,10 +89,8 @@ func (a *Session) Push(cmd, act uint16, request interface{}) error {
 func (a *Session) send(message *iface.ActorMessage) error {
 	if a.GetAgent() == a.ctx.ID() {
 		return a.ctx.InvokerMessage(message)
-	} else {
-		system := a.ctx.Node().System()
-		return system.Send(message)
 	}
+	return a.ctx.System().Send(message)
 }
 
 func (a *Session) Close() error {

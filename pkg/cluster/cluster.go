@@ -24,19 +24,22 @@ var (
 
 type ICluster interface {
 	Run(ctx context.Context) error
+	Subscribe(nodeId uint64, subscriber messageQue.ISubscriber) (messageQue.ISubscription, error)
 
 	Send(nodeId uint64, message interface{}) (err error)
 	Call(nodeId uint64, message interface{}, timeout time.Duration) (data []byte, err error)
-	Subscribe(nodeId uint64, subscriber messageQue.ISubscriber) (messageQue.ISubscription, error)
+
+	Register(member *discovery.Member) error
+	Deregister(memberId uint64) error
+	Update(member *discovery.Member) error
 
 	Select(name string, strategy RouteStrategy) (uint64, error)
-	Register(member *discovery.Member) error
-	Update(member *discovery.Member) error
-	Deregister(memberId uint64) error
+
 	GetById(memberId uint64) *discovery.Member
 	GetByKind(kind string) map[uint64]*discovery.Member
 	GetByTag(tag string) []*discovery.Member
 	GetAll() map[uint64]*discovery.Member
+
 	Watch(kind string, handler discovery.ServiceChangeHandler)
 	Unwatch(kind string, handler discovery.ServiceChangeHandler)
 
@@ -70,7 +73,8 @@ type Cluster struct {
 	stopper.Stopper
 	serializer lib.ISerializer
 	discovery.IDiscovery
-	mq messageQue.IMessageQue
+	mq        messageQue.IMessageQue
+	localInfo *discovery.Member
 }
 
 func (r *Cluster) Start(ctx context.Context) error {

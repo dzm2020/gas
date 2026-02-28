@@ -10,11 +10,12 @@ import (
 )
 
 // NewClusterSystem 创建集群版 Actor 系统。
-// node 为当前节点，transport 用于跨节点通信与集群元数据同步。
-func NewClusterSystem(selfNodeID uint64, serializer lib.ISerializer, transport cluster.ICluster) *ClusterSystem {
+// selfNodeID 为当前节点 ID，serializer 用于序列化，transport 用于跨节点通信与集群元数据同步。
+func NewClusterSystem(localInfo *iface.Member, serializer lib.ISerializer, transport cluster.ICluster) *ClusterSystem {
 	return &ClusterSystem{
-		System:    NewSystem(selfNodeID, serializer),
+		System:    NewSystem(localInfo.GetID(), serializer),
 		transport: transport,
+		localInfo: localInfo,
 	}
 }
 
@@ -22,6 +23,7 @@ func NewClusterSystem(selfNodeID uint64, serializer lib.ISerializer, transport c
 type ClusterSystem struct {
 	*System                    // 本地 Actor 系统，负责本节点进程与消息
 	transport cluster.ICluster // 集群传输，用于跨节点 Send/Call 与节点信息更新
+	localInfo *iface.Member    // 本节点集群信息，Named/Unname 时更新 Tags 并 Sync
 }
 
 func (s *ClusterSystem) Spawn(actor iface.IActor, args ...interface{}) *iface.Pid {
@@ -60,9 +62,8 @@ func (s *ClusterSystem) Named(ctx iface.IContext) error {
 	if !isGlobalName {
 		return nil
 	}
-	info := s.node.Info()
-	info.Tags = append(info.Tags, name)
-	return s.transport.Update(info)
+	s.localInfo.Tags = append(s.localInfo.Tags, name)
+	return s.transport.Update(s.localInfo)
 }
 
 // Unname 注销进程名字：先在本地 System 注销，若为全局名则从集群节点 Tags 中移除该名字。
@@ -75,9 +76,8 @@ func (s *ClusterSystem) Unname(ctx iface.IContext) error {
 	if !isGlobalName {
 		return nil
 	}
-	info := s.node.Info()
-	info.Tags = slices.DeleteFunc(info.Tags, func(s string) bool {
-		return s == name
+	s.localInfo.Tags = slices.DeleteFunc(s.localInfo.Tags, func(t string) bool {
+		return t == name
 	})
-	return s.transport.Update(info)
+	return s.transport.Update(s.localInfo)
 }

@@ -24,6 +24,7 @@ type (
 		lib.ISerializer
 		component.IManager[INode]
 		Info() *Member
+		Serializer() lib.ISerializer
 		SetSerializer(ser lib.ISerializer)
 		System() ISystem
 		Cluster() cluster.ICluster
