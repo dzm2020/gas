@@ -31,12 +31,13 @@ func (r *Cluster) Name() string {
 }
 
 func (r *Cluster) Start(ctx context.Context, node iface.INode) (err error) {
-	r.node = node
-	//  创建cluster
-	conf := cluster.DefaultConfig()
-	if err = profile.Get(r.Name(), conf); err != nil {
-		return err
+	if profile.IsSingleNodeMode() {
+		return
 	}
+	r.node = node
+
+	conf := profile.GetCluster()
+
 	r.ICluster, err = cluster.New(conf, node)
 
 	if err != nil {

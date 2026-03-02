@@ -34,10 +34,7 @@ func (c *Logger) Name() string {
 }
 
 func (c *Logger) Start(ctx context.Context, node iface.INode) error {
-	conf := logger.DefaultConfig()
-	if err := profile.Get(c.Name(), conf); err != nil {
-		return err
-	}
+	conf := profile.GetLogger()
 
 	logger.Init(conf)
 

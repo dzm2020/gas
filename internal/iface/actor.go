@@ -52,14 +52,14 @@ type (
 		Unname() error
 		GetName() string
 		Actor() IActor
+		Message() *ActorMessage
+		Process() IProcess
+		System() ISystem
 		SetCallTimeout(timeout time.Duration)
 		Send(to *Pid, methodName string, request interface{}) error
 		Call(to *Pid, methodName string, request interface{}, reply interface{}) error
 		Forward(to *Pid, method string) error
 		AfterFunc(duration time.Duration, task Task) *lib.Timer
-		Message() *ActorMessage
-		Process() IProcess
-		System() ISystem
 		Shutdown() error
 	}
 	IActor interface {

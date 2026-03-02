@@ -1,7 +1,7 @@
 package actor
 
 // Package actor cluster_system.go 提供集群版 Actor 系统（ClusterSystem），在嵌入的 System 基础上
-// 通过 transport 支持跨节点消息（Send/Call）与全局命名（Named/Unname）。
+// 通过 transport 支持跨节点消息（Send/Call）
 import (
 	"github.com/dzm2020/gas/internal/iface"
 	"github.com/dzm2020/gas/pkg/cluster"
@@ -22,7 +22,7 @@ func NewClusterSystem(selfNodeID uint64, serializer lib.ISerializer, transport c
 type ClusterSystem struct {
 	*System    // 本地 Actor 系统，负责本节点进程与消息
 	selfNodeID uint64
-	transport  cluster.ICluster // 集群传输，用于跨节点 Send/Call 与节点信息更新
+	transport  cluster.ICluster // 集群传输，用于跨节点 Send/Call
 }
 
 func (s *ClusterSystem) Spawn(actor iface.IActor, args ...interface{}) *iface.Pid {

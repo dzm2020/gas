@@ -77,12 +77,11 @@ func NewSystem(selfNodeID uint64, serializer lib.ISerializer) *System {
 // System 单节点 Actor 系统：维护进程表与名字表，负责本节点内 Spawn/消息/任务/关闭。
 type System struct {
 	stopper.Stopper
-	selfNodeID   uint64
-	autoId       atomic.Uint64
-	serializer   lib.ISerializer
-	IdDict       *maputil.ConcurrentMap[uint64, iface.IContext] // ActorId -> IContext
-	nameDict     *maputil.ConcurrentMap[string, iface.IContext] // 名字 -> IContext
-	shuttingDown atomic.Bool
+	selfNodeID uint64
+	autoId     atomic.Uint64
+	serializer lib.ISerializer
+	IdDict     *maputil.ConcurrentMap[uint64, iface.IContext] // ActorId -> IContext
+	nameDict   *maputil.ConcurrentMap[string, iface.IContext] // 名字 -> IContext
 }
 
 func (s *System) NextID() uint64 {

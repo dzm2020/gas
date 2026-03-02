@@ -1,8 +1,9 @@
 package profile
 
 import (
+	"github.com/dzm2020/gas/pkg/cluster"
 	"github.com/dzm2020/gas/pkg/glog"
-
+	logger "github.com/dzm2020/gas/pkg/glog"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
 )
@@ -29,4 +30,23 @@ func Init(path string) {
 
 func Get(key string, cfg interface{}) error {
 	return vp.UnmarshalKey(key, cfg)
+}
+
+func IsSingleNodeMode() bool {
+	return viper.GetBool("single-node")
+}
+
+func GetCluster() *cluster.Config {
+	conf := cluster.DefaultConfig()
+	if err := Get("cluster", conf); err != nil {
+
+	}
+	return conf
+}
+
+func GetLogger() *logger.Config {
+	conf := logger.DefaultConfig()
+	if err := Get("logger", conf); err != nil {
+	}
+	return conf
 }
