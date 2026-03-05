@@ -1,0 +1,223 @@
+{"L":"debug","T":"2026/03/02 16:38:21.435572+0800","C":"nats/client.go:51","M":"NATS启动成功","address":["nats://127.0.0.1:4222"]}
+{"L":"debug","T":"2026/03/02 16:38:21.452415+0800","C":"consul/provider.go:75","M":"CONSUL启动成功","address":"127.0.0.1:8500"}
+{"L":"debug","T":"2026/03/02 16:38:21.452415+0800","C":"consul/provider.go:100","M":"CONSUL关闭","address":"127.0.0.1:8500"}
+{"L":"debug","T":"2026/03/02 16:38:21.453504+0800","C":"nats/client.go:105","M":"NATS关闭","address":["nats://127.0.0.1:4222"]}
+{"L":"debug","T":"2026/03/02 16:38:21.460425+0800","C":"nats/client.go:51","M":"NATS启动成功","address":["nats://127.0.0.1:4222"]}
+{"L":"debug","T":"2026/03/02 16:38:21.460425+0800","C":"consul/provider.go:75","M":"CONSUL启动成功","address":"127.0.0.1:8500"}
+{"L":"debug","T":"2026/03/02 16:38:21.472353+0800","C":"consul/serviceHealth.go:124","M":"定时更新TTL","memberId":1}
+{"L":"debug","T":"2026/03/02 16:38:21.472353+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{"1":{"id":1,"kind":"cluster-test-svc","address":"127.0.0.1","port":8080,"tags":[],"meta":null,"status":"passing"}}}
+{"L":"debug","T":"2026/03/02 16:38:21.974923+0800","C":"consul/serviceHealth.go:124","M":"定时更新TTL","memberId":1}
+{"L":"debug","T":"2026/03/02 16:38:22.472278+0800","C":"consul/serviceHealth.go:124","M":"定时更新TTL","memberId":1}
+{"L":"debug","T":"2026/03/02 16:38:22.477574+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{"1":{"id":1,"kind":"cluster-test-svc","address":"127.0.0.1","port":8080,"tags":[],"meta":null,"status":"passing"}}}
+{"L":"debug","T":"2026/03/02 16:38:22.973153+0800","C":"consul/serviceHealth.go:124","M":"定时更新TTL","memberId":1}
+{"L":"debug","T":"2026/03/02 16:38:23.470924+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:23.472574+0800","C":"consul/provider.go:100","M":"CONSUL关闭","address":"127.0.0.1:8500"}
+{"L":"debug","T":"2026/03/02 16:38:23.473097+0800","C":"nats/client.go:105","M":"NATS关闭","address":["nats://127.0.0.1:4222"]}
+{"L":"debug","T":"2026/03/02 16:38:23.478016+0800","C":"nats/client.go:51","M":"NATS启动成功","address":["nats://127.0.0.1:4222"]}
+{"L":"debug","T":"2026/03/02 16:38:23.478540+0800","C":"consul/provider.go:75","M":"CONSUL启动成功","address":"127.0.0.1:8500"}
+{"L":"debug","T":"2026/03/02 16:38:23.485969+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{"1":{"id":1,"kind":"cluster-test-call","address":"127.0.0.1","port":8081,"tags":[],"meta":null,"status":"passing"}}}
+{"L":"debug","T":"2026/03/02 16:38:23.486494+0800","C":"consul/serviceHealth.go:124","M":"定时更新TTL","memberId":1}
+{"L":"debug","T":"2026/03/02 16:38:23.987447+0800","C":"consul/serviceHealth.go:124","M":"定时更新TTL","memberId":1}
+{"L":"debug","T":"2026/03/02 16:38:24.488332+0800","C":"consul/serviceHealth.go:124","M":"定时更新TTL","memberId":1}
+{"L":"debug","T":"2026/03/02 16:38:24.489428+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{"1":{"id":1,"kind":"cluster-test-call","address":"127.0.0.1","port":8081,"tags":[],"meta":null,"status":"passing"}}}
+{"L":"debug","T":"2026/03/02 16:38:24.988549+0800","C":"consul/serviceHealth.go:124","M":"定时更新TTL","memberId":1}
+{"L":"debug","T":"2026/03/02 16:38:25.485132+0800","C":"consul/serviceHealth.go:124","M":"定时更新TTL","memberId":1}
+{"L":"debug","T":"2026/03/02 16:38:25.489310+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:25.490364+0800","C":"consul/provider.go:100","M":"CONSUL关闭","address":"127.0.0.1:8500"}
+{"L":"debug","T":"2026/03/02 16:38:25.490906+0800","C":"nats/client.go:105","M":"NATS关闭","address":["nats://127.0.0.1:4222"]}
+{"L":"debug","T":"2026/03/02 16:38:25.495121+0800","C":"nats/client.go:51","M":"NATS启动成功","address":["nats://127.0.0.1:4222"]}
+{"L":"debug","T":"2026/03/02 16:38:25.495121+0800","C":"consul/provider.go:75","M":"CONSUL启动成功","address":"127.0.0.1:8500"}
+{"L":"debug","T":"2026/03/02 16:38:25.495121+0800","C":"consul/provider.go:100","M":"CONSUL关闭","address":"127.0.0.1:8500"}
+{"L":"debug","T":"2026/03/02 16:38:25.496177+0800","C":"nats/client.go:105","M":"NATS关闭","address":["nats://127.0.0.1:4222"]}
+{"L":"debug","T":"2026/03/02 16:38:25.499283+0800","C":"nats/client.go:51","M":"NATS启动成功","address":["nats://127.0.0.1:4222"]}
+{"L":"debug","T":"2026/03/02 16:38:25.499808+0800","C":"consul/provider.go:75","M":"CONSUL启动成功","address":"127.0.0.1:8500"}
+{"L":"debug","T":"2026/03/02 16:38:25.508517+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{"10":{"id":10,"kind":"cluster-test-select","address":"127.0.0.1","port":9010,"tags":["tag1"],"meta":null,"status":"passing"}}}
+{"L":"debug","T":"2026/03/02 16:38:25.512793+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{"10":{"id":10,"kind":"cluster-test-select","address":"127.0.0.1","port":9010,"tags":["tag1"],"meta":null,"status":"passing"},"20":{"id":20,"kind":"cluster-test-select","address":"127.0.0.1","port":9020,"tags":["tag1"],"meta":null,"status":"passing"}}}
+{"L":"debug","T":"2026/03/02 16:38:25.513844+0800","C":"consul/serviceHealth.go:124","M":"定时更新TTL","memberId":10}
+{"L":"debug","T":"2026/03/02 16:38:25.514887+0800","C":"consul/serviceHealth.go:124","M":"定时更新TTL","memberId":20}
+{"L":"debug","T":"2026/03/02 16:38:25.721962+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:26.009897+0800","C":"consul/serviceHealth.go:124","M":"定时更新TTL","memberId":10}
+{"L":"debug","T":"2026/03/02 16:38:26.014668+0800","C":"consul/serviceHealth.go:124","M":"定时更新TTL","memberId":20}
+{"L":"debug","T":"2026/03/02 16:38:26.509891+0800","C":"consul/serviceHealth.go:124","M":"定时更新TTL","memberId":10}
+{"L":"debug","T":"2026/03/02 16:38:26.513850+0800","C":"consul/serviceHealth.go:124","M":"定时更新TTL","memberId":20}
+{"L":"debug","T":"2026/03/02 16:38:26.514367+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{"10":{"id":10,"kind":"cluster-test-select","address":"127.0.0.1","port":9010,"tags":["tag1"],"meta":null,"status":"passing"},"20":{"id":20,"kind":"cluster-test-select","address":"127.0.0.1","port":9020,"tags":["tag1"],"meta":null,"status":"passing"}}}
+{"L":"debug","T":"2026/03/02 16:38:26.722265+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:26.722914+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:27.009522+0800","C":"consul/serviceHealth.go:124","M":"定时更新TTL","memberId":10}
+{"L":"debug","T":"2026/03/02 16:38:27.014344+0800","C":"consul/serviceHealth.go:124","M":"定时更新TTL","memberId":20}
+{"L":"debug","T":"2026/03/02 16:38:27.509521+0800","C":"consul/serviceHealth.go:124","M":"定时更新TTL","memberId":10}
+{"L":"debug","T":"2026/03/02 16:38:27.514789+0800","C":"consul/serviceHealth.go:124","M":"定时更新TTL","memberId":20}
+{"L":"debug","T":"2026/03/02 16:38:27.514789+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{"20":{"id":20,"kind":"cluster-test-select","address":"127.0.0.1","port":9020,"tags":["tag1"],"meta":null,"status":"passing"}}}
+{"L":"debug","T":"2026/03/02 16:38:27.516346+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:27.517498+0800","C":"consul/provider.go:100","M":"CONSUL关闭","address":"127.0.0.1:8500"}
+{"L":"debug","T":"2026/03/02 16:38:27.518028+0800","C":"nats/client.go:105","M":"NATS关闭","address":["nats://127.0.0.1:4222"]}
+{"L":"debug","T":"2026/03/02 16:38:27.524251+0800","C":"nats/client.go:51","M":"NATS启动成功","address":["nats://127.0.0.1:4222"]}
+{"L":"debug","T":"2026/03/02 16:38:27.524251+0800","C":"consul/provider.go:75","M":"CONSUL启动成功","address":"127.0.0.1:8500"}
+{"L":"debug","T":"2026/03/02 16:38:27.530809+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{"100":{"id":100,"kind":"cluster-test-reg","address":"127.0.0.1","port":9100,"tags":["t1"],"meta":null,"status":"passing"}}}
+{"L":"debug","T":"2026/03/02 16:38:27.531329+0800","C":"consul/serviceHealth.go:124","M":"定时更新TTL","memberId":100}
+{"L":"debug","T":"2026/03/02 16:38:27.731802+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:27.746652+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:27.751389+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:27.751912+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:27.765128+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:27.773214+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:27.773739+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:27.785931+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:27.793421+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:27.799645+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:27.808056+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:27.814175+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:27.814680+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:27.827159+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:27.833428+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:27.841039+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:27.846268+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:27.854870+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:27.863263+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:27.870531+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:27.872050+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:27.883761+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:27.891654+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:27.897683+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:27.904999+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:27.911792+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:27.918054+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:27.925212+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:27.931429+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:27.938899+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:27.945842+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:27.978515+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.068144+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.068751+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.095198+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.117400+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.134162+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.135188+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.163330+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.163851+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.184175+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.194277+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.196315+0800","C":"consul/serviceHealth.go:124","M":"定时更新TTL","memberId":100}
+{"L":"debug","T":"2026/03/02 16:38:28.206294+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.214016+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.222552+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.230782+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.240772+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.247980+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.256588+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.264562+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.273827+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.281026+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.292145+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.301575+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.314244+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.323348+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.332068+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.340587+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.348069+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.357683+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.367842+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.377709+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.385089+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.414083+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.441930+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.442999+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.473787+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.491613+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.502851+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.511932+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.527837+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.531906+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{"100":{"id":100,"kind":"cluster-test-reg","address":"127.0.0.1","port":9100,"tags":["t1"],"meta":null,"status":"passing"}}}
+{"L":"debug","T":"2026/03/02 16:38:28.546265+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.556481+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.563678+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.573216+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.580782+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.590309+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.597683+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.604981+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.613294+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.624987+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.627998+0800","C":"consul/serviceHealth.go:124","M":"定时更新TTL","memberId":100}
+{"L":"debug","T":"2026/03/02 16:38:28.635082+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.643004+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.650218+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.660077+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.667001+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.674997+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.682772+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.692016+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.699420+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.707519+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.714746+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.723671+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.730059+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.737742+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.745838+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.754806+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.762813+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:28.764454+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{"100":{"id":100,"kind":"test","address":"127.0.0.1","port":8080,"tags":[],"meta":null,"status":"passing"}}}
+{"L":"debug","T":"2026/03/02 16:38:29.040255+0800","C":"consul/serviceHealth.go:124","M":"定时更新TTL","memberId":100}
+{"L":"debug","T":"2026/03/02 16:38:29.546054+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:29.546054+0800","C":"consul/serviceHealth.go:124","M":"定时更新TTL","memberId":100}
+{"L":"debug","T":"2026/03/02 16:38:29.547061+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{"100":{"id":100,"kind":"cluster-test-reg","address":"127.0.0.1","port":9101,"tags":["t1"],"meta":null,"status":"passing"}}}
+{"L":"debug","T":"2026/03/02 16:38:29.547955+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:29.564293+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:30.551017+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:30.566530+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:31.563691+0800","C":"consul/provider.go:100","M":"CONSUL关闭","address":"127.0.0.1:8500"}
+{"L":"debug","T":"2026/03/02 16:38:31.564207+0800","C":"nats/client.go:105","M":"NATS关闭","address":["nats://127.0.0.1:4222"]}
+{"L":"debug","T":"2026/03/02 16:38:31.569168+0800","C":"nats/client.go:51","M":"NATS启动成功","address":["nats://127.0.0.1:4222"]}
+{"L":"debug","T":"2026/03/02 16:38:31.569168+0800","C":"consul/provider.go:75","M":"CONSUL启动成功","address":"127.0.0.1:8500"}
+{"L":"debug","T":"2026/03/02 16:38:31.571219+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:31.571759+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:31.576867+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{"201":{"id":201,"kind":"cluster-test-get","address":"127.0.0.1","port":9201,"tags":["tagA"],"meta":null,"status":"passing"}}}
+{"L":"debug","T":"2026/03/02 16:38:31.582837+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{"201":{"id":201,"kind":"cluster-test-get","address":"127.0.0.1","port":9201,"tags":["tagA"],"meta":null,"status":"passing"},"202":{"id":202,"kind":"cluster-test-get","address":"127.0.0.1","port":9202,"tags":["tagA"],"meta":null,"status":"passing"}}}
+{"L":"debug","T":"2026/03/02 16:38:31.583904+0800","C":"consul/serviceHealth.go:124","M":"定时更新TTL","memberId":201}
+{"L":"debug","T":"2026/03/02 16:38:31.590317+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{"203":{"id":203,"kind":"cluster-test-get2","address":"127.0.0.1","port":9203,"tags":["tagB"],"meta":null,"status":"passing"}}}
+{"L":"debug","T":"2026/03/02 16:38:31.590833+0800","C":"consul/serviceHealth.go:124","M":"定时更新TTL","memberId":202}
+{"L":"debug","T":"2026/03/02 16:38:31.592398+0800","C":"consul/serviceHealth.go:124","M":"定时更新TTL","memberId":203}
+{"L":"debug","T":"2026/03/02 16:38:32.079221+0800","C":"consul/serviceHealth.go:124","M":"定时更新TTL","memberId":201}
+{"L":"debug","T":"2026/03/02 16:38:32.084218+0800","C":"consul/serviceHealth.go:124","M":"定时更新TTL","memberId":202}
+{"L":"debug","T":"2026/03/02 16:38:32.092172+0800","C":"consul/serviceHealth.go:124","M":"定时更新TTL","memberId":203}
+{"L":"debug","T":"2026/03/02 16:38:32.572254+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:32.578113+0800","C":"consul/serviceHealth.go:124","M":"定时更新TTL","memberId":201}
+{"L":"debug","T":"2026/03/02 16:38:32.584542+0800","C":"consul/serviceHealth.go:124","M":"定时更新TTL","memberId":202}
+{"L":"debug","T":"2026/03/02 16:38:32.584542+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{"201":{"id":201,"kind":"cluster-test-get","address":"127.0.0.1","port":9201,"tags":["tagA"],"meta":null,"status":"passing"},"202":{"id":202,"kind":"cluster-test-get","address":"127.0.0.1","port":9202,"tags":["tagA"],"meta":null,"status":"passing"}}}
+{"L":"debug","T":"2026/03/02 16:38:32.591611+0800","C":"consul/serviceHealth.go:124","M":"定时更新TTL","memberId":203}
+{"L":"debug","T":"2026/03/02 16:38:32.592161+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{"203":{"id":203,"kind":"cluster-test-get2","address":"127.0.0.1","port":9203,"tags":["tagB"],"meta":null,"status":"passing"}}}
+{"L":"debug","T":"2026/03/02 16:38:33.078726+0800","C":"consul/serviceHealth.go:124","M":"定时更新TTL","memberId":201}
+{"L":"debug","T":"2026/03/02 16:38:33.084774+0800","C":"consul/serviceHealth.go:124","M":"定时更新TTL","memberId":202}
+{"L":"debug","T":"2026/03/02 16:38:33.091832+0800","C":"consul/serviceHealth.go:124","M":"定时更新TTL","memberId":203}
+{"L":"debug","T":"2026/03/02 16:38:33.576740+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:33.578745+0800","C":"consul/serviceHealth.go:124","M":"定时更新TTL","memberId":201}
+{"L":"debug","T":"2026/03/02 16:38:33.584276+0800","C":"consul/serviceHealth.go:124","M":"定时更新TTL","memberId":202}
+{"L":"debug","T":"2026/03/02 16:38:33.590664+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{"201":{"id":201,"kind":"cluster-test-get","address":"127.0.0.1","port":9201,"tags":["tagA"],"meta":null,"status":"passing"},"202":{"id":202,"kind":"cluster-test-get","address":"127.0.0.1","port":9202,"tags":["tagA"],"meta":null,"status":"passing"}}}
+{"L":"debug","T":"2026/03/02 16:38:33.591911+0800","C":"consul/serviceHealth.go:124","M":"定时更新TTL","memberId":203}
+{"L":"debug","T":"2026/03/02 16:38:33.593598+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{"202":{"id":202,"kind":"cluster-test-get","address":"127.0.0.1","port":9202,"tags":["tagA"],"meta":null,"status":"passing"}}}
+{"L":"debug","T":"2026/03/02 16:38:33.593598+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{"203":{"id":203,"kind":"cluster-test-get2","address":"127.0.0.1","port":9203,"tags":["tagB"],"meta":null,"status":"passing"}}}
+{"L":"debug","T":"2026/03/02 16:38:33.595245+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:33.596868+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:33.597500+0800","C":"consul/provider.go:100","M":"CONSUL关闭","address":"127.0.0.1:8500"}
+{"L":"debug","T":"2026/03/02 16:38:33.598563+0800","C":"nats/client.go:105","M":"NATS关闭","address":["nats://127.0.0.1:4222"]}
+{"L":"debug","T":"2026/03/02 16:38:33.603526+0800","C":"nats/client.go:51","M":"NATS启动成功","address":["nats://127.0.0.1:4222"]}
+{"L":"debug","T":"2026/03/02 16:38:33.604110+0800","C":"consul/provider.go:75","M":"CONSUL启动成功","address":"127.0.0.1:8500"}
+{"L":"debug","T":"2026/03/02 16:38:33.605155+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:33.605798+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:33.605798+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:33.612463+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{"301":{"id":301,"kind":"cluster-test-watch","address":"127.0.0.1","port":9301,"tags":[],"meta":null,"status":"passing"}}}
+{"L":"debug","T":"2026/03/02 16:38:33.614182+0800","C":"consul/serviceHealth.go:124","M":"定时更新TTL","memberId":301}
+{"L":"debug","T":"2026/03/02 16:38:34.115175+0800","C":"consul/serviceHealth.go:124","M":"定时更新TTL","memberId":301}
+{"L":"debug","T":"2026/03/02 16:38:34.607061+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:34.614542+0800","C":"consul/serviceHealth.go:124","M":"定时更新TTL","memberId":301}
+{"L":"debug","T":"2026/03/02 16:38:34.615083+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{"301":{"id":301,"kind":"cluster-test-watch","address":"127.0.0.1","port":9301,"tags":[],"meta":null,"status":"passing"}}}
+{"L":"debug","T":"2026/03/02 16:38:35.114608+0800","C":"consul/serviceHealth.go:124","M":"定时更新TTL","memberId":301}
+{"L":"debug","T":"2026/03/02 16:38:35.610464+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:35.612648+0800","C":"consul/serviceHealth.go:124","M":"定时更新TTL","memberId":301}
+{"L":"debug","T":"2026/03/02 16:38:35.613162+0800","C":"consul/watcher.go:118","M":"consul watch fetch","memberDict":{}}
+{"L":"debug","T":"2026/03/02 16:38:35.615307+0800","C":"consul/provider.go:100","M":"CONSUL关闭","address":"127.0.0.1:8500"}
+{"L":"debug","T":"2026/03/02 16:38:35.616410+0800","C":"nats/client.go:105","M":"NATS关闭","address":["nats://127.0.0.1:4222"]}
+{"L":"debug","T":"2026/03/02 16:38:35.621750+0800","C":"nats/client.go:51","M":"NATS启动成功","address":["nats://127.0.0.1:4222"]}
+{"L":"debug","T":"2026/03/02 16:38:35.621750+0800","C":"consul/provider.go:75","M":"CONSUL启动成功","address":"127.0.0.1:8500"}
+{"L":"debug","T":"2026/03/02 16:38:35.621750+0800","C":"consul/provider.go:100","M":"CONSUL关闭","address":"127.0.0.1:8500"}
+{"L":"debug","T":"2026/03/02 16:38:35.622304+0800","C":"nats/client.go:105","M":"NATS关闭","address":["nats://127.0.0.1:4222"]}

@@ -33,70 +33,87 @@ type jsonCodec struct {
 }
 
 func (p *jsonCodec) Unmarshal(data []byte, msg interface{}) error {
-	if data == nil || msg == nil {
-		return ErrJsonUnPack
+	if len(data) == 0 {
+		return nil
 	}
-	err := json.Unmarshal(data, msg)
-	if err != nil {
-		return err
+	if msg == nil {
+		return nil
 	}
-	return nil
+	if ptr, ok := msg.(*[]byte); ok {
+		*ptr = data
+		return nil
+	}
+	return json.Unmarshal(data, msg)
 }
 
 func (p *jsonCodec) Marshal(msg interface{}) ([]byte, error) {
 	if msg == nil {
-		return nil, ErrJsonPack
+		return []byte{}, nil
 	}
-	data, err := json.Marshal(msg)
-	if err != nil {
-		return nil, err
+	if data, ok := msg.([]byte); ok {
+		return data, nil
 	}
-	return data, nil
+	return json.Marshal(msg)
 }
 
 type msgPackCodec struct {
 }
 
 func (p *msgPackCodec) Unmarshal(data []byte, msg interface{}) error {
-	err := msgpack.Unmarshal(data, msg)
-	return err
+	if len(data) == 0 {
+		return nil
+	}
+	if msg == nil {
+		return nil
+	}
+	if ptr, ok := msg.(*[]byte); ok {
+		*ptr = data
+		return nil
+	}
+	return msgpack.Unmarshal(data, msg)
 }
 
 func (p *msgPackCodec) Marshal(msg interface{}) ([]byte, error) {
-	data, err := msgpack.Marshal(msg)
-	return data, err
+	if msg == nil {
+		return []byte{}, nil
+	}
+	if data, ok := msg.([]byte); ok {
+		return data, nil
+	}
+	return msgpack.Marshal(msg)
 }
 
 type pbCodec struct {
 }
 
 func (p *pbCodec) Unmarshal(data []byte, msg interface{}) error {
+	if len(data) == 0 {
+		return nil
+	}
 	if msg == nil {
-		return ErrPBUnPack
+		return nil
+	}
+	if ptr, ok := msg.(*[]byte); ok {
+		*ptr = data
+		return nil
 	}
 	v, ok := msg.(proto.Message)
 	if !ok {
 		return ErrNotPBMsg
 	}
-	err := proto.Unmarshal(data, v)
-	if err != nil {
-		return err
-	}
-	return nil
+	return proto.Unmarshal(data, v)
 }
 
 func (p *pbCodec) Marshal(msg interface{}) ([]byte, error) {
 	if msg == nil {
-		return nil, ErrPBPack
+		return []byte{}, nil
+	}
+	if data, ok := msg.([]byte); ok {
+		return data, nil
 	}
 	v, ok := msg.(proto.Message)
 	if !ok {
 		return nil, ErrNotPBMsg
 	}
-	data, err := proto.Marshal(v)
-	if err != nil {
-		return nil, err
-	}
-
-	return data, nil
+	return proto.Marshal(v)
 }

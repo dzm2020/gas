@@ -77,7 +77,7 @@ type Cluster struct {
 	localInfo *discovery.Member
 }
 
-func (r *Cluster) Start(ctx context.Context) error {
+func (r *Cluster) Run(ctx context.Context) error {
 	// 启动消息队列组件
 	if err := r.mq.Run(ctx); err != nil {
 		return err

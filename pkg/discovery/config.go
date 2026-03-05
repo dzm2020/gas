@@ -1,19 +1,12 @@
 package discovery
 
 import (
-	"errors"
+	"fmt"
 
 	"github.com/dzm2020/gas/pkg/discovery/iface"
-	"github.com/dzm2020/gas/pkg/lib/factory"
-)
 
-var (
-	factoryMgr = factory.New[iface.IDiscovery]()
+	"github.com/dzm2020/gas/pkg/discovery/registry"
 )
-
-func GetFactoryMgr() *factory.Manager[iface.IDiscovery] {
-	return factoryMgr
-}
 
 // Config 服务发现配置
 type Config struct {
@@ -23,9 +16,9 @@ type Config struct {
 
 // NewFromConfig 根据配置创建服务发现实例
 func NewFromConfig(config Config) (iface.IDiscovery, error) {
-	creator, ok := factoryMgr.Get(config.Type)
+	creator, ok := registry.GetFactoryMgr().Get(config.Type)
 	if !ok {
-		return nil, errors.New("unsupported discovery type")
+		return nil, fmt.Errorf("unsupported discovery type:%v", config.Type)
 	}
 	return creator(config.Config)
 }

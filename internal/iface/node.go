@@ -21,7 +21,6 @@ type (
 
 	INode interface {
 		IMember
-		lib.ISerializer
 		component.IManager[INode]
 		Info() *Member
 		Serializer() lib.ISerializer

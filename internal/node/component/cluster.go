@@ -8,6 +8,7 @@ import (
 	"github.com/dzm2020/gas/pkg/cluster"
 	"github.com/dzm2020/gas/pkg/glog"
 	"github.com/dzm2020/gas/pkg/lib/component"
+	"github.com/dzm2020/gas/pkg/lib/xerror"
 	"go.uber.org/zap"
 )
 
@@ -38,7 +39,7 @@ func (r *Cluster) Start(ctx context.Context, node iface.INode) (err error) {
 
 	conf := profile.GetCluster()
 
-	r.ICluster, err = cluster.New(conf, node)
+	r.ICluster, err = cluster.New(conf, node.Serializer())
 
 	if err != nil {
 		return err
@@ -46,15 +47,12 @@ func (r *Cluster) Start(ctx context.Context, node iface.INode) (err error) {
 
 	//  启动
 	if err = r.ICluster.Run(ctx); err != nil {
-		return err
+		return xerror.Wrapf(err, "cluster run fail")
 	}
-	//  注册
-	if err = r.ICluster.Register(r.node.Info()); err != nil {
-		return err
-	}
+
 	//  订阅
 	if _, err = r.ICluster.Subscribe(r.node.GetID(), r); err != nil {
-		return err
+		return xerror.Wrapf(err, "message queue subscribe fail")
 	}
 
 	return
@@ -74,7 +72,7 @@ func (r *Cluster) OnMessage(data []byte, response func(data []byte) error) {
 	}
 	msg := &iface.ActorMessage{Message: message}
 
-	glog.Debug("集群：处理消息", zap.Any("message", message))
+	glog.Info("集群：处理消息", zap.Any("message", message))
 
 	system := r.node.System()
 	if msg.GetAsync() {
@@ -84,7 +82,7 @@ func (r *Cluster) OnMessage(data []byte, response func(data []byte) error) {
 		responseData, responseErr := system.Call(msg)
 		//  打包结果
 		responseMessage := iface.NewResponse(responseData, responseErr)
-		responseData, err = r.node.Marshal(responseMessage)
+		responseData, err = r.node.Serializer().Marshal(responseMessage)
 		if err != nil {
 			return
 		}

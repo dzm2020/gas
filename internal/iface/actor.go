@@ -98,3 +98,16 @@ func (a *Actor) OnStop(ctx IContext) error {
 func (a *Actor) OnMessage(ctx IContext, msg interface{}) error {
 	return nil
 }
+
+func EqualPid(a, b *Pid) bool {
+	// 1. 都为nil，内容相等
+	if a == nil && b == nil {
+		return true
+	}
+	// 2. 一个为nil，一个非nil，内容不等
+	if a == nil || b == nil {
+		return false
+	}
+	// 3. 逐个比较字段
+	return a.GetNodeId() == b.GetNodeId() && a.GetActorId() == b.GetActorId()
+}

@@ -27,6 +27,7 @@ func NewWithSession(session *iface.Session) *Session {
 	}
 }
 
+// todo Session 能不能去掉context?
 type Session struct {
 	*iface.Session
 	ctx iface.IContext
@@ -87,7 +88,7 @@ func (a *Session) Push(cmd, act uint16, request interface{}) error {
 
 // sendToSession 发送消息到会话，如果是本地则直接调用，否则通过系统发送
 func (a *Session) send(message *iface.ActorMessage) error {
-	if a.GetAgent() == a.ctx.ID() {
+	if iface.EqualPid(a.GetAgent(), a.ctx.ID()) {
 		return a.ctx.InvokerMessage(message)
 	}
 	return a.ctx.System().Send(message)

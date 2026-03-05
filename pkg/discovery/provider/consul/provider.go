@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"sync"
 
-	discoveryApi "github.com/dzm2020/gas/pkg/discovery"
 	"github.com/dzm2020/gas/pkg/discovery/iface"
+	"github.com/dzm2020/gas/pkg/discovery/registry"
 	"github.com/dzm2020/gas/pkg/glog"
 	"github.com/dzm2020/gas/pkg/lib/grs"
 	"github.com/dzm2020/gas/pkg/lib/stopper"
@@ -18,7 +18,7 @@ import (
 )
 
 func init() {
-	_ = discoveryApi.GetFactoryMgr().Register("consul", func(args ...any) (iface.IDiscovery, error) {
+	_ = registry.GetFactoryMgr().Register("consul", func(args ...any) (iface.IDiscovery, error) {
 		if len(args) == 0 {
 			return nil, errors.New("consul provider: config is required")
 		}

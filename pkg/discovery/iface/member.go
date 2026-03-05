@@ -29,6 +29,9 @@ func (b *Member) GetMeta() map[string]string {
 	return b.Meta
 }
 func (b *Member) GetStatus() string {
+	if b.Status == "" {
+		return "passing"
+	}
 	return b.Status
 }
 

@@ -33,6 +33,8 @@ func New(path string) *Node {
 	return node
 }
 
+var _ iface.INode = (*Node)(nil)
+
 type Node struct {
 	*iface.Member
 	component.IManager[iface.INode]
@@ -72,34 +74,6 @@ func (n *Node) Serializer() lib.ISerializer {
 	return n.serializer
 }
 
-func (n *Node) Marshal(request interface{}) ([]byte, error) {
-	if request == nil {
-		return []byte{}, nil
-	}
-
-	if data, ok := request.([]byte); ok {
-		return data, nil
-	}
-
-	return n.Serializer().Marshal(request)
-}
-
-func (n *Node) Unmarshal(data []byte, reply interface{}) error {
-	if len(data) == 0 {
-		return nil
-	}
-
-	if reply == nil {
-		return nil
-	}
-
-	if ptr, ok := reply.(*[]byte); ok {
-		*ptr = data
-		return nil
-	}
-	return n.Serializer().Unmarshal(data, reply)
-}
-
 func (n *Node) Startup(comps ...component.IComponent[iface.INode]) (err error) {
 	defer xerror.PrintCoreDump()
 
@@ -134,6 +108,11 @@ func (n *Node) Startup(comps ...component.IComponent[iface.INode]) (err error) {
 	}
 
 	glog.Info("节点启动完成", zap.String("path", n.path), zap.Strings("component", n.IManager.GetComponentNames()))
+
+	//  所有组件注册完成后,再在集群中注册节点
+	if err = n.Cluster().Register(n.Info()); err != nil {
+		return xerror.Wrapf(err, "discovery Register fail")
+	}
 
 	// 阻塞等待进程终止信号
 	sigChan := make(chan os.Signal, 1)

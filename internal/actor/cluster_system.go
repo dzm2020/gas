@@ -48,7 +48,19 @@ func (s *ClusterSystem) Call(message *iface.ActorMessage) (data []byte, err erro
 	if s.isLocalMessage(message) {
 		return s.System.Call(message)
 	}
-	return s.transport.Call(message.To.NodeId, message, timeout)
+	data, err = s.transport.Call(message.To.NodeId, message, timeout)
+	if err != nil {
+		return nil, err
+	}
+	//  解析返回值
+	response := &iface.Response{}
+	if err = s.Serializer().Unmarshal(data, response); err != nil {
+		return nil, err
+	}
+	if response.GetError() != nil {
+		return nil, response.GetError()
+	}
+	return response.GetData(), nil
 }
 
 //  tag应该在启动时静态赋值,因为节点的功能在启动时应该是确定的

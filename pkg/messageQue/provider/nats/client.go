@@ -7,8 +7,8 @@ import (
 	"github.com/dzm2020/gas/pkg/glog"
 	"github.com/dzm2020/gas/pkg/lib/stopper"
 	"github.com/dzm2020/gas/pkg/lib/xerror"
-	"github.com/dzm2020/gas/pkg/messageQue"
 	"github.com/dzm2020/gas/pkg/messageQue/iface"
+	"github.com/dzm2020/gas/pkg/messageQue/registry"
 	"go.uber.org/zap"
 
 	"github.com/nats-io/nats.go"
@@ -16,7 +16,7 @@ import (
 )
 
 func init() {
-	_ = messageQue.GetFactoryMgr().Register("nats", func(args ...any) (iface.IMessageQue, error) {
+	_ = registry.GetFactoryMgr().Register("nats", func(args ...any) (iface.IMessageQue, error) {
 		config := args[0].(map[string]interface{})
 
 		natsCfg := defaultConfig()

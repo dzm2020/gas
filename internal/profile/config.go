@@ -39,7 +39,7 @@ func IsSingleNodeMode() bool {
 func GetCluster() *cluster.Config {
 	conf := cluster.DefaultConfig()
 	if err := Get("cluster", conf); err != nil {
-
+		glog.Fatal("get cluster config", zap.Error(err))
 	}
 	return conf
 }
@@ -47,6 +47,7 @@ func GetCluster() *cluster.Config {
 func GetLogger() *logger.Config {
 	conf := logger.DefaultConfig()
 	if err := Get("logger", conf); err != nil {
+		glog.Fatal("get cluster config", zap.Error(err))
 	}
 	return conf
 }

@@ -60,6 +60,7 @@ func (g *Gate) OnMessage(entity network.IConnection, data []byte) (n int, err er
 	var msg *protocol.Message
 	var processN int
 	for len(data) > 0 {
+		//  解包
 		msg, processN, err = codec.Decode(data)
 		if err != nil {
 			return
@@ -70,38 +71,35 @@ func (g *Gate) OnMessage(entity network.IConnection, data []byte) (n int, err er
 		n += processN
 		data = data[processN:]
 
-		//  提交到agent actor处理
-		s, ok := entity.Context().(*session.Session)
-		if !ok || s == nil || s.GetAgent() == nil {
-			return n, nil
+		//  运行中间件
+		if len(g.Middlewares) > 0 {
+			msg, err = RunAfterDecode(g.Middlewares, msg)
+			if err != nil {
+				return
+			}
+			if msg == nil {
+				return
+			}
 		}
-		err = g.system.SubmitTask(s.GetAgent(), func(ctx iface.IContext) error {
-			return g.onData(ctx, msg, s)
-		})
-		if err != nil {
+		//  提交到agent actor处理
+		actorMsg := g.convertMessage(msg, g.getSession(entity))
+		if err = g.system.Send(actorMsg); err != nil {
 			return
 		}
 	}
 	return
 }
 
-func (g *Gate) onData(ctx iface.IContext, msg *protocol.Message, s *session.Session) error {
-	var err error
-	agent := ctx.Actor().(IAgent)
-	if len(g.Middlewares) > 0 {
-		msg, err = RunAfterDecode(g.Middlewares, msg)
-		if err != nil {
-			return err
-		}
-		if msg == nil {
-			return nil
-		}
+func (g *Gate) convertMessage(clientMsg *protocol.Message, s *session.Session) *iface.ActorMessage {
+	actorMsg := iface.NewActorMessage(nil, s.GetAgent(), "OnData", clientMsg.Data)
+	if s != nil {
+		ss := convertor.DeepClone(s)
+		ss.Cmd = uint32(clientMsg.Cmd)
+		ss.Act = uint32(clientMsg.Act)
+		ss.Index = clientMsg.Index
+		actorMsg.Session = ss.Session
 	}
-	ss := convertor.DeepClone(s)
-	ss.Cmd = uint32(msg.Cmd)
-	ss.Act = uint32(msg.Act)
-	ss.Index = msg.Index
-	return agent.OnData(ctx, ss, msg.Data)
+	return actorMsg
 }
 
 func (g *Gate) OnClose(entity network.IConnection, wrong error) {
@@ -111,6 +109,11 @@ func (g *Gate) OnClose(entity network.IConnection, wrong error) {
 		return
 	}
 	_ = g.system.ShutdownProcess(s.GetAgent())
+}
+
+func (g *Gate) getSession(entity network.IConnection) *session.Session {
+	s, _ := entity.Context().(*session.Session)
+	return s
 }
 
 func (g *Gate) Stop(ctx context.Context) error {
