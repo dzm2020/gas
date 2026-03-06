@@ -75,12 +75,18 @@ type (
 	}
 
 	ISession interface {
-		Meta() *Session
-		SetContext(ctx IContext)
+		GetAgent() *Pid
+		Raw() *Session
 		Response(request interface{}) error
 		ResponseCode(code int64) error
 		Push(cmd, act uint16, request interface{}) error
 		Close() error
+	}
+
+	// ISessionFactory 由上层（如 gate）实现，用于在 actor 处理消息时把 *Session 包装成可写的 ISession。
+	// actor 包仅依赖此接口，不依赖具体 session 实现。
+	ISessionFactory interface {
+		FromRaw(ctx IContext, raw *Session) ISession
 	}
 )
 
@@ -97,17 +103,4 @@ func (a *Actor) OnStop(ctx IContext) error {
 }
 func (a *Actor) OnMessage(ctx IContext, msg interface{}) error {
 	return nil
-}
-
-func EqualPid(a, b *Pid) bool {
-	// 1. 都为nil，内容相等
-	if a == nil && b == nil {
-		return true
-	}
-	// 2. 一个为nil，一个非nil，内容不等
-	if a == nil || b == nil {
-		return false
-	}
-	// 3. 逐个比较字段
-	return a.GetNodeId() == b.GetNodeId() && a.GetActorId() == b.GetActorId()
 }

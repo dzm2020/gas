@@ -4,9 +4,9 @@ import (
 	"errors"
 
 	"github.com/duke-git/lancet/v2/maputil"
-	"github.com/dzm2020/gas/internal/gate/codec"
-	"github.com/dzm2020/gas/internal/gate/protocol"
-	"github.com/dzm2020/gas/internal/gate/session"
+	"github.com/dzm2020/gas/internal/component/gate/codec"
+	"github.com/dzm2020/gas/internal/component/gate/protocol"
+	"github.com/dzm2020/gas/internal/component/gate/session"
 	"github.com/dzm2020/gas/internal/iface"
 	"github.com/dzm2020/gas/pkg/glog"
 	"github.com/dzm2020/gas/pkg/lib/xerror"
@@ -39,7 +39,7 @@ func (a *AgentHandler) OnData(ctx iface.IContext, s *session.Session, data []byt
 type IAgent interface {
 	iface.IActor
 	IAgentHandler
-	SetMiddleware(middlewares []Middleware)
+	AppendMiddleware(middlewares ...Middleware)
 	Push(ctx iface.IContext, s *session.Session, data []byte) error
 	Shutdown(ctx iface.IContext, s *session.Session) error
 }
@@ -53,8 +53,8 @@ type Agent struct {
 	middlewares []Middleware
 }
 
-func (agent *Agent) SetMiddleware(middlewares []Middleware) {
-	agent.middlewares = middlewares
+func (agent *Agent) AppendMiddleware(middlewares ...Middleware) {
+	agent.middlewares = append(agent.middlewares, middlewares...)
 }
 
 func (agent *Agent) Push(ctx iface.IContext, s *session.Session, data []byte) error {

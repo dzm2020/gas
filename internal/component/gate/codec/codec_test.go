@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/dzm2020/gas/internal/gate/protocol"
+	"github.com/dzm2020/gas/internal/component/gate/protocol"
 )
 
 func TestEncode_Decode_RoundTrip(t *testing.T) {

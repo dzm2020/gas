@@ -1,7 +1,7 @@
 package gate
 
 import (
-	"github.com/dzm2020/gas/internal/gate/protocol"
+	"github.com/dzm2020/gas/internal/component/gate/protocol"
 )
 
 // Middleware 在 codec.Decode 之后、以及 codec.Encode 之前对消息进行处理

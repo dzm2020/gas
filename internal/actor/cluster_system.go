@@ -20,8 +20,8 @@ func NewClusterSystem(selfNodeID uint64, serializer lib.ISerializer, transport c
 
 // ClusterSystem 在 System 之上增加集群能力：本地消息走嵌入的 System，跨节点走 transport。
 type ClusterSystem struct {
-	*System    // 本地 Actor 系统，负责本节点进程与消息
-	selfNodeID uint64
+	*System                     // 本地 Actor 系统，负责本节点进程与消息
+	selfNodeID uint64           // 本节点ID
 	transport  cluster.ICluster // 集群传输，用于跨节点 Send/Call
 }
 
@@ -62,35 +62,3 @@ func (s *ClusterSystem) Call(message *iface.ActorMessage) (data []byte, err erro
 	}
 	return response.GetData(), nil
 }
-
-//  tag应该在启动时静态赋值,因为节点的功能在启动时应该是确定的
-
-//// Named 为进程注册名字：先在本地 System 注册，若名字首字母大写则视为全局名并同步到集群（更新节点 Tags）。
-//func (s *ClusterSystem) Named(ctx iface.IContext) error {
-//	if err := s.System.Named(ctx); err != nil {
-//		return err
-//	}
-//	name := ctx.GetName()
-//	isGlobalName := lib.IsFirstLetterUppercase(name)
-//	if !isGlobalName {
-//		return nil
-//	}
-//	s.localInfo.Tags = append(s.localInfo.Tags, name)
-//	return s.transport.Update(s.localInfo)
-//}
-//
-//// Unname 注销进程名字：先在本地 System 注销，若为全局名则从集群节点 Tags 中移除该名字。
-//func (s *ClusterSystem) Unname(ctx iface.IContext) error {
-//	if err := s.System.Unname(ctx); err != nil {
-//		return err
-//	}
-//	name := ctx.GetName()
-//	isGlobalName := lib.IsFirstLetterUppercase(name)
-//	if !isGlobalName {
-//		return nil
-//	}
-//	s.localInfo.Tags = slices.DeleteFunc(s.localInfo.Tags, func(t string) bool {
-//		return t == name
-//	})
-//	return s.transport.Update(s.localInfo)
-//}

@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"errors"
 
-	"github.com/dzm2020/gas/internal/gate/protocol"
+	"github.com/dzm2020/gas/internal/component/gate/protocol"
 )
 
 //var (

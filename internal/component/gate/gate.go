@@ -4,9 +4,8 @@ import (
 	"context"
 	"errors"
 
-	"github.com/dzm2020/gas/internal/gate/codec"
-	"github.com/dzm2020/gas/internal/gate/protocol"
-	"github.com/dzm2020/gas/internal/gate/session"
+	"github.com/dzm2020/gas/internal/component/gate/codec"
+	"github.com/dzm2020/gas/internal/component/gate/protocol"
 	"github.com/dzm2020/gas/internal/iface"
 	"github.com/dzm2020/gas/pkg/glog"
 	"github.com/dzm2020/gas/pkg/network"
@@ -45,11 +44,14 @@ func (g *Gate) OnConnect(entity network.IConnection) error {
 
 	//  创建agent
 	agent := g.Factory()
-	agent.SetMiddleware(g.Middlewares)
+	agent.AppendMiddleware(g.Middlewares...)
 	system := g.system
 	pid := system.Spawn(agent)
 	//  绑定
-	s := session.New(entity.ID(), pid)
+	s := &iface.Session{
+		Agent:    pid,
+		EntityId: entity.ID(),
+	}
 	entity.SetContext(s)
 
 	glog.Debug("网关:创建Agent", zap.Int64("entityId", entity.ID()), zap.Any("pid", pid))
@@ -90,29 +92,29 @@ func (g *Gate) OnMessage(entity network.IConnection, data []byte) (n int, err er
 	return
 }
 
-func (g *Gate) convertMessage(clientMsg *protocol.Message, s *session.Session) *iface.ActorMessage {
+func (g *Gate) convertMessage(clientMsg *protocol.Message, s *iface.Session) *iface.ActorMessage {
 	actorMsg := iface.NewActorMessage(nil, s.GetAgent(), "OnData", clientMsg.Data)
 	if s != nil {
 		ss := convertor.DeepClone(s)
 		ss.Cmd = uint32(clientMsg.Cmd)
 		ss.Act = uint32(clientMsg.Act)
 		ss.Index = clientMsg.Index
-		actorMsg.Session = ss.Session
+		actorMsg.Session = ss
 	}
 	return actorMsg
 }
 
 func (g *Gate) OnClose(entity network.IConnection, wrong error) {
 	g.count.Add(-1)
-	s, ok := entity.Context().(*session.Session)
-	if !ok || s == nil || s.GetAgent() == nil {
+	s := g.getSession(entity)
+	if s == nil {
 		return
 	}
 	_ = g.system.ShutdownProcess(s.GetAgent())
 }
 
-func (g *Gate) getSession(entity network.IConnection) *session.Session {
-	s, _ := entity.Context().(*session.Session)
+func (g *Gate) getSession(entity network.IConnection) *iface.Session {
+	s, _ := entity.Context().(*iface.Session)
 	return s
 }
 

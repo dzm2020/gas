@@ -29,73 +29,66 @@ type ISerializer interface {
 	Marshal(msg interface{}) ([]byte, error)
 }
 
-type jsonCodec struct {
-}
-
-func (p *jsonCodec) Unmarshal(data []byte, msg interface{}) error {
-	if len(data) == 0 {
-		return nil
-	}
-	if msg == nil {
-		return nil
+// unmarshalPreCheck 统一 Unmarshal 前置检查，若已处理则返回 (true, 应返回的 error)。
+func unmarshalPreCheck(data []byte, msg interface{}) (handled bool, retErr error) {
+	if len(data) == 0 || msg == nil {
+		return true, nil
 	}
 	if ptr, ok := msg.(*[]byte); ok {
 		*ptr = data
-		return nil
+		return true, nil
+	}
+	return false, nil
+}
+
+// marshalPreCheck 统一 Marshal 前置检查，若已处理则返回 (结果字节, true)。
+func marshalPreCheck(msg interface{}) (data []byte, handled bool) {
+	if msg == nil {
+		return []byte{}, true
+	}
+	if b, ok := msg.([]byte); ok {
+		return b, true
+	}
+	return nil, false
+}
+
+type jsonCodec struct{}
+
+func (p *jsonCodec) Unmarshal(data []byte, msg interface{}) error {
+	if ok, err := unmarshalPreCheck(data, msg); ok {
+		return err
 	}
 	return json.Unmarshal(data, msg)
 }
 
 func (p *jsonCodec) Marshal(msg interface{}) ([]byte, error) {
-	if msg == nil {
-		return []byte{}, nil
-	}
-	if data, ok := msg.([]byte); ok {
+	if data, ok := marshalPreCheck(msg); ok {
 		return data, nil
 	}
 	return json.Marshal(msg)
 }
 
-type msgPackCodec struct {
-}
+type msgPackCodec struct{}
 
 func (p *msgPackCodec) Unmarshal(data []byte, msg interface{}) error {
-	if len(data) == 0 {
-		return nil
-	}
-	if msg == nil {
-		return nil
-	}
-	if ptr, ok := msg.(*[]byte); ok {
-		*ptr = data
-		return nil
+	if ok, err := unmarshalPreCheck(data, msg); ok {
+		return err
 	}
 	return msgpack.Unmarshal(data, msg)
 }
 
 func (p *msgPackCodec) Marshal(msg interface{}) ([]byte, error) {
-	if msg == nil {
-		return []byte{}, nil
-	}
-	if data, ok := msg.([]byte); ok {
+	if data, ok := marshalPreCheck(msg); ok {
 		return data, nil
 	}
 	return msgpack.Marshal(msg)
 }
 
-type pbCodec struct {
-}
+type pbCodec struct{}
 
 func (p *pbCodec) Unmarshal(data []byte, msg interface{}) error {
-	if len(data) == 0 {
-		return nil
-	}
-	if msg == nil {
-		return nil
-	}
-	if ptr, ok := msg.(*[]byte); ok {
-		*ptr = data
-		return nil
+	if ok, err := unmarshalPreCheck(data, msg); ok {
+		return err
 	}
 	v, ok := msg.(proto.Message)
 	if !ok {
@@ -105,10 +98,7 @@ func (p *pbCodec) Unmarshal(data []byte, msg interface{}) error {
 }
 
 func (p *pbCodec) Marshal(msg interface{}) ([]byte, error) {
-	if msg == nil {
-		return []byte{}, nil
-	}
-	if data, ok := msg.([]byte); ok {
+	if data, ok := marshalPreCheck(msg); ok {
 		return data, nil
 	}
 	v, ok := msg.(proto.Message)

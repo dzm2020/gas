@@ -29,6 +29,11 @@ const (
 	DefaultDispatcherThroughput = 1024 // 默认调度器吞吐量
 )
 
+// systemWithSessionFactory 可选能力：提供 Session 工厂，用于解耦 actor 与 session 实现。
+type systemWithSessionFactory interface {
+	SessionFactory() iface.ISessionFactory
+}
+
 // spawn 创建并注册新 Actor 进程，投递 OnInit 任务后返回 Pid。
 func spawn(s iface.ISystem, actor iface.IActor, args ...interface{}) *iface.Pid {
 
@@ -42,6 +47,9 @@ func spawn(s iface.ISystem, actor iface.IActor, args ...interface{}) *iface.Pid 
 		system:     s,
 		timeout:    DefaultCallTimeout,
 		serializer: s.Serializer(),
+	}
+	if sf, ok := s.(systemWithSessionFactory); ok {
+		ctx.sessionFactory = sf.SessionFactory()
 	}
 
 	mailBox := NewMailbox()
@@ -77,11 +85,12 @@ func NewSystem(selfNodeID uint64, serializer lib.ISerializer) *System {
 // System 单节点 Actor 系统：维护进程表与名字表，负责本节点内 Spawn/消息/任务/关闭。
 type System struct {
 	stopper.Stopper
-	selfNodeID uint64
-	autoId     atomic.Uint64
-	serializer lib.ISerializer
-	IdDict     *maputil.ConcurrentMap[uint64, iface.IContext] // ActorId -> IContext
-	nameDict   *maputil.ConcurrentMap[string, iface.IContext] // 名字 -> IContext
+	selfNodeID     uint64
+	autoId         atomic.Uint64
+	serializer     lib.ISerializer
+	IdDict         *maputil.ConcurrentMap[uint64, iface.IContext] // ActorId -> IContext
+	nameDict       *maputil.ConcurrentMap[string, iface.IContext] // 名字 -> IContext
+	sessionFactory iface.ISessionFactory                           // 可选，用于从 *Session 构造 ISession，由 gate 等上层注入
 }
 
 func (s *System) NextID() uint64 {
@@ -93,6 +102,16 @@ func (s *System) NodeId() uint64 {
 
 func (s *System) Serializer() lib.ISerializer {
 	return s.serializer
+}
+
+// SetSessionFactory 设置 Session 工厂；传入 nil 表示不使用。由需要 session 能力的上层（如 gate）调用。
+func (s *System) SetSessionFactory(f iface.ISessionFactory) {
+	s.sessionFactory = f
+}
+
+// SessionFactory 实现 systemWithSessionFactory，供 spawn 注入到 actorContext。
+func (s *System) SessionFactory() iface.ISessionFactory {
+	return s.sessionFactory
 }
 
 // Spawn 创建并注册新 Actor 进程，投递 OnInit 任务后返回 Pid。
