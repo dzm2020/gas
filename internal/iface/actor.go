@@ -23,7 +23,7 @@ type (
 		NextID() uint64
 
 		Serializer() lib.ISerializer
-
+		SessionFactory() ISessionFactory
 		Spawn(actor IActor, args ...interface{}) *Pid
 
 		Register(ctx IContext) error
@@ -75,12 +75,15 @@ type (
 	}
 
 	ISession interface {
-		GetAgent() *Pid
+		GetId() int64
 		Raw() *Session
-		Response(request interface{}) error
-		ResponseCode(code int64) error
-		Push(cmd, act uint16, request interface{}) error
-		Close() error
+		SyncValues() error // 同步values
+		SetString(key, value string)
+		GetString(key string) string
+		SetUint64(key string, value uint64)
+		GetUint64(key string) uint64
+		SetInt64(key string, value int64)
+		GetInt64(key string) int64
 	}
 
 	// ISessionFactory 由上层（如 gate）实现，用于在 actor 处理消息时把 *Session 包装成可写的 ISession。

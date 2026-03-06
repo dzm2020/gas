@@ -88,8 +88,8 @@ type Message struct {
 	Method        string                 `protobuf:"bytes,3,opt,name=method,proto3" json:"method,omitempty"`
 	Data          []byte                 `protobuf:"bytes,4,opt,name=data,proto3" json:"data,omitempty"`
 	Async         bool                   `protobuf:"varint,5,opt,name=async,proto3" json:"async,omitempty"`
-	Session       *Session               `protobuf:"bytes,6,opt,name=session,proto3" json:"session,omitempty"`
-	Deadline      int64                  `protobuf:"varint,7,opt,name=deadline,proto3" json:"deadline,omitempty"`
+	Deadline      int64                  `protobuf:"varint,6,opt,name=deadline,proto3" json:"deadline,omitempty"`
+	Session       *Session               `protobuf:"bytes,7,opt,name=session,proto3" json:"session,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -159,18 +159,18 @@ func (x *Message) GetAsync() bool {
 	return false
 }
 
-func (x *Message) GetSession() *Session {
-	if x != nil {
-		return x.Session
-	}
-	return nil
-}
-
 func (x *Message) GetDeadline() int64 {
 	if x != nil {
 		return x.Deadline
 	}
 	return 0
+}
+
+func (x *Message) GetSession() *Session {
+	if x != nil {
+		return x.Session
+	}
+	return nil
 }
 
 type Response struct {
@@ -227,14 +227,9 @@ func (x *Response) GetErrMsg() string {
 
 type Session struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Agent         *Pid                   `protobuf:"bytes,1,opt,name=agent,proto3" json:"agent,omitempty"`
-	EntityId      int64                  `protobuf:"varint,2,opt,name=entityId,proto3" json:"entityId,omitempty"`
-	UserId        uint64                 `protobuf:"varint,3,opt,name=userId,proto3" json:"userId,omitempty"`
-	Index         uint32                 `protobuf:"varint,4,opt,name=index,proto3" json:"index,omitempty"`
-	Cmd           uint32                 `protobuf:"varint,5,opt,name=cmd,proto3" json:"cmd,omitempty"`
-	Act           uint32                 `protobuf:"varint,6,opt,name=act,proto3" json:"act,omitempty"`
-	Code          int64                  `protobuf:"varint,7,opt,name=code,proto3" json:"code,omitempty"`
-	Values        map[string]string      `protobuf:"bytes,8,rep,name=values,proto3" json:"values,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Id            int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	NodeId        int64                  `protobuf:"varint,2,opt,name=nodeId,proto3" json:"nodeId,omitempty"`
+	Values        map[string]string      `protobuf:"bytes,3,rep,name=values,proto3" json:"values,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -269,51 +264,16 @@ func (*Session) Descriptor() ([]byte, []int) {
 	return file_actor_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *Session) GetAgent() *Pid {
+func (x *Session) GetId() int64 {
 	if x != nil {
-		return x.Agent
-	}
-	return nil
-}
-
-func (x *Session) GetEntityId() int64 {
-	if x != nil {
-		return x.EntityId
+		return x.Id
 	}
 	return 0
 }
 
-func (x *Session) GetUserId() uint64 {
+func (x *Session) GetNodeId() int64 {
 	if x != nil {
-		return x.UserId
-	}
-	return 0
-}
-
-func (x *Session) GetIndex() uint32 {
-	if x != nil {
-		return x.Index
-	}
-	return 0
-}
-
-func (x *Session) GetCmd() uint32 {
-	if x != nil {
-		return x.Cmd
-	}
-	return 0
-}
-
-func (x *Session) GetAct() uint32 {
-	if x != nil {
-		return x.Act
-	}
-	return 0
-}
-
-func (x *Session) GetCode() int64 {
-	if x != nil {
-		return x.Code
+		return x.NodeId
 	}
 	return 0
 }
@@ -341,22 +301,16 @@ const file_actor_proto_rawDesc = "" +
 	".actor.PidR\x04from\x12\x16\n" +
 	"\x06method\x18\x03 \x01(\tR\x06method\x12\x12\n" +
 	"\x04data\x18\x04 \x01(\fR\x04data\x12\x14\n" +
-	"\x05async\x18\x05 \x01(\bR\x05async\x12(\n" +
-	"\asession\x18\x06 \x01(\v2\x0e.actor.SessionR\asession\x12\x1a\n" +
-	"\bdeadline\x18\a \x01(\x03R\bdeadline\"6\n" +
+	"\x05async\x18\x05 \x01(\bR\x05async\x12\x1a\n" +
+	"\bdeadline\x18\x06 \x01(\x03R\bdeadline\x12(\n" +
+	"\asession\x18\a \x01(\v2\x0e.actor.SessionR\asession\"6\n" +
 	"\bResponse\x12\x12\n" +
 	"\x04data\x18\x01 \x01(\fR\x04data\x12\x16\n" +
-	"\x06errMsg\x18\x02 \x01(\tR\x06errMsg\"\x9c\x02\n" +
-	"\aSession\x12 \n" +
-	"\x05agent\x18\x01 \x01(\v2\n" +
-	".actor.PidR\x05agent\x12\x1a\n" +
-	"\bentityId\x18\x02 \x01(\x03R\bentityId\x12\x16\n" +
-	"\x06userId\x18\x03 \x01(\x04R\x06userId\x12\x14\n" +
-	"\x05index\x18\x04 \x01(\rR\x05index\x12\x10\n" +
-	"\x03cmd\x18\x05 \x01(\rR\x03cmd\x12\x10\n" +
-	"\x03act\x18\x06 \x01(\rR\x03act\x12\x12\n" +
-	"\x04code\x18\a \x01(\x03R\x04code\x122\n" +
-	"\x06values\x18\b \x03(\v2\x1a.actor.Session.ValuesEntryR\x06values\x1a9\n" +
+	"\x06errMsg\x18\x02 \x01(\tR\x06errMsg\"\xa0\x01\n" +
+	"\aSession\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x16\n" +
+	"\x06nodeId\x18\x02 \x01(\x03R\x06nodeId\x122\n" +
+	"\x06values\x18\x03 \x03(\v2\x1a.actor.Session.ValuesEntryR\x06values\x1a9\n" +
 	"\vValuesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\n" +
@@ -386,13 +340,12 @@ var file_actor_proto_depIdxs = []int32{
 	0, // 0: actor.Message.to:type_name -> actor.Pid
 	0, // 1: actor.Message.from:type_name -> actor.Pid
 	3, // 2: actor.Message.session:type_name -> actor.Session
-	0, // 3: actor.Session.agent:type_name -> actor.Pid
-	4, // 4: actor.Session.values:type_name -> actor.Session.ValuesEntry
-	5, // [5:5] is the sub-list for method output_type
-	5, // [5:5] is the sub-list for method input_type
-	5, // [5:5] is the sub-list for extension type_name
-	5, // [5:5] is the sub-list for extension extendee
-	0, // [0:5] is the sub-list for field type_name
+	4, // 3: actor.Session.values:type_name -> actor.Session.ValuesEntry
+	4, // [4:4] is the sub-list for method output_type
+	4, // [4:4] is the sub-list for method input_type
+	4, // [4:4] is the sub-list for extension type_name
+	4, // [4:4] is the sub-list for extension extendee
+	0, // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_actor_proto_init() }

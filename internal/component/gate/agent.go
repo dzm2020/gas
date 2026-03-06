@@ -24,7 +24,7 @@ var (
 type Factory func() IAgent
 
 type IAgentHandler interface {
-	OnData(ctx iface.IContext, s *session.Session, data []byte) error
+	OnData(ctx iface.IContext, s iface.ISession, data []byte) error
 }
 
 var _ IAgentHandler = (*AgentHandler)(nil)
@@ -32,7 +32,7 @@ var _ IAgentHandler = (*AgentHandler)(nil)
 type AgentHandler struct {
 }
 
-func (a *AgentHandler) OnData(ctx iface.IContext, s *session.Session, data []byte) error {
+func (a *AgentHandler) OnData(ctx iface.IContext, s iface.ISession, data []byte) error {
 	return nil
 }
 
@@ -40,8 +40,8 @@ type IAgent interface {
 	iface.IActor
 	IAgentHandler
 	AppendMiddleware(middlewares ...Middleware)
-	Push(ctx iface.IContext, s *session.Session, data []byte) error
-	Shutdown(ctx iface.IContext, s *session.Session) error
+	Push(ctx iface.IContext, s iface.ISession, data []byte) error
+	Shutdown(ctx iface.IContext, s iface.ISession) error
 }
 
 var _ IAgent = (*Agent)(nil)
@@ -57,16 +57,17 @@ func (agent *Agent) AppendMiddleware(middlewares ...Middleware) {
 	agent.middlewares = append(agent.middlewares, middlewares...)
 }
 
-func (agent *Agent) Push(ctx iface.IContext, s *session.Session, data []byte) error {
+func (agent *Agent) Push(ctx iface.IContext, s iface.ISession, data []byte) error {
+	ses := s.(*session.Session)
 	var err error
-	entity := network.GetConnection(s.GetEntityId())
+	entity := network.GetConnection(ses.GetId())
 	if entity == nil {
-		return xerror.Wrapf(ErrNotFoundEntity, "entity:%d", s.GetEntityId())
+		return xerror.Wrapf(ErrNotFoundEntity, "entity:%d", ses.GetId())
 	}
 
-	msg := protocol.New(uint8(s.Cmd), uint8(s.Act), data)
-	msg.Index = s.GetIndex()
-	msg.Error = uint16(s.GetCode())
+	msg := protocol.New(ses.GetCmd(), ses.GetAct(), data)
+	msg.Index = ses.GetIndex()
+	msg.Error = uint16(ses.GetErrCode())
 
 	if len(agent.middlewares) > 0 {
 		msg, err = RunBeforeEncode(agent.middlewares, msg)
@@ -78,18 +79,19 @@ func (agent *Agent) Push(ctx iface.IContext, s *session.Session, data []byte) er
 		}
 	}
 
-	glog.Debug("发送消息到客户端", zap.Int64("entityId", s.GetEntityId()), zap.Any("msg", msg))
+	glog.Debug("发送消息到客户端", zap.Int64("entityId", ses.GetId()), zap.Any("msg", msg))
 
 	var bytes []byte
 	bytes, err = codec.Encode(msg)
 	if err != nil {
-		return xerror.Wrapf(err, "codec:%d", s.GetCode())
+		return xerror.Wrapf(err, "codec")
 	}
 	return entity.Send(bytes)
 }
 
-func (agent *Agent) SetValue(ctx iface.IContext, s *session.Session, data []byte) error {
-	entity := network.GetConnection(s.GetEntityId())
+func (agent *Agent) SetValue(ctx iface.IContext, s iface.ISession, data []byte) error {
+	ses := s.(*session.Session)
+	entity := network.GetConnection(ses.GetId())
 	if entity == nil {
 		return nil
 	}
@@ -97,19 +99,17 @@ func (agent *Agent) SetValue(ctx iface.IContext, s *session.Session, data []byte
 	if ss == nil || !ok {
 		return nil
 	}
-	ss.Values = s.GetValues()
-	ss.Values = maputil.Merge(s.Values, s.GetValues())
+	ss.Values = ses.GetValues()
+	ss.Values = maputil.Merge(ss.Values, ses.GetValues())
 	return nil
 }
 
-func (agent *Agent) Shutdown(ctx iface.IContext, s *session.Session) error {
-	if s == nil {
-		return nil
-	}
-	glog.Info("关闭网络连接", zap.Int64("entityId", s.GetEntityId()))
-	entity := network.GetConnection(s.GetEntityId())
+func (agent *Agent) Shutdown(ctx iface.IContext, s iface.ISession) error {
+	ses := s.(*session.Session)
+	glog.Info("关闭网络连接", zap.Int64("entityId", ses.GetId()))
+	entity := network.GetConnection(ses.GetId())
 	if entity == nil {
-		return xerror.Wrapf(ErrNotFoundEntity, "entity:%d", s.GetEntityId())
+		return xerror.Wrapf(ErrNotFoundEntity, "entity:%d", ses.GetId())
 	}
 	_ = entity.Close(nil)
 	_ = ctx.Shutdown()
