@@ -34,9 +34,7 @@ func (g *Gate) Start(ctx context.Context, system iface.ISystem) (err error) {
 	if err != nil {
 		return
 	}
-
 	system.SetSessionFactory(&session.Factory{})
-
 	return g.server.Start()
 }
 
