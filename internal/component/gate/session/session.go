@@ -130,7 +130,8 @@ func (a *Session) SyncValues() error {
 	if err := a.check(); err != nil {
 		return err
 	}
-	return a.transport.Send(a, MethodSetValue, nil)
+	bin, _ := json.Marshal(a.Values)
+	return a.transport.Send(a.GetAgent(), MethodSetValue, bin)
 }
 
 // Response 向对端推送一条业务响应（走 Push 路由）。
@@ -140,7 +141,7 @@ func (a *Session) Response(data []byte) error {
 		return err
 	}
 	bin, _ := codec.Encode(clientMsg)
-	return a.transport.Send(a, MethodPush, bin)
+	return a.transport.Send(a.GetAgent(), MethodPush, bin)
 }
 
 // ResponseErr 设置 client.errCode 并向对端推送（无 body 的 Push）。
@@ -150,7 +151,7 @@ func (a *Session) ResponseErr(code uint16) error {
 		return err
 	}
 	bin, _ := codec.Encode(clientMsg)
-	return a.transport.Send(a, MethodPush, bin)
+	return a.transport.Send(a.GetAgent(), MethodPush, bin)
 }
 
 // Push 设置 cmd/act 并向对端推送一条消息（带 body）。
@@ -160,7 +161,7 @@ func (a *Session) Push(cmd, act uint8, data []byte) error {
 		return err
 	}
 	bin, _ := codec.Encode(clientMsg)
-	return a.transport.Send(a, MethodPush, bin)
+	return a.transport.Send(a.GetAgent(), MethodPush, bin)
 }
 
 // Close 通知对端关闭连接（Shutdown 路由）。
@@ -168,7 +169,7 @@ func (a *Session) Close() error {
 	if err := a.check(); err != nil {
 		return err
 	}
-	return a.transport.Send(a, MethodShutDown, nil)
+	return a.transport.Send(a.GetAgent(), MethodShutDown, nil)
 }
 
 // SetAgent 将 Pid JSON 序列化后写入 Values，并更新缓存。
@@ -237,26 +238,4 @@ func (a *Session) SetErrCode(code int64) {
 // GetErrCode 从 Values 读取 client.errCode。
 func (a *Session) GetErrCode() int64 {
 	return a.GetInt64(KeyClientMsgErrCode)
-}
-
-// ITransport 将 Session 的写操作（Push/Shutdown/SetValue）转成对 Agent 的调用或系统消息。
-type ITransport interface {
-	Send(session iface.ISession, method string, bin []byte) error
-}
-
-// transport 实现 ITransport：将 Session 写操作转为发往 Agent 的 Actor 消息（本进程投递或 System.Send）。
-type transport struct {
-	ctx iface.IContext
-}
-
-// Send 序列化 payload，按 method 构造发往 session.GetAgent() 的消息并投递。
-func (m *transport) Send(session iface.ISession, method string, bin []byte) error {
-	ses := session.(*Session)
-	msg := iface.NewActorMessage(m.ctx.ID(), ses.GetAgent(), method, bin)
-	msg.Session = session.Raw()
-	if ses.GetAgent().Equal(m.ctx.ID()) {
-		return m.ctx.InvokerMessage(msg)
-	} else {
-		return m.ctx.System().Send(msg)
-	}
 }
