@@ -22,8 +22,10 @@ type (
 		NodeId() uint64
 		NextID() uint64
 
-		Serializer() lib.ISerializer
 		SessionFactory() ISessionFactory
+		SetSessionFactory(f ISessionFactory)
+
+		Serializer() lib.ISerializer
 		Spawn(actor IActor, args ...interface{}) *Pid
 
 		Register(ctx IContext) error
@@ -106,4 +108,22 @@ func (a *Actor) OnStop(ctx IContext) error {
 }
 func (a *Actor) OnMessage(ctx IContext, msg interface{}) error {
 	return nil
+}
+
+// Equal 自定义逻辑相等判断
+func (o *Pid) Equal(other *Pid) bool {
+	// 先比对可比较字段
+	if o == nil && other == nil {
+		return true
+	}
+	if o == nil || other == nil {
+		return false
+	}
+	if o.GetNodeId() != other.GetNodeId() {
+		return false
+	}
+	if o.GetActorId() == other.GetActorId() {
+		return true
+	}
+	return o.GetActorName() == other.GetActorName()
 }

@@ -34,6 +34,9 @@ func (g *Gate) Start(ctx context.Context, system iface.ISystem) (err error) {
 	if err != nil {
 		return
 	}
+
+	system.SetSessionFactory(&session.Factory{})
+
 	return g.server.Start()
 }
 
@@ -43,13 +46,13 @@ func (g *Gate) OnConnect(entity network.IConnection) error {
 	}
 	g.count.Add(1)
 
+	s := session.New(entity.ID())
 	//  创建agent
 	agent := g.Factory()
-	agent.AppendMiddleware(g.Middlewares...)
-	system := g.system
-	pid := system.Spawn(agent)
+	agent.Init(s, entity, g.Middlewares...)
+	pid := g.system.Spawn(agent)
 	//  绑定
-	s := session.New(entity.ID())
+	s.SetAgent(pid)
 	entity.SetContext(s)
 
 	glog.Debug("网关:创建Agent", zap.Int64("entityId", entity.ID()), zap.Any("pid", pid))

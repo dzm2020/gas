@@ -7,6 +7,8 @@ import (
 	"errors"
 	"strconv"
 
+	"github.com/dzm2020/gas/internal/component/gate/codec"
+	"github.com/dzm2020/gas/internal/component/gate/protocol"
 	"github.com/dzm2020/gas/internal/iface"
 )
 
@@ -30,11 +32,6 @@ var (
 	errTransportIsNil = errors.New("transport is nil")
 )
 
-// ITransport 将 Session 的写操作（Push/Shutdown/SetValue）转成对 Agent 的调用或系统消息。
-type ITransport interface {
-	Send(session iface.ISession, method string, payload interface{}) error
-}
-
 // New 仅用 id 构造 Session，transport 为 nil，仅可读；需写时由上层用 NewWithData 注入 transport。
 func New(id int64) *Session {
 	data := &iface.Session{
@@ -45,9 +42,9 @@ func New(id int64) *Session {
 }
 
 // NewWithData 用原始会话数据与 transport 构造 Session，用于处理请求时得到可写的 ISession。
-func NewWithData(session *iface.Session, transport ITransport) *Session {
+func NewWithData(data *iface.Session, transport ITransport) *Session {
 	s := &Session{
-		Session:   session,
+		Session:   data,
 		transport: transport,
 	}
 	if s.Values == nil {
@@ -137,30 +134,33 @@ func (a *Session) SyncValues() error {
 }
 
 // Response 向对端推送一条业务响应（走 Push 路由）。
-func (a *Session) Response(request interface{}) error {
+func (a *Session) Response(data []byte) error {
+	clientMsg := protocol.New(a.GetCmd(), a.GetAct(), data)
 	if err := a.check(); err != nil {
 		return err
 	}
-	return a.transport.Send(a, MethodPush, request)
+	bin, _ := codec.Encode(clientMsg)
+	return a.transport.Send(a, MethodPush, bin)
 }
 
-// ResponseCode 设置 client.errCode 并向对端推送（无 body 的 Push）。
-func (a *Session) ResponseCode(code int64) error {
-	a.SetInt64(KeyClientMsgErrCode, code)
+// ResponseErr 设置 client.errCode 并向对端推送（无 body 的 Push）。
+func (a *Session) ResponseErr(code uint16) error {
+	clientMsg := protocol.NewErr(a.GetCmd(), a.GetAct(), code)
 	if err := a.check(); err != nil {
 		return err
 	}
-	return a.transport.Send(a, MethodPush, nil)
+	bin, _ := codec.Encode(clientMsg)
+	return a.transport.Send(a, MethodPush, bin)
 }
 
 // Push 设置 cmd/act 并向对端推送一条消息（带 body）。
-func (a *Session) Push(cmd, act uint8, request interface{}) error {
-	a.SetUint64(KeyClientMsgCmd, uint64(cmd))
-	a.SetUint64(KeyClientMsgAct, uint64(act))
+func (a *Session) Push(cmd, act uint8, data []byte) error {
+	clientMsg := protocol.New(cmd, act, data)
 	if err := a.check(); err != nil {
 		return err
 	}
-	return a.transport.Send(a, MethodPush, request)
+	bin, _ := codec.Encode(clientMsg)
+	return a.transport.Send(a, MethodPush, bin)
 }
 
 // Close 通知对端关闭连接（Shutdown 路由）。
@@ -239,20 +239,22 @@ func (a *Session) GetErrCode() int64 {
 	return a.GetInt64(KeyClientMsgErrCode)
 }
 
+// ITransport 将 Session 的写操作（Push/Shutdown/SetValue）转成对 Agent 的调用或系统消息。
+type ITransport interface {
+	Send(session iface.ISession, method string, bin []byte) error
+}
+
 // transport 实现 ITransport：将 Session 写操作转为发往 Agent 的 Actor 消息（本进程投递或 System.Send）。
 type transport struct {
 	ctx iface.IContext
 }
 
 // Send 序列化 payload，按 method 构造发往 session.GetAgent() 的消息并投递。
-func (m *transport) Send(session iface.ISession, method string, payload interface{}) error {
+func (m *transport) Send(session iface.ISession, method string, bin []byte) error {
 	ses := session.(*Session)
-	bin, err := m.ctx.Serializer().Marshal(payload)
-	if err != nil {
-		return err
-	}
 	msg := iface.NewActorMessage(m.ctx.ID(), ses.GetAgent(), method, bin)
-	if ses.GetAgent() == m.ctx.ID() {
+	msg.Session = session.Raw()
+	if ses.GetAgent().Equal(m.ctx.ID()) {
 		return m.ctx.InvokerMessage(msg)
 	} else {
 		return m.ctx.System().Send(msg)

@@ -5,7 +5,6 @@ import (
 
 	"github.com/duke-git/lancet/v2/maputil"
 	"github.com/dzm2020/gas/internal/component/gate/codec"
-	"github.com/dzm2020/gas/internal/component/gate/protocol"
 	"github.com/dzm2020/gas/internal/component/gate/session"
 	"github.com/dzm2020/gas/internal/iface"
 	"github.com/dzm2020/gas/pkg/glog"
@@ -39,6 +38,7 @@ func (a *AgentHandler) OnData(ctx iface.IContext, s iface.ISession, data []byte)
 type IAgent interface {
 	iface.IActor
 	IAgentHandler
+	Init(s *session.Session, entity network.IConnection, middlewares ...Middleware)
 	AppendMiddleware(middlewares ...Middleware)
 	Push(ctx iface.IContext, s iface.ISession, data []byte) error
 	Shutdown(ctx iface.IContext, s iface.ISession) error
@@ -49,26 +49,28 @@ var _ IAgent = (*Agent)(nil)
 type Agent struct {
 	iface.Actor
 	AgentHandler
-	// middlewares 由 Gate 在创建 session 时注入，Encode 前按顺序执行
-	middlewares []Middleware
+	s           *session.Session
+	entity      network.IConnection
+	middlewares []Middleware // middlewares 由 Gate 在创建 session 时注入，Encode 前按顺序执行
+}
+
+func (agent *Agent) Init(s *session.Session, entity network.IConnection, middlewares ...Middleware) {
+	agent.s = s
+	agent.entity = entity
+	agent.middlewares = middlewares
 }
 
 func (agent *Agent) AppendMiddleware(middlewares ...Middleware) {
 	agent.middlewares = append(agent.middlewares, middlewares...)
 }
 
-func (agent *Agent) Push(ctx iface.IContext, s iface.ISession, data []byte) error {
+func (agent *Agent) Push(ctx iface.IContext, s iface.ISession, data []byte) (err error) {
 	ses := s.(*session.Session)
-	var err error
 	entity := network.GetConnection(ses.GetId())
 	if entity == nil {
 		return xerror.Wrapf(ErrNotFoundEntity, "entity:%d", ses.GetId())
 	}
-
-	msg := protocol.New(ses.GetCmd(), ses.GetAct(), data)
-	msg.Index = ses.GetIndex()
-	msg.Error = uint16(ses.GetErrCode())
-
+	msg, _, _ := codec.Decode(data)
 	if len(agent.middlewares) > 0 {
 		msg, err = RunBeforeEncode(agent.middlewares, msg)
 		if err != nil {
@@ -81,12 +83,12 @@ func (agent *Agent) Push(ctx iface.IContext, s iface.ISession, data []byte) erro
 
 	glog.Debug("发送消息到客户端", zap.Int64("entityId", ses.GetId()), zap.Any("msg", msg))
 
-	var bytes []byte
-	bytes, err = codec.Encode(msg)
+	var bin []byte
+	bin, err = codec.Encode(msg)
 	if err != nil {
 		return xerror.Wrapf(err, "codec")
 	}
-	return entity.Send(bytes)
+	return entity.Send(bin)
 }
 
 func (agent *Agent) SetValue(ctx iface.IContext, s iface.ISession, data []byte) error {
