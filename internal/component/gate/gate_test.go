@@ -7,13 +7,19 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dzm2020/gas/internal/component/gate/agent"
 	"github.com/dzm2020/gas/internal/component/gate/codec"
+	"github.com/dzm2020/gas/internal/component/gate/middleware"
 	"github.com/dzm2020/gas/internal/component/gate/protocol"
 	"github.com/dzm2020/gas/internal/component/gate/session"
 	"github.com/dzm2020/gas/internal/iface"
 	"github.com/dzm2020/gas/pkg/cluster"
 	"github.com/dzm2020/gas/pkg/lib"
 	"github.com/dzm2020/gas/pkg/network"
+)
+
+var (
+	ErrNotFoundEntity = errors.New("entity not found")
 )
 
 // ---------- mocks ----------
@@ -77,7 +83,7 @@ func (testContext) InvokerMessage(interface{}) error                        { re
 func (testContext) ID() *iface.Pid                                          { return &iface.Pid{} }
 func (testContext) Named(string) error                                      { return nil }
 func (testContext) Unname() error                                           { return nil }
-func (testContext) Actor() iface.IActor                                     { return &Agent{} }
+func (testContext) Actor() iface.IActor                                     { return &agent.Agent{} }
 func (testContext) SetCallTimeout(time.Duration)                            {}
 func (testContext) Send(*iface.Pid, string, interface{}) error              { return nil }
 func (testContext) Call(*iface.Pid, string, interface{}, interface{}) error { return nil }
@@ -123,36 +129,36 @@ func (m suffixMw) BeforeEncode(msg *protocol.Message) (*protocol.Message, error)
 func TestMiddleware(t *testing.T) {
 	t.Run("RunAfterDecode", func(t *testing.T) {
 		msg := protocol.New(1, 2, []byte("a"))
-		out, err := RunAfterDecode(nil, msg)
+		out, err := middleware.RunAfterDecode(nil, msg)
 		if err != nil || out != msg {
 			t.Fatalf("nil chain: err=%v out=%p", err, out)
 		}
-		out, err = RunAfterDecode([]Middleware{noopMw{}}, msg)
+		out, err = middleware.RunAfterDecode([]middleware.Middleware{noopMw{}}, msg)
 		if err != nil || out != msg {
 			t.Fatalf("noop: err=%v", err)
 		}
 		e := errors.New("err")
-		out, err = RunAfterDecode([]Middleware{errMw{e}}, msg)
+		out, err = middleware.RunAfterDecode([]middleware.Middleware{errMw{e}}, msg)
 		if err != e || out != nil {
 			t.Fatalf("error: err=%v", err)
 		}
-		out, err = RunAfterDecode([]Middleware{suffixMw{[]byte("b")}, suffixMw{[]byte("c")}}, msg)
+		out, err = middleware.RunAfterDecode([]middleware.Middleware{suffixMw{[]byte("b")}, suffixMw{[]byte("c")}}, msg)
 		if err != nil || string(out.Data) != "abc" {
 			t.Fatalf("chain: data=%q", out.Data)
 		}
 	})
 	t.Run("RunBeforeEncode", func(t *testing.T) {
 		msg := protocol.New(0, 0, []byte("1"))
-		out, err := RunBeforeEncode(nil, msg)
+		out, err := middleware.RunBeforeEncode(nil, msg)
 		if err != nil || out != msg {
 			t.Fatalf("nil: err=%v", err)
 		}
 		e := errors.New("e")
-		out, err = RunBeforeEncode([]Middleware{errMw{e}}, msg)
+		out, err = middleware.RunBeforeEncode([]middleware.Middleware{errMw{e}}, msg)
 		if err != e || out != nil {
 			t.Fatalf("error: err=%v", err)
 		}
-		out, err = RunBeforeEncode([]Middleware{suffixMw{[]byte("2")}, suffixMw{[]byte("3")}}, msg)
+		out, err = middleware.RunBeforeEncode([]middleware.Middleware{suffixMw{[]byte("2")}, suffixMw{[]byte("3")}}, msg)
 		if err != nil || string(out.Data) != "123" {
 			t.Fatalf("chain: data=%q", out.Data)
 		}
@@ -166,7 +172,7 @@ func TestGate(t *testing.T) {
 		g := &Gate{MaxConn: 1}
 		g.count.Store(2)
 		g.system = &mockSystem{}
-		g.Factory = func() IAgent { return &Agent{} }
+		g.Factory = func() agent.IAgent { return &agent.Agent{} }
 		err := g.OnConnect(&mockConn{id: 1})
 		if err == nil {
 			t.Fatal("want error when count > MaxConn")
@@ -178,7 +184,7 @@ func TestGate(t *testing.T) {
 	t.Run("OnConnect_BindsSession", func(t *testing.T) {
 		g := &Gate{MaxConn: 10}
 		g.system = &mockSystem{}
-		g.Factory = func() IAgent { return &Agent{} }
+		g.Factory = func() agent.IAgent { return &agent.Agent{} }
 		conn := &mockConn{id: 99}
 		if err := g.OnConnect(conn); err != nil {
 			t.Fatal(err)
@@ -240,7 +246,7 @@ func TestAgent(t *testing.T) {
 		network.AddConnection(conn)
 		s := session.New(100, &iface.Pid{})
 		s.Cmd, s.Act, s.Index = 1, 2, 3
-		if err := (&Agent{}).Push(testContext{}, s, []byte("hello")); err != nil {
+		if err := (&agent.Agent{}).Push(testContext{}, s, []byte("hello")); err != nil {
 			t.Fatal(err)
 		}
 		if len(conn.sent) != 1 {
@@ -256,7 +262,7 @@ func TestAgent(t *testing.T) {
 	t.Run("Push_NoConn", func(t *testing.T) {
 		network.ClearConnections()
 		defer network.ClearConnections()
-		err := (&Agent{}).Push(testContext{}, session.New(999, &iface.Pid{}), []byte("x"))
+		err := (&agent.Agent{}).Push(testContext{}, session.New(999, &iface.Pid{}), []byte("x"))
 		if err == nil || !errors.Is(err, ErrNotFoundEntity) {
 			t.Fatalf("err=%v", err)
 		}
@@ -266,8 +272,8 @@ func TestAgent(t *testing.T) {
 		defer network.ClearConnections()
 		conn := &mockConn{id: 1}
 		network.AddConnection(conn)
-		agent := &Agent{}
-		agent.SetMiddleware([]Middleware{suffixMw{[]byte("-ok")}})
+		agent := &agent.Agent{}
+		agent.SetMiddleware([]middleware.Middleware{suffixMw{[]byte("-ok")}})
 		if err := agent.Push(testContext{}, session.New(1, &iface.Pid{}), []byte("body")); err != nil {
 			t.Fatal(err)
 		}
@@ -277,12 +283,12 @@ func TestAgent(t *testing.T) {
 		}
 	})
 	t.Run("Shutdown", func(t *testing.T) {
-		if err := (&Agent{}).Shutdown(testContext{}, nil); err != nil {
+		if err := (&agent.Agent{}).Shutdown(testContext{}, nil); err != nil {
 			t.Fatal(err)
 		}
 		network.ClearConnections()
 		defer network.ClearConnections()
-		err := (&Agent{}).Shutdown(testContext{}, session.New(888, &iface.Pid{}))
+		err := (&agent.Agent{}).Shutdown(testContext{}, session.New(888, &iface.Pid{}))
 		if err == nil || !errors.Is(err, ErrNotFoundEntity) {
 			t.Fatalf("err=%v", err)
 		}

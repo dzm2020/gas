@@ -5,7 +5,9 @@ package actor
 import (
 	"github.com/dzm2020/gas/internal/iface"
 	"github.com/dzm2020/gas/pkg/cluster"
+	"github.com/dzm2020/gas/pkg/glog"
 	"github.com/dzm2020/gas/pkg/lib"
+	"go.uber.org/zap"
 )
 
 // NewClusterSystem 创建集群版 Actor 系统。
@@ -39,6 +41,7 @@ func (s *ClusterSystem) Send(message *iface.ActorMessage) (err error) {
 	if s.isLocalMessage(message) {
 		return s.System.Send(message)
 	}
+	glog.Info("cluster system send message", zap.Any("message", message))
 	return s.transport.Send(message.To.NodeId, message)
 }
 

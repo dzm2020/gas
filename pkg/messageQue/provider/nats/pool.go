@@ -12,71 +12,67 @@ import (
 func NewPool(cfg *Config) *ConnPool {
 	servers := strings.Join(cfg.Servers, ",")
 	natsOpts := toOptions(cfg)
-	// 创建连接池
 	poolSize := cfg.PoolSize
 	if poolSize <= 0 {
-		poolSize = 10 // 默认大小
+		poolSize = 10
 	}
 	pool := &ConnPool{
-		pool:    make(chan *nats.Conn, poolSize),
+		conns:   make([]*nats.Conn, poolSize),
 		servers: servers,
 		opts:    natsOpts,
 		size:    poolSize,
 	}
-
-	// 预创建连接池中的连接
 	for i := 0; i < poolSize; i++ {
 		conn, err := pool.createConn()
 		if err != nil {
-			// 如果预创建失败，继续尝试，连接会在使用时创建
 			continue
 		}
-		pool.put(conn)
+		pool.conns[i] = conn
 	}
 	return pool
 }
 
-// ConnPool 连接池
+// hashSubject 对 subject 做哈希，相同 subject 始终映射到同一连接下标，保证 Publish/Request 顺序性。
+func hashSubject(subject string) uint32 {
+	var h uint32 = 0
+	for _, c := range subject {
+		h = h*31 + uint32(c)
+	}
+	return h
+}
+
+// ConnPool 按 subject 固定到同一连接的池，保证同一 subject 的 Publish 与 Request 顺序。
 type ConnPool struct {
 	stopper.Stopper
-	pool    chan *nats.Conn
-	mu      sync.RWMutex
+	conns   []*nats.Conn
+	mu      sync.Mutex
 	servers string
 	opts    []nats.Option
 	size    int
 }
 
-// get 从连接池获取连接
-func (p *ConnPool) get() (*nats.Conn, error) {
+// getConnBySubject 返回该 subject 固定绑定的连接，同一 subject 始终用同一 conn，保证消息顺序。
+func (p *ConnPool) getConnBySubject(subject string) (*nats.Conn, error) {
 	if p.IsStop() {
 		return nil, errors.New("连接池已关闭")
 	}
-
-	select {
-	case conn := <-p.pool:
-		// 检查连接是否有效
-		if conn != nil && !conn.IsClosed() {
-			return conn, nil
+	idx := uint32(0)
+	if p.size > 0 {
+		idx = hashSubject(subject) % uint32(p.size)
+	}
+	p.mu.Lock()
+	conn := p.conns[idx]
+	if conn == nil || conn.IsClosed() {
+		var err error
+		conn, err = p.createConn()
+		if err != nil {
+			p.mu.Unlock()
+			return nil, err
 		}
-		// 连接已关闭，创建新连接
-		return p.createConn()
-	default:
-		// 连接池为空，创建新连接
-		return p.createConn()
+		p.conns[idx] = conn
 	}
-}
-
-// put 归还连接到连接池
-func (p *ConnPool) put(conn *nats.Conn) {
-	if p.IsStop() {
-		conn.Close()
-		return
-	}
-	select {
-	case p.pool <- conn:
-	default:
-		conn.Close()
-	}
+	p.mu.Unlock()
+	return conn, nil
 }
 
 // createConn 创建新连接
@@ -89,16 +85,12 @@ func (p *ConnPool) close() {
 	if !p.Stop() {
 		return
 	}
-	// 关闭所有连接
-	for {
-		select {
-		case conn := <-p.pool:
-			if conn != nil && !conn.IsClosed() {
-				conn.Close()
-			}
-		default:
-			close(p.pool)
-			return
+	p.mu.Lock()
+	for i, conn := range p.conns {
+		if conn != nil && !conn.IsClosed() {
+			conn.Close()
 		}
+		p.conns[i] = nil
 	}
+	p.mu.Unlock()
 }

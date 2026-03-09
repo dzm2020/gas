@@ -15,19 +15,6 @@ func New(cmd, act uint8, data []byte) *Message {
 	}
 }
 
-func NewWithData(data []byte) *Message {
-	return &Message{
-		Head: new(Head),
-		Data: data,
-	}
-}
-
-func NewErr(cmd, act uint8, code uint16) *Message {
-	m := New(cmd, act, nil)
-	m.Error = code
-	return m
-}
-
 type Message struct {
 	*Head
 	Data []byte
@@ -48,10 +35,21 @@ func (m *Message) ID() uint16 {
 type Head struct {
 	Len   uint32 // 包体长度
 	Cmd   uint8  // 命令
-	Act   uint8  // 命令
+	Act   uint8  // 动作
 	Error uint16 // 错误码
 	Index uint32 // 序号
 }
+
+func (h *Head) GetLen() uint32    { return h.Len }
+func (h *Head) SetLen(v uint32)   { h.Len = v }
+func (h *Head) GetCmd() uint8     { return h.Cmd }
+func (h *Head) SetCmd(v uint8)    { h.Cmd = v }
+func (h *Head) GetAct() uint8     { return h.Act }
+func (h *Head) SetAct(v uint8)    { h.Act = v }
+func (h *Head) GetError() uint16  { return h.Error }
+func (h *Head) SetError(v uint16) { h.Error = v }
+func (h *Head) GetIndex() uint32  { return h.Index }
+func (h *Head) SetIndex(v uint32) { h.Index = v }
 
 func CmdAct(cmd, act uint8) uint16 {
 	return uint16(cmd)<<8 + uint16(act)

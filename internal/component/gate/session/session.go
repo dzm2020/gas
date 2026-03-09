@@ -55,9 +55,10 @@ func NewWithData(data *iface.Session, transport ITransport) *Session {
 
 // Session 封装 *iface.Session 并提供 Response/Push/Close 等写能力，通过 transport 下发到对端。
 type Session struct {
-	*iface.Session            // 原始数据
-	transport      ITransport // 写操作下发；nil 时仅可读
-	agent          *iface.Pid // 缓存；为 nil 时 GetAgent 从 Values 反序列化
+	*iface.Session             // 原始数据
+	transport      ITransport  // 写操作下发；nil 时仅可读
+	agent          *iface.Pid  // 缓存；为 nil 时 GetAgent 从 Values 反序列化
+	middlewareRef  interface{} // 指向当前连接对应 agent 的 middleware 链（*[]Middleware），由 gate 注入，避免循环依赖用 interface{}
 }
 
 // Raw 返回底层 *iface.Session，供需要原始结构的调用方使用。
@@ -137,6 +138,7 @@ func (a *Session) SyncValues() error {
 // Response 向对端推送一条业务响应（走 Push 路由）。
 func (a *Session) Response(data []byte) error {
 	clientMsg := protocol.New(a.GetCmd(), a.GetAct(), data)
+	clientMsg.SetIndex(a.GetIndex())
 	if err := a.check(); err != nil {
 		return err
 	}
@@ -146,7 +148,9 @@ func (a *Session) Response(data []byte) error {
 
 // ResponseErr 设置 client.errCode 并向对端推送（无 body 的 Push）。
 func (a *Session) ResponseErr(code uint16) error {
-	clientMsg := protocol.NewErr(a.GetCmd(), a.GetAct(), code)
+	clientMsg := protocol.New(a.GetCmd(), a.GetAct(), nil)
+	clientMsg.SetIndex(a.GetIndex())
+	clientMsg.SetError(code)
 	if err := a.check(); err != nil {
 		return err
 	}

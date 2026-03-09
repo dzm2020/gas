@@ -2,6 +2,7 @@ package nats
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/dzm2020/gas/pkg/glog"
@@ -41,15 +42,18 @@ func New(cfg *Config) *Client {
 type Client struct {
 	stopper.Stopper
 	cfg     *Config
-	pool    *ConnPool  // 连接池，用于 Publish 和 Request
+	pool    *ConnPool  // 按 subject 固定连接，同一 subject 的 Publish/Request 用同一 conn 保证顺序
 	subConn *nats.Conn // 专门的订阅连接
 }
 
 func (n *Client) Run(ctx context.Context) (err error) {
 	n.pool = NewPool(n.cfg)
-	n.subConn, err = n.pool.get()
+	n.subConn, err = nats.Connect(strings.Join(n.cfg.Servers, ","), toOptions(n.cfg)...)
+	if err != nil {
+		return err
+	}
 	glog.Debug("NATS启动成功", zap.Strings("address", n.cfg.Servers))
-	return
+	return nil
 }
 
 func (n *Client) Subscribe(subject string, subscriber iface.ISubscriber) (iface.ISubscription, error) {
@@ -66,22 +70,18 @@ func (n *Client) Subscribe(subject string, subscriber iface.ISubscriber) (iface.
 }
 
 func (n *Client) Publish(subject string, data []byte) error {
-	conn, err := n.pool.get()
+	conn, err := n.pool.getConnBySubject(subject)
 	if err != nil {
 		return xerror.Wrapf(err, "从连接池获取连接失败, subject:%s", subject)
 	}
-	defer n.pool.put(conn)
-
 	return conn.Publish(subject, data)
 }
 
 func (n *Client) Request(subject string, data []byte, timeout time.Duration) ([]byte, error) {
-	conn, err := n.pool.get()
+	conn, err := n.pool.getConnBySubject(subject)
 	if err != nil {
 		return nil, xerror.Wrapf(err, "从连接池获取连接失败, subject:%s", subject)
 	}
-	defer n.pool.put(conn)
-
 	ret, err := conn.Request(subject, data, timeout)
 	if err != nil {
 		return nil, xerror.Wrapf(err, "subject:%s", subject)

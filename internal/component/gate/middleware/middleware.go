@@ -1,11 +1,11 @@
-package gate
+package middleware
 
 import (
 	"github.com/dzm2020/gas/internal/component/gate/protocol"
 )
 
-// Middleware 在 codec.Decode 之后、以及 codec.Encode 之前对消息进行处理
-type Middleware interface {
+// IMiddleware 在 codec.Decode 之后、以及 codec.Encode 之前对消息进行处理
+type IMiddleware interface {
 	// AfterDecode Decode 之后调用，可修改或替换 msg，返回 error 会终止后续处理
 	AfterDecode(msg *protocol.Message) (*protocol.Message, error)
 	// BeforeEncode Encode 之前调用，可修改或替换 msg，返回 error 会终止发送
@@ -13,7 +13,7 @@ type Middleware interface {
 }
 
 // RunAfterDecode 按顺序执行 middleware 的 AfterDecode
-func RunAfterDecode(chain []Middleware, msg *protocol.Message) (*protocol.Message, error) {
+func RunAfterDecode(chain []IMiddleware, msg *protocol.Message) (*protocol.Message, error) {
 	var err error
 	for _, mw := range chain {
 		if mw == nil {
@@ -31,7 +31,7 @@ func RunAfterDecode(chain []Middleware, msg *protocol.Message) (*protocol.Messag
 }
 
 // RunBeforeEncode 按顺序执行 middleware 的 BeforeEncode
-func RunBeforeEncode(chain []Middleware, msg *protocol.Message) (*protocol.Message, error) {
+func RunBeforeEncode(chain []IMiddleware, msg *protocol.Message) (*protocol.Message, error) {
 	var err error
 	for _, mw := range chain {
 		if mw == nil {
