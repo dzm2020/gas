@@ -9,7 +9,13 @@ import (
 // Factory 实现 iface.ISessionFactory，将 *pb.Session 与 ctx 包装成可 Response/Push/Close 的 Session。
 type Factory struct{}
 
-// FromRaw 用 raw 与当前 ctx 构造带 transport 的 Session（transport 目标为 raw.Agent），供 actor 路由使用。
+// FromRaw
+//
+//	@Description: 用 raw 与 ctx 构造带 transport 的 Session。
+//	@receiver m
+//	@param ctx
+//	@param raw
+//	@return iface.ISession
 func (m *Factory) FromRaw(ctx iface.IContext, raw *pb.Session) iface.ISession {
 	return New(raw, ctx)
 }

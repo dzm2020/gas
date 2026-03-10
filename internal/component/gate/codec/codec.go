@@ -13,7 +13,12 @@ const MaxMsgSize = 1024 * 1024
 
 const maxMsgSize = MaxMsgSize
 
-// Encode 将 protocol.Message 编码为字节流：HeadLen 字节头（Len 按 len(Data) 写入）+ Data；消息体超过 maxMsgSize 返回错误。
+// Encode
+//
+//	@Description: 将 Message 编码为字节流，超长返回错误。
+//	@param msg
+//	@return []byte
+//	@return error
 func Encode(msg *protocol.Message) ([]byte, error) {
 	dataLen := uint32(len(msg.Data))
 	if dataLen >= maxMsgSize {
@@ -37,7 +42,13 @@ func Encode(msg *protocol.Message) ([]byte, error) {
 	return buf, nil
 }
 
-// Decode 从 buf 解出一个完整包：若数据不足或 Len 非法返回 (nil, 0, nil/nil)；成功返回 (*Message, 消费字节数, nil)。
+// Decode
+//
+//	@Description: 从 buf 解出一个完整包，返回消息与消费字节数。
+//	@param buf
+//	@return *protocol.Message
+//	@return int
+//	@return error
 func Decode(buf []byte) (*protocol.Message, int, error) {
 	if len(buf) < protocol.HeadLen {
 		return nil, 0, nil

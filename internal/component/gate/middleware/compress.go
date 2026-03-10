@@ -22,7 +22,11 @@ type Compress struct {
 	minLen int // 仅当 len(Data) >= minLen 时压缩，0 表示始终压缩
 }
 
-// NewCompress 创建压缩中间件。minLen 为启用压缩的最小 Body 长度，0 表示一律压缩。
+// NewCompress
+//
+//	@Description: 创建压缩中间件，minLen 为最小压缩长度，0 表示一律压缩。
+//	@param minLen
+//	@return *Compress
 func NewCompress(minLen int) *Compress {
 	return &Compress{minLen: minLen}
 }

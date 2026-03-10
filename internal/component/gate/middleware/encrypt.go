@@ -35,7 +35,11 @@ type Encrypt struct {
 	derivedKey []byte
 }
 
-// NewEncrypt 创建服务端加密中间件。随机生成 serverKey；业务在收到 (0,0, clientKey) 后回复 (0,0, ServerKey())。
+// NewEncrypt
+//
+//	@Description: 创建服务端加密中间件，随机 serverKey，密钥交换 (0,0)。
+//	@return *Encrypt
+//	@return error
 func NewEncrypt() (*Encrypt, error) {
 	serverKey := make([]byte, 32)
 	if _, err := rand.Read(serverKey); err != nil {
@@ -44,19 +48,34 @@ func NewEncrypt() (*Encrypt, error) {
 	return &Encrypt{serverKey: serverKey}, nil
 }
 
-// NewEncryptClient 创建客户端加密中间件，传入本地 clientKey；收到服务端 (0,0, serverKey) 后派生密钥。
+// NewEncryptClient
+//
+//	@Description: 创建客户端加密中间件，收到 (0,0, serverKey) 后派生密钥。
+//	@param clientKey
+//	@return *Encrypt
 func NewEncryptClient(clientKey []byte) *Encrypt {
 	key := make([]byte, len(clientKey))
 	copy(key, clientKey)
 	return &Encrypt{clientKey: key}
 }
 
-// ServerKey 返回本端 serverKey，供服务端在密钥交换时填入回复包（cmd=0 act=0, data=ServerKey()）。
+// ServerKey
+//
+//	@Description: 返回本端 serverKey，供密钥交换回复使用。
+//	@receiver e
+//	@return []byte
 func (e *Encrypt) ServerKey() []byte {
 	return e.serverKey
 }
 
-// AfterDecode 解码后：若为密钥交换（cmd=0 act=0），服务端将 data 视为 clientKey 并派生密钥，客户端将 data 视为 serverKey 并派生密钥；否则用派生密钥对 Body 异或解密。
+// AfterDecode
+//
+//	@Description: 解码后：密钥交换(0,0)则派生密钥或回复；否则 XOR 解密 Body。
+//	@receiver e
+//	@param agent
+//	@param msg
+//	@return *protocol.Message
+//	@return error
 func (e *Encrypt) AfterDecode(agent gateiface.IAgent, msg *protocol.Message) (*protocol.Message, error) {
 	if msg == nil {
 		return nil, nil
@@ -100,7 +119,13 @@ func (e *Encrypt) AfterDecode(agent gateiface.IAgent, msg *protocol.Message) (*p
 
 }
 
-// BeforeEncode 编码前：若为密钥交换（cmd=0 act=0 且 data 为本端 serverKey 或 clientKey），则不加密；否则用派生密钥对 Body 异或加密。
+// BeforeEncode
+//
+//	@Description: 编码前：密钥交换(0,0)不加密，否则 XOR 加密 Body。
+//	@receiver e
+//	@param msg
+//	@return *protocol.Message
+//	@return error
 func (e *Encrypt) BeforeEncode(_ gateiface.IAgent, msg *protocol.Message) (*protocol.Message, error) {
 	if msg == nil {
 		return nil, nil

@@ -18,12 +18,33 @@ type IHandler interface {
 // Handler 空实现，便于业务只重写需要的方法。
 type Handler struct{}
 
+// OnInit
+//
+//	@Description: 空实现，可重写。
+//	@receiver a
+//	@param agent
+//	@return error
 func (a *Handler) OnInit(agent gateiface.IAgent) error {
 	return nil
 }
+
+// OnRoute
+//
+//	@Description: 空实现，可重写。
+//	@receiver a
+//	@param agent
+//	@param data
+//	@return error
 func (a *Handler) OnRoute(agent gateiface.IAgent, data []byte) error {
 	return nil
 }
+
+// OnStop
+//
+//	@Description: 空实现，可重写。
+//	@receiver a
+//	@param agent
+//	@return error
 func (a *Handler) OnStop(agent gateiface.IAgent) error {
 	return nil
 }

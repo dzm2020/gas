@@ -1,4 +1,5 @@
-// 本文件实现 ITransport：把 Session 的 Push/SetValue/Close 转成发往 Agent 的 Actor 调用（本进程 InvokerMessage 或跨节点 System.Send）。
+// Package session
+// @Description: 本文件实现 ITransport：把 Session 的 Push/SetValue/Close 转成发往 Agent 的 Actor 调用（本进程 InvokerMessage 或跨actor System.Send）。
 package session
 
 import (

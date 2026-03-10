@@ -14,7 +14,10 @@ type Log struct{}
 
 var _ gateiface.IMiddleware = (*Log)(nil)
 
-// NewLog 创建日志中间件。
+// NewLog
+//
+//	@Description: 创建日志中间件。
+//	@return *Log
 func NewLog() *Log {
 	return &Log{}
 }

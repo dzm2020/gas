@@ -3,7 +3,13 @@ package protocol
 
 const HeadLen = 13 // 协议头长度（字节）：Len(4)+Cmd(1)+Act(1)+Error(2)+Index(4)+Tag(1)
 
-// New 构造一条协议消息，Head 中 Len 初始为 0（由 codec 编码时按 Data 长度写入）。
+// New
+//
+//	@Description: 构造协议消息，Len 由 codec 按 Data 长度写入。
+//	@param cmd
+//	@param act
+//	@param data
+//	@return *Message
 func New(cmd, act uint8, data []byte) *Message {
 	return &Message{
 		Head: &Head{
@@ -18,12 +24,20 @@ func New(cmd, act uint8, data []byte) *Message {
 	}
 }
 
-// NewData 构造 Cmd=0、Act=0 的纯数据消息，常用于业务透传或 Response。
+// NewData
+//
+//	@Description: 构造 (0,0) 纯数据消息。
+//	@param data
+//	@return *Message
 func NewData(data []byte) *Message {
 	return New(0, 0, data)
 }
 
-// NewErr 构造仅带错误码的响应消息，Body 为空。
+// NewErr
+//
+//	@Description: 构造仅带错误码的响应，Body 为空。
+//	@param err
+//	@return *Message
 func NewErr(err uint16) *Message {
 	msg := New(0, 0, nil)
 	msg.SetError(err)
@@ -36,7 +50,11 @@ type Message struct {
 	Data []byte
 }
 
-// Copy 从 old 复制 Cmd、Act、Index、Tag 到当前消息（用于回包时保持序号与路由信息）。
+// Copy
+//
+//	@Description: 从 old 复制 Cmd、Act、Index、Tag，用于回包。
+//	@receiver m
+//	@param old
 func (m *Message) Copy(old *Message) {
 	if old == nil {
 		return
@@ -47,7 +65,11 @@ func (m *Message) Copy(old *Message) {
 	m.Tag = old.Tag
 }
 
-// ID 返回 Cmd<<8+Act 的组合 ID，用于路由或映射。
+// ID
+//
+//	@Description: 返回 Cmd<<8+Act 的组合 ID。
+//	@receiver m
+//	@return uint16
 func (m *Message) ID() uint16 {
 	return CmdAct(m.Cmd, m.Act)
 }
@@ -74,12 +96,22 @@ func (h *Head) SetIndex(v uint32) { h.Index = v }
 func (h *Head) GetTag() uint8     { return h.Tag }
 func (h *Head) SetTag(v uint8)    { h.Tag = v }
 
-// CmdAct 将 cmd、act 合并为 16 位 ID（高 8 位 cmd，低 8 位 act）。
+// CmdAct
+//
+//	@Description: 将 cmd、act 合并为 16 位 ID。
+//	@param cmd
+//	@param act
+//	@return uint16
 func CmdAct(cmd, act uint8) uint16 {
 	return uint16(cmd)<<8 + uint16(act)
 }
 
-// ParseId 将 16 位 msgId 拆成 cmd（高 8 位）与 act（低 8 位）。
+// ParseId
+//
+//	@Description: 将 msgId 拆成 cmd 与 act。
+//	@param msgId
+//	@return uint8
+//	@return uint8
 func ParseId(msgId uint16) (uint8, uint8) {
 	cmd := uint8(msgId >> 8)
 	act := uint8(msgId & 0xFF)

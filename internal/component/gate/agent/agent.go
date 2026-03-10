@@ -27,7 +27,12 @@ type IRemoteHandler interface {
 
 var _ gateiface.IAgent = (*Agent)(nil)
 
-// New 构造 Agent，绑定连接与业务 IHandler；由 Gate.OnConnect 调用并 Spawn 为 Actor。
+// New
+//
+//	@Description: 构造 Agent，由 Gate.OnConnect 调用并 Spawn。
+//	@param entity
+//	@param handler
+//	@return *Agent
 func New(entity network.IConnection, handler IHandler) *Agent {
 	return &Agent{
 		entity:   entity,
@@ -47,7 +52,13 @@ type Agent struct {
 	middlewares []gateiface.IMiddleware
 }
 
-// OnInit 初始化 Session（含当前 Agent Pid），并调用 IHandler.OnInit。
+// OnInit
+//
+//	@Description: 初始化 Session 并调用 IHandler.OnInit。
+//	@receiver agent
+//	@param ctx
+//	@param params
+//	@return error
 func (agent *Agent) OnInit(ctx iface.IContext, params []interface{}) error {
 	agent.ctx = ctx
 	entity := agent.GetEntity()
@@ -61,7 +72,13 @@ func (agent *Agent) OnInit(ctx iface.IContext, params []interface{}) error {
 	return agent.IHandler.OnInit(agent)
 }
 
-// OnData 收到 Gate 投递的协议消息：先走 AfterDecode 中间件，再 SetMessage 并调用 IHandler.OnRoute(ctx, agent, msg.Data)。
+// OnData
+//
+//	@Description: 经 AfterDecode 后 SetMessage 并调用 IHandler.OnRoute。
+//	@receiver agent
+//	@param ctx
+//	@param msg
+//	@return err
 func (agent *Agent) OnData(ctx iface.IContext, msg *protocol.Message) (err error) {
 	msg, err = middleware.RunAfterDecode(agent.GetMiddleware(), agent, msg)
 	if err != nil || msg == nil {
@@ -70,19 +87,40 @@ func (agent *Agent) OnData(ctx iface.IContext, msg *protocol.Message) (err error
 	agent.session.SetMessage(msg)
 	return agent.IHandler.OnRoute(agent, msg.Data)
 }
-func (agent *Agent) Context() iface.IContext {
-	return agent.ctx
-}
 
-// OnStop 委托 IHandler.OnStop 做清理。
+// OnStop
+//
+//	@Description: 委托 IHandler.OnStop 清理。
+//	@receiver agent
+//	@param ctx
+//	@return error
 func (agent *Agent) OnStop(ctx iface.IContext) error {
 	return agent.IHandler.OnStop(agent)
 }
 
+// GetEntity
+//
+//	@Description:
+//	@receiver agent
+//	@return network.IConnection
 func (agent *Agent) GetEntity() network.IConnection {
 	return agent.entity
 }
 
+// Context
+//
+//	@Description:
+//	@receiver agent
+//	@return iface.IContext
+func (agent *Agent) Context() iface.IContext {
+	return agent.ctx
+}
+
+// GetSession
+//
+//	@Description:
+//	@receiver agent
+//	@return *session.Session
 func (agent *Agent) GetSession() *session.Session {
 	return agent.session
 }
@@ -91,7 +129,11 @@ func (agent *Agent) AppendMiddleware(middlewares ...gateiface.IMiddleware) {
 	agent.middlewares = append(agent.middlewares, middlewares...)
 }
 
-// SetMiddleware 替换当前 agent 的整条 middleware 链（测试或自定义 agent 用）。
+// SetMiddleware
+//
+//	@Description: 替换整条 middleware 链。
+//	@receiver agent
+//	@param chain
 func (agent *Agent) SetMiddleware(chain []gateiface.IMiddleware) {
 	agent.middlewares = chain
 }
@@ -100,7 +142,12 @@ func (agent *Agent) GetMiddleware() []gateiface.IMiddleware {
 	return agent.middlewares
 }
 
-// Push 由系统/对端调用：将 data 解包为 Message，经 BeforeEncode 中间件后编码并发送到 entity；用于响应或集群转发到客户端。
+// Push
+//
+//	@Description: 经 BeforeEncode 后编码并发送到连接。
+//	@receiver agent
+//	@param msg
+//	@return err
 func (agent *Agent) Push(msg *protocol.Message) (err error) {
 	if len(agent.middlewares) > 0 {
 		msg, err = middleware.RunBeforeEncode(agent.middlewares, agent, msg)
@@ -119,13 +166,22 @@ func (agent *Agent) Push(msg *protocol.Message) (err error) {
 	return agent.GetEntity().Send(bin)
 }
 
-// SetValues 处理对端同步的 Values：data 为 JSON map，与当前 session.Values 合并。
+// SetValues
+//
+//	@Description: 合并对端同步的 Values 到 session。
+//	@receiver agent
+//	@param values
+//	@return error
 func (agent *Agent) SetValues(values map[string]string) error {
 	agent.session.Values = maputil.Merge(agent.session.Values, values)
 	return nil
 }
 
-// Shutdown 关闭网络连接并关闭当前 Actor 进程。
+// Shutdown
+//
+//	@Description: 关闭连接并关闭当前 Actor。
+//	@receiver agent
+//	@return error
 func (agent *Agent) Shutdown() error {
 	_ = agent.GetEntity().Close(nil)
 	_ = agent.ctx.Shutdown()

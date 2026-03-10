@@ -27,6 +27,12 @@ var (
 	errTransportIsNil = errors.New("transport is nil")
 )
 
+// New
+//
+//	@Description: 用 raw 与 ctx 构造 Session 并绑定 transport。
+//	@param raw
+//	@param ctx
+//	@return *Session
 func New(raw *pb.Session, ctx iface.IContext) *Session {
 	s := &Session{
 		Session: raw,
@@ -48,22 +54,42 @@ type Session struct {
 	msg         *protocol.Message
 }
 
-// SetString 在 Values 中设置字符串，不经过 transport 同步。
+// SetString
+//
+//	@Description: 设置 Values 中的字符串（不同步到对端）。
+//	@receiver a
+//	@param key
+//	@param value
 func (a *Session) SetString(key, value string) {
 	a.Values[key] = value
 }
 
-// GetString 从 Values 读取字符串，不存在返回空串。
+// GetString
+//
+//	@Description: 从 Values 取字符串，不存在返回空串。
+//	@receiver a
+//	@param key
+//	@return string
 func (a *Session) GetString(key string) string {
 	return a.Values[key]
 }
 
-// SetUint64 在 Values 中以字符串形式存储 uint64，不触发 transport 同步；需同步时请调 SyncValues。
+// SetUint64
+//
+//	@Description: 在 Values 中存 uint64（不同步，需同步请调 SyncValues）。
+//	@receiver a
+//	@param key
+//	@param value
 func (a *Session) SetUint64(key string, value uint64) {
 	a.Values[key] = strconv.FormatUint(value, 10)
 }
 
-// GetUint64 从 Values 按 key 取字符串并解析为 uint64，不存在或解析失败返回 0。
+// GetUint64
+//
+//	@Description: 从 Values 取并解析为 uint64，失败返回 0。
+//	@receiver a
+//	@param key
+//	@return uint64
 func (a *Session) GetUint64(key string) uint64 {
 	if a.Values == nil {
 		return 0
@@ -79,12 +105,22 @@ func (a *Session) GetUint64(key string) uint64 {
 	return val
 }
 
-// SetInt64 在 Values 中以字符串形式存储 int64，不触发 transport 同步；需同步时请调 SyncValues。
+// SetInt64
+//
+//	@Description: 在 Values 中存 int64（不同步，需同步请调 SyncValues）。
+//	@receiver a
+//	@param key
+//	@param value
 func (a *Session) SetInt64(key string, value int64) {
 	a.Values[key] = strconv.FormatInt(value, 10)
 }
 
-// GetInt64 从 Values 按 key 取字符串并解析为 int64，不存在或解析失败返回 0。
+// GetInt64
+//
+//	@Description: 从 Values 取并解析为 int64，失败返回 0。
+//	@receiver a
+//	@param key
+//	@return int64
 func (a *Session) GetInt64(key string) int64 {
 	if a.Values == nil {
 		return 0
@@ -108,7 +144,11 @@ func (a *Session) check() error {
 	return nil
 }
 
-// SyncValues 通过 transport 将当前 Values 同步到对端（如连接侧 Session）。
+// SyncValues
+//
+//	@Description: 将 Values 同步到对端。
+//	@receiver a
+//	@return error
 func (a *Session) SyncValues() error {
 	if err := a.check(); err != nil {
 		return err
@@ -116,7 +156,12 @@ func (a *Session) SyncValues() error {
 	return a.transport.SetValue(a.Values)
 }
 
-// Response 向对端推送一条业务响应（走 Push 路由）。
+// Response
+//
+//	@Description: 向对端推送业务响应。
+//	@receiver a
+//	@param data
+//	@return error
 func (a *Session) Response(data []byte) error {
 	clientMsg := protocol.NewData(data)
 	clientMsg.Copy(a.GetMessage())
@@ -130,7 +175,12 @@ func (a *Session) Response(data []byte) error {
 	return a.transport.Push(bin)
 }
 
-// ResponseErr 设置 client.errCode 并向对端推送（无 body 的 Push）。
+// ResponseErr
+//
+//	@Description: 设置错误码并推送无 body 消息。
+//	@receiver a
+//	@param errCode
+//	@return error
 func (a *Session) ResponseErr(errCode uint16) error {
 	clientMsg := protocol.NewErr(errCode)
 	clientMsg.Copy(a.GetMessage())
@@ -144,7 +194,14 @@ func (a *Session) ResponseErr(errCode uint16) error {
 	return a.transport.Push(bin)
 }
 
-// Push 设置 cmd/act 并向对端推送一条消息（带 body）。
+// Push
+//
+//	@Description: 按 cmd/act 向对端推送带 body 消息。
+//	@receiver a
+//	@param cmd
+//	@param act
+//	@param data
+//	@return error
 func (a *Session) Push(cmd, act uint8, data []byte) error {
 	clientMsg := protocol.New(cmd, act, data)
 	if err := a.check(); err != nil {
@@ -157,7 +214,11 @@ func (a *Session) Push(cmd, act uint8, data []byte) error {
 	return a.transport.Push(bin)
 }
 
-// Close 通知对端关闭连接（Shutdown 路由）。
+// Close
+//
+//	@Description: 通知对端关闭连接。
+//	@receiver a
+//	@return error
 func (a *Session) Close() error {
 	if err := a.check(); err != nil {
 		return err
@@ -207,8 +268,11 @@ func (a *Session) getMessageDecoded() *protocol.Message {
 	return msg
 }
 
-// SetMessage 设置当前请求的客户端消息，并同步写入 Values[KeyMessage]（base64），
-// 确保经集群 JSON 序列化后 GetMessage 仍能拿到正确的 msg.Index。
+// SetMessage
+//
+//	@Description: 设置当前请求消息并写入 Values（base64），供集群序列化后 GetMessage 使用。
+//	@receiver a
+//	@param msg
 func (a *Session) SetMessage(msg *protocol.Message) {
 	a.msg = msg
 	a.setMessageEncoded(msg)

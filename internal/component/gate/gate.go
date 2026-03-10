@@ -31,14 +31,14 @@ type Gate struct {
 	Options []network.Option // 网络选项（KeepAlive、缓冲区等）
 	Factory agent.Factory    // 创建 IHandler，用于每个连接对应一个 Agent
 	MaxConn int64            // 最大连接数，超过则 OnConnect 返回错误
-	server  network.IServer
-	count   atomic.Int64 // 当前连接数
+	count   atomic.Int64     // 当前连接数
 	system  iface.ISystem
+	server  network.IServer
 }
 
 // Start
 //
-//	@Description: 启动网关：注入 system、创建网络服务、注册 Session 工厂并启动监听。
+//	@Description: 启动网关，注册 Session 工厂并监听。
 //	@receiver g
 //	@param ctx
 //	@param system
@@ -53,7 +53,12 @@ func (g *Gate) Start(ctx context.Context, system iface.ISystem) (err error) {
 	return g.server.Start()
 }
 
-// OnConnect 新连接建立时：检查 MaxConn，计数+1，创建并 Spawn Agent，将 Agent 的 Pid 绑定到 entity.Context。
+// OnConnect
+//
+//	@Description: 新连接时创建 Agent 并绑定 Pid。
+//	@receiver g
+//	@param entity
+//	@return error
 func (g *Gate) OnConnect(entity network.IConnection) error {
 	if g.count.Load() > g.MaxConn {
 		return errors.New("too many connections")
@@ -65,7 +70,14 @@ func (g *Gate) OnConnect(entity network.IConnection) error {
 	return nil
 }
 
-// OnMessage 收到原始字节：循环解包，每解出一个完整 Message 则提交给 process 投递到对应 Agent 处理；返回已处理的字节数。
+// OnMessage
+//
+//	@Description: 解包字节流并投递到对应 Agent，返回已处理字节数。
+//	@receiver g
+//	@param entity
+//	@param data
+//	@return n
+//	@return err
 func (g *Gate) OnMessage(entity network.IConnection, data []byte) (n int, err error) {
 	var msg *protocol.Message
 	var processN int
@@ -86,7 +98,13 @@ func (g *Gate) OnMessage(entity network.IConnection, data []byte) (n int, err er
 	return
 }
 
-// process 从 entity 取出绑定的 Agent Pid，将 msg 通过 SubmitTask 投递到该 Agent 的 OnData 处理；若未绑定 Pid 则返回 ErrNoAgent。
+// process
+//
+//	@Description: 将 msg 投递到 entity 绑定的 Agent 的 OnData。
+//	@receiver g
+//	@param entity
+//	@param msg
+//	@return err
 func (g *Gate) process(entity network.IConnection, msg *protocol.Message) (err error) {
 	pid, _ := entity.Context().(*iface.Pid)
 	if pid == nil {
@@ -98,7 +116,12 @@ func (g *Gate) process(entity network.IConnection, msg *protocol.Message) (err e
 	})
 }
 
-// OnClose 连接关闭时：连接数-1，若 entity 上绑定了 Agent Pid 则关闭该进程（主动关闭时由 Agent.Shutdown 触发，被动关闭时由网络层触发）。
+// OnClose
+//
+//	@Description: 连接关闭时减计数并关闭绑定的 Agent 进程。
+//	@receiver g
+//	@param entity
+//	@param wrong
 func (g *Gate) OnClose(entity network.IConnection, wrong error) {
 	g.count.Add(-1)
 	pid, _ := entity.Context().(*iface.Pid)
@@ -108,7 +131,12 @@ func (g *Gate) OnClose(entity network.IConnection, wrong error) {
 	_ = g.system.ShutdownProcess(pid)
 }
 
-// Stop 关闭网络服务。
+// Stop
+//
+//	@Description: 关闭网络服务。
+//	@receiver g
+//	@param ctx
+//	@return error
 func (g *Gate) Stop(ctx context.Context) error {
 	if g.server == nil {
 		return nil

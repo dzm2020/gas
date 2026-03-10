@@ -37,8 +37,12 @@ type RateLimit struct {
 	messageId uint16
 }
 
-// NewRateLimitForConnection 创建按连接限流的中间件。每个连接（Agent）应使用独立实例。
-// limit 为每秒令牌数（如 rate.PerSecond(100)），burst 为桶容量。
+// NewRateLimitForConnection
+//
+//	@Description: 创建按连接限流的中间件，每连接独立实例。
+//	@param limit
+//	@param burst
+//	@return *RateLimit
 func NewRateLimitForConnection(limit rate.Limit, burst int) *RateLimit {
 	if burst <= 0 {
 		burst = 1
@@ -51,7 +55,13 @@ func NewRateLimitForConnection(limit rate.Limit, burst int) *RateLimit {
 	}
 }
 
-// NewRateLimitForMessageID 创建按消息 ID 限流的中间件，限制的是**单条连接上**某个特定消息 ID 的频率。
+// NewRateLimitForMessageID
+//
+//	@Description: 创建按消息 ID 限流的中间件。
+//	@param limit
+//	@param burst
+//	@param messageId
+//	@return *RateLimit
 func NewRateLimitForMessageID(limit rate.Limit, burst int, messageId uint16) *RateLimit {
 	if burst <= 0 {
 		burst = 1
