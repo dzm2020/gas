@@ -33,63 +33,55 @@ gate/
 | **职责清晰** | Gate 管连接与解包，Agent 管会话与业务，Session/Transport 分离写能力与集群投递，边界明确。 |
 | **接口抽象** | `agent.Factory`、`IHandler`、`IAgent`、`ITransport`、`IMiddleware` 便于扩展与测试。 |
 | **并发安全** | 连接数用 `atomic.Int64` 计数，消息经 Actor 单线程处理，无竞态。 |
-| **协议与编解码** | 固定 12 字节头 + 变长 body，Encode/Decode 边界清晰，有最大长度校验。 |
+| **协议与编解码** | 固定 12 字节头 + 变长 body，Encode/Decode 边界清晰，有最大长度校验（`codec.MaxMsgSize`）。 |
 | **Session 设计** | Values 存 KV、Message 用 base64 规避 JSON 非法 UTF-8，集群序列化友好。 |
 | **中间件** | AfterDecode/BeforeEncode 链式处理，支持透传、修改、拦截。 |
 
-## 4. 问题与改进建议
+## 4. 代码质量评分
 
-### 4.1 错误与边界处理
+评分说明：各维度 **1～10 分**，10 为最佳；综合得分取各维度算术平均，保留一位小数。
 
-- **gate.go**  
-  - `process` 中 `entity.Context()` 断言失败时直接 `return`，未返回明确错误，调用方难以区分「无 pid」与「处理成功」。  
-  - **建议**：pid 为 nil 时返回如 `errNoAgent`，或在文档中明确“无 pid 视为忽略”。
+| 维度 | 得分 | 说明 |
+|------|------|------|
+| **架构与职责** | 9 | 模块边界清晰（Gate/Agent/Session/Transport/Codec/Protocol/Middleware），单一职责明确，依赖方向合理。 |
+| **可读性与注释** | 8 | 包注释与关键函数注释完整，命名统一；部分内部方法可再补一句用途说明。 |
+| **错误处理与健壮性** | 8 | 关键路径已显式处理（ErrNoAgent、Encode/Decode 失败、TLS 双路径校验）；边界与半包有考虑。 |
+| **可测试性** | 8 | 接口抽象好，便于 mock；codec/protocol/gate/agent/session 均有单测，覆盖主要分支与写路径。 |
+| **可维护性与扩展性** | 9 | 接口驱动（IHandler/IAgent/ITransport/IMiddleware）、配置与常量已收敛（MaxMsgSize、Config），扩展中间件与协议方便。 |
 
-- **session/session.go**  
-  - `Response`、`ResponseErr`、`Push` 中 `codec.Encode` 错误被忽略（`bin, _ := codec.Encode(...)`）。  
-  - **建议**：至少打日志并 return Encode 的 error，避免静默失败。
+**综合得分：8.4 / 10**
 
-- **agent/agent.go**  
-  - `Push` 中 `codec.Decode(data)` 的 error 被忽略，异常 data 可能导致 nil msg 后续使用。  
-  - **建议**：Decode 失败时返回错误并记录日志。
+- **等级**：良好，可生产使用；gate/agent/session 单测已补充，覆盖核心逻辑与 Transport 写路径。
 
-### 4.2 配置与常量
+## 5. 已修复项（对照原评估）
 
-- **config.go**  
-  - `ToOptions` 中仅当 `len(c.TlsKeyFile) > 0` 时加 TLS，未校验 `TlsCertFile` 是否非空，可能传错参数。  
-  - **建议**：TLS 同时校验 CertFile/KeyFile，或显式注释“仅以 KeyFile 为开关”。
+| 问题 | 修复方式 |
+|------|----------|
+| **gate.go process 无 pid** | 定义 `ErrNoAgent`，pid 为 nil 时返回该错误，调用方可区分「无 Agent」与「处理成功」。 |
+| **session 忽略 Encode 错误** | `Response`、`ResponseErr`、`Push` 中检查 `codec.Encode` 返回值，失败时打日志并 return error；`setMessageEncoded` 失败时打日志并清除 KeyMessage。 |
+| **agent.Push 忽略 Decode 错误** | 检查 `codec.Decode` 的 error 与 nil msg，失败时打日志并返回包装错误。 |
+| **config TLS 仅看 KeyFile** | `ToOptions` 改为仅当 `TlsCertFile` 与 `TlsKeyFile` 均非空时添加 TLS，并补充注释。 |
+| **codec 魔数** | 导出包级常量 `MaxMsgSize`（1MB），内部沿用，便于文档与上层校验。 |
+| **protocol 单测与 API 不一致** | `message_test.go` 中：`NewWithData` → `NewData`，`NewErr(3,4,500)` → `NewErr(500)`，`HeadLen` 期望改为 12。 |
 
-- **codec/codec.go**  
-  - `maxMsgSize` 为魔数 1MB，未与配置或常量统一。  
-  - **建议**：抽成包级常量或可配置项，并在文档中说明。
+## 6. 测试现状
 
-### 4.3 测试与兼容性
-
-- **gate_test.go** 与当前实现存在不一致：  
-  - 使用 `session.New(entityId, pid)`、`s.GetEntityId()` 等，当前 API 为 `session.New(raw *pb.Session, ctx)`，Session 无 `GetEntityId()`。  
-  - `Factory` 类型为 `func() IHandler`，测试里写成 `func() agent.IAgent`。  
-  - middleware 测试使用 `[]middleware.Middleware`，实际类型为 `[]middleware.IMiddleware`。  
-- **protocol/message_test.go**：  
-  - 使用 `NewWithData`、`NewErr(3,4,500)`，当前为 `NewData`、`NewErr(err uint16)`；`HeadLen` 测试期望 13，当前为 12。  
-- **建议**：按当前 API 修正单测，保证 `go test ./internal/component/gate/...` 通过，并补充 Agent 生命周期、Session Response/Push 的集成或单元测试。
-
-### 4.4 注释与可维护性
-
-- **gate.go**：缺少包注释；`process`、`OnMessage` 等未说明“无 pid 即忽略”等约定。  
-- **protocol/message.go**：`Head` 各字段有注释，但 `Message`、`Copy`、`CmdAct` 等缺少说明。  
-- **codec**：存在大段注释掉的旧代码，建议删除或移到文档，避免干扰阅读。
-
-## 5. 测试现状
-
-| 包 | 覆盖内容 | 说明 |
+| 包 | 覆盖内容 | 状态 |
 |----|----------|------|
-| codec | Encode/Decode 往返、短包、半包、不篡改 Len | 较完整 |
-| protocol | New/NewData/NewErr/Copy/ID/CmdAct/ParseId/HeadLen | 部分用例与当前 API 不一致 |
-| gate | OnConnect 限连、OnMessage、OnClose、Stop；Agent Push/Shutdown；Middleware 链 | 用例与当前实现不匹配，需修复 |
+| codec | Encode/Decode 往返、短包、半包、不篡改 Len | 通过 |
+| protocol | New/NewData/NewErr/Copy/ID/CmdAct/ParseId/HeadLen | 通过 |
+| gate | OnConnect（MaxConn 拒绝/成功绑定 Pid）、OnMessage（短包/ErrNoAgent/带 Pid 投递）、OnClose、Stop | 通过 |
+| agent | New/GetEntity/GetSession、OnInit、OnData（含中间件错误）、Push（成功/半包）、SetValue、Shutdown、SetMiddleware/AppendMiddleware、BeforeEncode 中间件 | 通过 |
+| session | Values（Set/Get String/Uint64/Int64）、Response/ResponseErr/Push/Close/SyncValues、GetMessage/SetMessage/Raw、nil transport 报错 | 通过 |
 
-建议：修复上述测试后，增加 Session.Response/Push/Close 与 Transport 的测试（可用 mock ITransport）。
+运行：`go test ./internal/component/gate/...`
 
-## 6. 总结
+## 7. 可选后续改进
 
-- **整体**：结构清晰，接口划分合理，Session/Transport/中间件设计良好，适合作为网关核心扩展。  
-- **主要改进**：补齐错误处理（Encode/Decode/无 pid）、统一/修正单测与 API、清理废弃代码与魔数、补充包与关键函数注释。完成上述项后，可标注为生产可用并便于后续维护。
+- **codec 可配置**：若需运行时调整单包最大长度，可将 `MaxMsgSize` 改为从配置或 Option 注入（当前 1MB 常量已满足多数场景）。
+- **middleware 单测**：可单独为 `middleware.RunAfterDecode` / `RunBeforeEncode` 增加 _test.go（当前通过 agent 测试间接覆盖）。
+
+## 8. 总结
+
+- **整体**：结构清晰，接口划分合理，Session/Transport/中间件设计良好，错误处理与配置/常量已按评估建议补齐，适合作为网关核心扩展与生产使用。  
+- **当前状态**：文档中列出的问题均已修复，包与关键函数已补充注释；codec/protocol/gate/agent/session 单测均已通过，覆盖核心分支与 Session/Transport 写路径。

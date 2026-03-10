@@ -3,6 +3,7 @@ package agent
 
 import (
 	"encoding/json"
+	"errors"
 
 	"github.com/duke-git/lancet/v2/maputil"
 	"github.com/dzm2020/gas/internal/component/gate/codec"
@@ -98,7 +99,15 @@ func (agent *Agent) GetMiddleware() []middleware.IMiddleware {
 
 // Push 由系统/对端调用：将 data 解包为 Message，经 BeforeEncode 中间件后编码并发送到 entity；用于响应或集群转发到客户端。
 func (agent *Agent) Push(ctx iface.IContext, data []byte) (err error) {
-	msg, _, _ := codec.Decode(data)
+	msg, _, decodeErr := codec.Decode(data)
+	if decodeErr != nil {
+		glog.Warn("agent.Push decode failed", zap.Int64("entityId", agent.GetEntity().ID()), zap.Error(decodeErr))
+		return xerror.Wrapf(decodeErr, "codec.Decode")
+	}
+	if msg == nil {
+		glog.Warn("agent.Push decode returned nil message", zap.Int64("entityId", agent.GetEntity().ID()))
+		return errors.New("codec.Decode: incomplete or empty message")
+	}
 	if len(agent.middlewares) > 0 {
 		msg, err = middleware.RunBeforeEncode(agent.middlewares, msg)
 		if err != nil {

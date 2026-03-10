@@ -8,9 +8,10 @@ import (
 	"github.com/dzm2020/gas/internal/component/gate/protocol"
 )
 
-const (
-	maxMsgSize = 1024 * 1024 // 单条消息最大 1MB，超过则 Encode/Decode 报错
-)
+// MaxMsgSize 单条消息 body 最大长度（1MB），Encode/Decode 超过此长度会返回错误；可供上层配置或校验复用。
+const MaxMsgSize = 1024 * 1024
+
+const maxMsgSize = MaxMsgSize
 
 // Encode 将 protocol.Message 编码为字节流：HeadLen 字节头（Len 按 len(Data) 写入）+ Data；消息体超过 maxMsgSize 返回错误。
 func Encode(msg *protocol.Message) ([]byte, error) {

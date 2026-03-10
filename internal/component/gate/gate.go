@@ -18,6 +18,11 @@ import (
 	"go.uber.org/zap"
 )
 
+var (
+	// ErrNoAgent 表示连接上未绑定 Agent Pid，无法投递消息（如连接尚未完成 OnConnect 或已异常）。
+	ErrNoAgent = errors.New("gate: no agent bound to connection")
+)
+
 // Gate 网关核心：实现连接建立/消息回调/关闭，并委托 Agent Actor 处理业务。
 // 连接数由 count 原子计数，超过 MaxConn 时拒绝新连接。
 type Gate struct {
@@ -75,11 +80,11 @@ func (g *Gate) OnMessage(entity network.IConnection, data []byte) (n int, err er
 	return
 }
 
-// process 从 entity 取出绑定的 Agent Pid，将 msg 通过 SubmitTask 投递到该 Agent 的 OnData 处理；若未绑定 Pid 则直接返回 nil（忽略）。
+// process 从 entity 取出绑定的 Agent Pid，将 msg 通过 SubmitTask 投递到该 Agent 的 OnData 处理；若未绑定 Pid 则返回 ErrNoAgent。
 func (g *Gate) process(entity network.IConnection, msg *protocol.Message) (err error) {
 	pid, _ := entity.Context().(*iface.Pid)
 	if pid == nil {
-		return
+		return ErrNoAgent
 	}
 	return g.system.SubmitTask(pid, func(ctx iface.IContext) error {
 		a := ctx.Actor().(*agent.Agent)

@@ -20,10 +20,10 @@ func TestNew(t *testing.T) {
 	}
 }
 
-func TestNewWithData(t *testing.T) {
-	m := NewWithData([]byte("x"))
+func TestNewData(t *testing.T) {
+	m := NewData([]byte("x"))
 	if m == nil || m.Head == nil {
-		t.Fatal("NewWithData should return non-nil Message")
+		t.Fatal("NewData should return non-nil Message")
 	}
 	if string(m.Data) != "x" {
 		t.Errorf("Data want 'x', got %q", m.Data)
@@ -31,12 +31,12 @@ func TestNewWithData(t *testing.T) {
 }
 
 func TestNewErr(t *testing.T) {
-	m := NewErr(3, 4, 500)
+	m := NewErr(500)
 	if m == nil {
 		t.Fatal("NewErr should not return nil")
 	}
-	if m.Cmd != 3 || m.Act != 4 {
-		t.Errorf("Cmd/Act want 3/4, got %d/%d", m.Cmd, m.Act)
+	if m.Cmd != 0 || m.Act != 0 {
+		t.Errorf("Cmd/Act want 0/0, got %d/%d", m.Cmd, m.Act)
 	}
 	if m.Error != 500 {
 		t.Errorf("Error want 500, got %d", m.Error)
@@ -94,7 +94,7 @@ func TestParseId(t *testing.T) {
 }
 
 func TestHeadLen(t *testing.T) {
-	if HeadLen != 13 {
-		t.Errorf("HeadLen want 13, got %d", HeadLen)
+	if HeadLen != 12 {
+		t.Errorf("HeadLen want 12, got %d", HeadLen)
 	}
 }

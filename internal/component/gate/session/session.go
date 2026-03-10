@@ -12,6 +12,9 @@ import (
 	"github.com/dzm2020/gas/internal/component/gate/protocol"
 	"github.com/dzm2020/gas/internal/iface"
 	"github.com/dzm2020/gas/internal/pb"
+	"github.com/dzm2020/gas/pkg/glog"
+
+	"go.uber.org/zap"
 )
 
 const (
@@ -118,7 +121,11 @@ func (a *Session) Response(data []byte) error {
 	if err := a.check(); err != nil {
 		return err
 	}
-	bin, _ := codec.Encode(clientMsg)
+	bin, err := codec.Encode(clientMsg)
+	if err != nil {
+		glog.Warn("session.Response encode failed", zap.Error(err))
+		return err
+	}
 	return a.transport.Push(bin)
 }
 
@@ -129,7 +136,11 @@ func (a *Session) ResponseErr(errCode uint16) error {
 	if err := a.check(); err != nil {
 		return err
 	}
-	bin, _ := codec.Encode(clientMsg)
+	bin, err := codec.Encode(clientMsg)
+	if err != nil {
+		glog.Warn("session.ResponseErr encode failed", zap.Error(err))
+		return err
+	}
 	return a.transport.Push(bin)
 }
 
@@ -139,7 +150,11 @@ func (a *Session) Push(cmd, act uint8, data []byte) error {
 	if err := a.check(); err != nil {
 		return err
 	}
-	bin, _ := codec.Encode(clientMsg)
+	bin, err := codec.Encode(clientMsg)
+	if err != nil {
+		glog.Warn("session.Push encode failed", zap.Error(err))
+		return err
+	}
 	return a.transport.Push(bin)
 }
 
@@ -164,12 +179,18 @@ func (a *Session) Raw() *pb.Session {
 
 // setMessageEncoded 将 msg 编码为 base64 写入 Values[KeyMessage]，避免集群 JSON 序列化时
 // 将非法 UTF-8 字节（如 Index 的 0xDE）替换为 U+FFFD(0xEF) 导致回复消息 Index 错误。
+// Encode 失败时仅打日志并清除 KeyMessage，不中断调用方。
 func (a *Session) setMessageEncoded(msg *protocol.Message) {
 	if msg == nil {
 		delete(a.Values, KeyMessage)
 		return
 	}
-	value, _ := codec.Encode(msg)
+	value, err := codec.Encode(msg)
+	if err != nil {
+		glog.Warn("session.setMessageEncoded encode failed", zap.Error(err))
+		delete(a.Values, KeyMessage)
+		return
+	}
 	a.SetString(KeyMessage, base64.StdEncoding.EncodeToString(value))
 }
 

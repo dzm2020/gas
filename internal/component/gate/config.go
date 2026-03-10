@@ -47,7 +47,8 @@ func ToOptions(c *Config) []network.Option {
 	if c.ReadBufSize > 0 {
 		options = append(options, network.WithReadBufSize(c.ReadBufSize))
 	}
-	if len(c.TlsKeyFile) > 0 {
+	// TLS 仅在证书与私钥路径均非空时启用，避免只填其一导致错误配置。
+	if len(c.TlsCertFile) > 0 && len(c.TlsKeyFile) > 0 {
 		options = append(options, network.WithTLS(c.TlsCertFile, c.TlsKeyFile))
 	}
 	return options
