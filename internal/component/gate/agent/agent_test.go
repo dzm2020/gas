@@ -2,13 +2,12 @@ package agent
 
 import (
 	"bytes"
-	"encoding/json"
 	"errors"
 	"testing"
 	"time"
 
 	"github.com/dzm2020/gas/internal/component/gate/codec"
-	"github.com/dzm2020/gas/internal/component/gate/middleware"
+	gateiface "github.com/dzm2020/gas/internal/component/gate/gateiface"
 	"github.com/dzm2020/gas/internal/component/gate/protocol"
 	"github.com/dzm2020/gas/internal/component/gate/session"
 	"github.com/dzm2020/gas/internal/iface"
@@ -20,28 +19,31 @@ import (
 // ---------- mock IConnection ----------
 
 type mockConn struct {
-	id    int64
-	sent  [][]byte
+	id     int64
+	sent   [][]byte
 	closed bool
 }
 
-func (m *mockConn) ID() int64                 { return m.id }
-func (m *mockConn) Send(data []byte) error   { m.sent = append(m.sent, append([]byte(nil), data...)); return nil }
-func (m *mockConn) Close(err error) error   { m.closed = true; return nil }
-func (m *mockConn) LocalAddr() string        { return "" }
-func (m *mockConn) RemoteAddr() string       { return "" }
-func (m *mockConn) IsStop() bool             { return m.closed }
-func (m *mockConn) Type() network.ConnType   { return 0 }
-func (m *mockConn) Context() interface{}     { return nil }
-func (m *mockConn) SetContext(interface{})    {}
-func (m *mockConn) SetReadBuffer(int) error  { return nil }
-func (m *mockConn) SetWriteBuffer(int) error { return nil }
-func (m *mockConn) SetLinger(bool, int) error { return nil }
-func (m *mockConn) SetNoDelay(bool) error     { return nil }
-func (m *mockConn) SetTCPKeepAlive(bool, time.Duration) error { return nil }
-func (m *mockConn) OnConnect(network.IConnection) error      { return nil }
+func (m *mockConn) ID() int64 { return m.id }
+func (m *mockConn) Send(data []byte) error {
+	m.sent = append(m.sent, append([]byte(nil), data...))
+	return nil
+}
+func (m *mockConn) Close(err error) error                              { m.closed = true; return nil }
+func (m *mockConn) LocalAddr() string                                  { return "" }
+func (m *mockConn) RemoteAddr() string                                 { return "" }
+func (m *mockConn) IsStop() bool                                       { return m.closed }
+func (m *mockConn) Type() network.ConnType                             { return 0 }
+func (m *mockConn) Context() interface{}                               { return nil }
+func (m *mockConn) SetContext(interface{})                             {}
+func (m *mockConn) SetReadBuffer(int) error                            { return nil }
+func (m *mockConn) SetWriteBuffer(int) error                           { return nil }
+func (m *mockConn) SetLinger(bool, int) error                          { return nil }
+func (m *mockConn) SetNoDelay(bool) error                              { return nil }
+func (m *mockConn) SetTCPKeepAlive(bool, time.Duration) error          { return nil }
+func (m *mockConn) OnConnect(network.IConnection) error                { return nil }
 func (m *mockConn) OnMessage(network.IConnection, []byte) (int, error) { return 0, nil }
-func (m *mockConn) OnClose(network.IConnection, error)       {}
+func (m *mockConn) OnClose(network.IConnection, error)                 {}
 
 // ---------- mock IContext ----------
 
@@ -51,41 +53,41 @@ type mockContext struct {
 	system iface.ISystem
 }
 
-func (c *mockContext) ID() *iface.Pid                      { return c.pid }
-func (c *mockContext) Actor() iface.IActor                  { return c.actor }
-func (c *mockContext) InvokerMessage(interface{}) error     { return nil }
-func (c *mockContext) Serializer() lib.ISerializer         { return nil }
-func (c *mockContext) Message() *iface.ActorMessage         { return nil }
-func (c *mockContext) Process() iface.IProcess              { return nil }
-func (c *mockContext) System() iface.ISystem                 { return c.system }
-func (c *mockContext) Named(string) error                   { return nil }
-func (c *mockContext) Unname() error                        { return nil }
-func (c *mockContext) GetName() string                      { return "" }
-func (c *mockContext) SetCallTimeout(time.Duration)        {}
-func (c *mockContext) Send(*iface.Pid, string, interface{}) error { return nil }
+func (c *mockContext) ID() *iface.Pid                                          { return c.pid }
+func (c *mockContext) Actor() iface.IActor                                     { return c.actor }
+func (c *mockContext) InvokerMessage(interface{}) error                        { return nil }
+func (c *mockContext) Serializer() lib.ISerializer                             { return nil }
+func (c *mockContext) Message() *iface.ActorMessage                            { return nil }
+func (c *mockContext) Process() iface.IProcess                                 { return nil }
+func (c *mockContext) System() iface.ISystem                                   { return c.system }
+func (c *mockContext) Named(string) error                                      { return nil }
+func (c *mockContext) Unname() error                                           { return nil }
+func (c *mockContext) GetName() string                                         { return "" }
+func (c *mockContext) SetCallTimeout(time.Duration)                            {}
+func (c *mockContext) Send(*iface.Pid, string, interface{}) error              { return nil }
 func (c *mockContext) Call(*iface.Pid, string, interface{}, interface{}) error { return nil }
-func (c *mockContext) Forward(*iface.Pid, string) error      { return nil }
-func (c *mockContext) AfterFunc(time.Duration, iface.Task) *lib.Timer { return nil }
-func (c *mockContext) Shutdown() error                      { return nil }
+func (c *mockContext) Forward(*iface.Pid, string) error                        { return nil }
+func (c *mockContext) AfterFunc(time.Duration, iface.Task) *lib.Timer          { return nil }
+func (c *mockContext) Shutdown() error                                         { return nil }
 
 // ---------- record handler ----------
 
 type recordHandler struct {
-	onInitCalled  bool
-	onRouteData   []byte
-	onStopCalled  bool
-	onRouteErr    error
+	onInitCalled bool
+	onRouteData  []byte
+	onStopCalled bool
+	onRouteErr   error
 }
 
-func (h *recordHandler) OnInit(ctx iface.IContext, a IAgent) error {
+func (h *recordHandler) OnInit(a gateiface.IAgent) error {
 	h.onInitCalled = true
 	return nil
 }
-func (h *recordHandler) OnRoute(ctx iface.IContext, a IAgent, data []byte) error {
+func (h *recordHandler) OnRoute(a gateiface.IAgent, data []byte) error {
 	h.onRouteData = append(h.onRouteData, data...)
 	return h.onRouteErr
 }
-func (h *recordHandler) OnStop(ctx iface.IContext, a IAgent) error {
+func (h *recordHandler) OnStop(a gateiface.IAgent) error {
 	h.onStopCalled = true
 	return nil
 }
@@ -153,7 +155,7 @@ func TestAgent_OnData_MiddlewareError(t *testing.T) {
 	pid := &iface.Pid{NodeId: 1, ActorId: 1}
 	ctx := &mockContext{pid: pid}
 	_ = a.OnInit(ctx, nil)
-	a.SetMiddleware([]middleware.IMiddleware{mw})
+	a.SetMiddleware([]gateiface.IMiddleware{mw})
 	msg := protocol.New(0, 0, []byte("x"))
 	err := a.OnData(ctx, msg)
 	if err != errMw {
@@ -163,8 +165,12 @@ func TestAgent_OnData_MiddlewareError(t *testing.T) {
 
 type errorMiddleware struct{ err error }
 
-func (e *errorMiddleware) AfterDecode(*protocol.Message) (*protocol.Message, error) { return nil, e.err }
-func (e *errorMiddleware) BeforeEncode(*protocol.Message) (*protocol.Message, error) { return nil, e.err }
+func (e *errorMiddleware) AfterDecode(gateiface.IAgent, *protocol.Message) (*protocol.Message, error) {
+	return nil, e.err
+}
+func (e *errorMiddleware) BeforeEncode(gateiface.IAgent, *protocol.Message) (*protocol.Message, error) {
+	return nil, e.err
+}
 
 func TestAgent_Push_Success(t *testing.T) {
 	conn := &mockConn{id: 1}
@@ -172,8 +178,8 @@ func TestAgent_Push_Success(t *testing.T) {
 	ctx := &mockContext{pid: pid}
 	a := New(conn, &recordHandler{})
 	_ = a.OnInit(ctx, nil)
-	enc, _ := codec.Encode(protocol.New(1, 2, []byte("body")))
-	err := a.Push(ctx, enc)
+	msg := protocol.New(1, 2, []byte("body"))
+	err := a.Push(msg)
 	if err != nil {
 		t.Fatalf("Push: %v", err)
 	}
@@ -186,15 +192,15 @@ func TestAgent_Push_Success(t *testing.T) {
 	}
 }
 
-func TestAgent_Push_DecodeIncomplete(t *testing.T) {
+func TestAgent_Push_MessageTooLarge(t *testing.T) {
 	a := New(&mockConn{id: 1}, &recordHandler{})
 	pid := &iface.Pid{NodeId: 1, ActorId: 1}
 	ctx := &mockContext{pid: pid}
 	_ = a.OnInit(ctx, nil)
-	short := make([]byte, protocol.HeadLen-1)
-	err := a.Push(ctx, short)
+	oversized := protocol.New(1, 2, make([]byte, codec.MaxMsgSize))
+	err := a.Push(oversized)
 	if err == nil {
-		t.Fatal("Push with short buffer should error")
+		t.Fatal("Push with message too large should error")
 	}
 	if len((a.GetEntity().(*mockConn)).sent) != 0 {
 		t.Error("Send should not be called")
@@ -208,8 +214,7 @@ func TestAgent_SetValue(t *testing.T) {
 	a := New(conn, &recordHandler{})
 	_ = a.OnInit(ctx, nil)
 	a.GetSession().SetString("a", "1")
-	data, _ := json.Marshal(map[string]string{"b": "2", "c": "3"})
-	err := a.SetValue(ctx, data)
+	err := a.SetValues(map[string]string{"b": "2", "c": "3"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -224,7 +229,7 @@ func TestAgent_Shutdown(t *testing.T) {
 	ctx := &mockContext{pid: &iface.Pid{}}
 	a := New(conn, &recordHandler{})
 	_ = a.OnInit(ctx, nil)
-	err := a.Shutdown(ctx, nil)
+	err := a.Shutdown()
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -236,7 +241,7 @@ func TestAgent_Shutdown(t *testing.T) {
 func TestAgent_SetMiddleware_AppendMiddleware(t *testing.T) {
 	a := New(&mockConn{id: 1}, &recordHandler{})
 	mw := &errorMiddleware{}
-	a.SetMiddleware([]middleware.IMiddleware{mw})
+	a.SetMiddleware([]gateiface.IMiddleware{mw})
 	if len(a.GetMiddleware()) != 1 {
 		t.Errorf("SetMiddleware len want 1, got %d", len(a.GetMiddleware()))
 	}
@@ -252,9 +257,9 @@ func TestAgent_Push_WithBeforeEncodeMiddleware(t *testing.T) {
 	ctx := &mockContext{pid: pid}
 	a := New(conn, &recordHandler{})
 	_ = a.OnInit(ctx, nil)
-	a.SetMiddleware([]middleware.IMiddleware{&suffixMiddleware{suffix: []byte("-ok")}})
-	enc, _ := codec.Encode(protocol.New(0, 0, []byte("x")))
-	err := a.Push(ctx, enc)
+	a.SetMiddleware([]gateiface.IMiddleware{&suffixMiddleware{suffix: []byte("-ok")}})
+	msg := protocol.New(0, 0, []byte("x"))
+	err := a.Push(msg)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -266,7 +271,7 @@ func TestAgent_Push_WithBeforeEncodeMiddleware(t *testing.T) {
 
 type suffixMiddleware struct{ suffix []byte }
 
-func (s *suffixMiddleware) AfterDecode(msg *protocol.Message) (*protocol.Message, error) {
+func (s *suffixMiddleware) AfterDecode(_ gateiface.IAgent, msg *protocol.Message) (*protocol.Message, error) {
 	if msg == nil {
 		return nil, nil
 	}
@@ -274,7 +279,7 @@ func (s *suffixMiddleware) AfterDecode(msg *protocol.Message) (*protocol.Message
 	out.Data = append(append([]byte(nil), msg.Data...), s.suffix...)
 	return &out, nil
 }
-func (s *suffixMiddleware) BeforeEncode(msg *protocol.Message) (*protocol.Message, error) {
+func (s *suffixMiddleware) BeforeEncode(_ gateiface.IAgent, msg *protocol.Message) (*protocol.Message, error) {
 	if msg == nil {
 		return nil, nil
 	}

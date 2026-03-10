@@ -15,8 +15,8 @@ func TestNew(t *testing.T) {
 	if string(m.Data) != "data" {
 		t.Errorf("Data want 'data', got %q", m.Data)
 	}
-	if m.Len != 0 || m.Error != 0 || m.Index != 0 {
-		t.Errorf("Head fields should be zero, got Len=%d Error=%d Index=%d", m.Len, m.Error, m.Index)
+	if m.Len != 0 || m.Error != 0 || m.Index != 0 || m.Tag != 0 {
+		t.Errorf("Head fields should be zero, got Len=%d Error=%d Index=%d Tag=%d", m.Len, m.Error, m.Index, m.Tag)
 	}
 }
 
@@ -47,9 +47,10 @@ func TestMessage_Copy(t *testing.T) {
 	dst := New(0, 0, nil)
 	old := New(5, 6, nil)
 	old.Index = 100
+	old.Tag = 3
 	dst.Copy(old)
-	if dst.Cmd != 5 || dst.Act != 6 || dst.Index != 100 {
-		t.Errorf("Copy: want Cmd=5 Act=6 Index=100, got Cmd=%d Act=%d Index=%d", dst.Cmd, dst.Act, dst.Index)
+	if dst.Cmd != 5 || dst.Act != 6 || dst.Index != 100 || dst.Tag != 3 {
+		t.Errorf("Copy: want Cmd=5 Act=6 Index=100 Tag=3, got Cmd=%d Act=%d Index=%d Tag=%d", dst.Cmd, dst.Act, dst.Index, dst.Tag)
 	}
 	dst.Copy(nil) // 不应 panic
 }
@@ -94,7 +95,7 @@ func TestParseId(t *testing.T) {
 }
 
 func TestHeadLen(t *testing.T) {
-	if HeadLen != 12 {
-		t.Errorf("HeadLen want 12, got %d", HeadLen)
+	if HeadLen != 13 {
+		t.Errorf("HeadLen want 13, got %d", HeadLen)
 	}
 }

@@ -67,10 +67,23 @@ func (m *mockSystem) SubmitTask(pid *iface.Pid, task iface.Task) error {
 func (m *mockSystem) SubmitTaskAndWait(*iface.Pid, iface.Task, time.Duration) error { return nil }
 func (m *mockSystem) Send(*iface.ActorMessage) error            { return nil }
 func (m *mockSystem) Call(*iface.ActorMessage) ([]byte, error)   { return nil, nil }
-func (m *mockSystem) GetProcess(interface{}) iface.IProcess      { return nil }
-func (m *mockSystem) GetAllProcesses() []iface.IProcess          { return nil }
-func (m *mockSystem) ShutdownProcess(pid *iface.Pid) error       { m.shutdownPid = pid; return nil }
+func (m *mockSystem) GetProcess(ref interface{}) iface.IProcess {
+	if pid, ok := ref.(*iface.Pid); ok && pid != nil {
+		return &mockProcess{sys: m, pid: pid}
+	}
+	return nil
+}
+func (m *mockSystem) GetAllProcesses() []iface.IProcess   { return nil }
+func (m *mockSystem) ShutdownProcess(pid *iface.Pid) error { m.shutdownPid = pid; return nil }
 func (m *mockSystem) Shutdown() error                            { return nil }
+
+type mockProcess struct {
+	sys *mockSystem
+	pid *iface.Pid
+}
+
+func (p *mockProcess) PostMessage(iface.IMessage) error { return nil }
+func (p *mockProcess) Shutdown() error                 { p.sys.shutdownPid = p.pid; return nil }
 func (m *mockSystem) Register(iface.IContext) error              { return nil }
 func (m *mockSystem) Unregister(iface.IContext) error            { return nil }
 func (m *mockSystem) Named(iface.IContext) error                 { return nil }

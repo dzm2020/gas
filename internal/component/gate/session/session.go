@@ -1,7 +1,8 @@
+package session
+
 // Package session 提供网关侧会话封装：携带连接/请求的会话数据（Values、Agent 等），
 // 并通过 ITransport 将 Response、Push、Close、SetValue 等操作下发到对端（如客户端连接、网关 Agent）。
 // Message 在 Values 中以 base64 存储，避免集群 JSON 序列化时非法 UTF-8 导致 Index 错误。
-package session
 
 import (
 	"encoding/base64"
@@ -13,6 +14,7 @@ import (
 	"github.com/dzm2020/gas/internal/iface"
 	"github.com/dzm2020/gas/internal/pb"
 	"github.com/dzm2020/gas/pkg/glog"
+	"github.com/dzm2020/gas/pkg/lib/xerror"
 
 	"go.uber.org/zap"
 )
@@ -123,8 +125,7 @@ func (a *Session) Response(data []byte) error {
 	}
 	bin, err := codec.Encode(clientMsg)
 	if err != nil {
-		glog.Warn("session.Response encode failed", zap.Error(err))
-		return err
+		return xerror.Wrapf(err, "session response encode failed")
 	}
 	return a.transport.Push(bin)
 }
@@ -138,8 +139,7 @@ func (a *Session) ResponseErr(errCode uint16) error {
 	}
 	bin, err := codec.Encode(clientMsg)
 	if err != nil {
-		glog.Warn("session.ResponseErr encode failed", zap.Error(err))
-		return err
+		return xerror.Wrapf(err, "session.ResponseErr encode failed")
 	}
 	return a.transport.Push(bin)
 }
@@ -152,7 +152,6 @@ func (a *Session) Push(cmd, act uint8, data []byte) error {
 	}
 	bin, err := codec.Encode(clientMsg)
 	if err != nil {
-		glog.Warn("session.Push encode failed", zap.Error(err))
 		return err
 	}
 	return a.transport.Push(bin)

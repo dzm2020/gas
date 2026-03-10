@@ -27,16 +27,22 @@ var (
 // 连接数由 count 原子计数，超过 MaxConn 时拒绝新连接。
 type Gate struct {
 	network.EmptyHandler
-	Address string            // 监听地址，如 tcp://127.0.0.1:9000
-	Options []network.Option  // 网络选项（KeepAlive、缓冲区等）
-	Factory agent.Factory     // 创建 IHandler，用于每个连接对应一个 Agent
-	MaxConn int64             // 最大连接数，超过则 OnConnect 返回错误
+	Address string           // 监听地址，如 tcp://127.0.0.1:9000
+	Options []network.Option // 网络选项（KeepAlive、缓冲区等）
+	Factory agent.Factory    // 创建 IHandler，用于每个连接对应一个 Agent
+	MaxConn int64            // 最大连接数，超过则 OnConnect 返回错误
 	server  network.IServer
-	count   atomic.Int64      // 当前连接数
+	count   atomic.Int64 // 当前连接数
 	system  iface.ISystem
 }
 
-// Start 启动网关：注入 system、创建网络服务、注册 Session 工厂并启动监听。
+// Start
+//
+//	@Description: 启动网关：注入 system、创建网络服务、注册 Session 工厂并启动监听。
+//	@receiver g
+//	@param ctx
+//	@param system
+//	@return err
 func (g *Gate) Start(ctx context.Context, system iface.ISystem) (err error) {
 	g.system = system
 	g.server, err = network.NewServer(g, g.Address, g.Options...)
@@ -92,7 +98,7 @@ func (g *Gate) process(entity network.IConnection, msg *protocol.Message) (err e
 	})
 }
 
-// OnClose 连接关闭时：连接数-1，若 entity 上绑定了 Agent Pid 则关闭该进程。
+// OnClose 连接关闭时：连接数-1，若 entity 上绑定了 Agent Pid 则关闭该进程（主动关闭时由 Agent.Shutdown 触发，被动关闭时由网络层触发）。
 func (g *Gate) OnClose(entity network.IConnection, wrong error) {
 	g.count.Add(-1)
 	pid, _ := entity.Context().(*iface.Pid)

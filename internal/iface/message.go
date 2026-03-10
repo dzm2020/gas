@@ -63,6 +63,7 @@ func NewActorMessage(from, to *Pid, methodName string, data []byte) *ActorMessag
 			Method:  methodName,
 			Data:    data,
 			Session: &pb.Session{},
+			Async:   true,
 		},
 	}
 	return message

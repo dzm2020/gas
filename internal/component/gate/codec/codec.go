@@ -1,4 +1,4 @@
-// Package codec 实现网关协议的二进制编解码：大端序 12 字节头 + 变长 Body，单条消息最大 1MB。
+// Package codec 实现网关协议的二进制编解码：大端序 13 字节头 + 变长 Body，单条消息最大 1MB。
 package codec
 
 import (
@@ -31,6 +31,8 @@ func Encode(msg *protocol.Message) ([]byte, error) {
 	offset += 2
 	binary.BigEndian.PutUint32(buf[offset:], msg.Index)
 	offset += 4
+	buf[offset] = msg.Tag
+	offset += 1
 	copy(buf[offset:], msg.Data)
 	return buf, nil
 }
@@ -63,6 +65,8 @@ func Decode(buf []byte) (*protocol.Message, int, error) {
 	offset += 2
 	msg.Index = binary.BigEndian.Uint32(buf[offset : offset+4])
 	offset += 4
+	msg.Tag = buf[offset]
+	offset += 1
 	msg.Data = make([]byte, msg.Len)
 	copy(msg.Data, buf[offset:])
 

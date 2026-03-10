@@ -3,9 +3,6 @@ package actor
 // Package actor cluster_system.go 提供集群版 Actor 系统（ClusterSystem），在嵌入的 System 基础上
 // 通过 transport 支持跨节点消息（Send/Call）
 import (
-	"fmt"
-
-	"github.com/dzm2020/gas/internal/component/gate/session"
 	"github.com/dzm2020/gas/internal/iface"
 	"github.com/dzm2020/gas/pkg/cluster"
 	"github.com/dzm2020/gas/pkg/lib"
@@ -42,8 +39,6 @@ func (s *ClusterSystem) Send(message *iface.ActorMessage) (err error) {
 	if s.isLocalMessage(message) {
 		return s.System.Send(message)
 	}
-	data := message.Session.Values[session.KeyMessage]
-	fmt.Printf("ClusterSystem Send data:%v \n", []byte(data))
 	return s.transport.Send(message.To.NodeId, message)
 }
 

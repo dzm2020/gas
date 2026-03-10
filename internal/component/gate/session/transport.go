@@ -9,9 +9,9 @@ import (
 
 // 与对端 Agent 路由方法名一致，用于 Actor 消息的 method 字段。
 const (
-	MethodPush     = "Push"     // 推送消息到客户端
-	MethodShutDown = "Shutdown" // 关闭连接
-	MethodSetValue = "SetValue" // 同步 Values 到对端
+	MethodPush     = "HandlerPush"     // 推送消息到客户端
+	MethodSetValue = "HandlerSetValue" // 同步 Values 到对端
+	MethodShutDown = "HandlerShutdown" // 关闭连接
 )
 
 // ITransport 将 Session 的写操作（Push/SetValue/Close）转成对 Agent 的 Actor 调用或系统消息。

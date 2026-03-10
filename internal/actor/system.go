@@ -246,6 +246,9 @@ func (s *System) sendToProcess(to *iface.Pid, msg iface.IMessage) error {
 // ShutdownProcess 向指定进程发送关闭任务，进程会在处理完 mailbox 后退出。
 func (s *System) ShutdownProcess(pid *iface.Pid) error {
 	process := s.GetProcess(pid)
+	if process == nil {
+		return xerror.Wrapf(ErrProcessNotFound, "pid=%v", pid)
+	}
 	return process.Shutdown()
 }
 

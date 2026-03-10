@@ -2,9 +2,7 @@ package component
 
 import (
 	"context"
-	"fmt"
 
-	"github.com/dzm2020/gas/internal/component/gate/session"
 	"github.com/dzm2020/gas/internal/iface"
 	"github.com/dzm2020/gas/internal/pb"
 	"github.com/dzm2020/gas/internal/profile"
@@ -70,17 +68,13 @@ func (r *Cluster) OnMessage(data []byte, response func(data []byte) error) {
 		}
 	}()
 
-	fmt.Printf("Cluster Send OnMessage:  data%v \n", []byte(data))
-
 	serializer := r.node.Serializer()
 	if err = serializer.Unmarshal(data, message); err != nil {
 		return
 	}
 	msg := &iface.ActorMessage{Message: message}
 
-	sdata := msg.Session.Values[session.KeyMessage]
-	fmt.Printf("Cluster Send OnMessage:%v \n", []byte(sdata))
-	glog.Info("集群：处理消息", zap.Any("message", message))
+	glog.Debug("集群：处理消息", zap.Any("message", message))
 
 	system := r.node.System()
 	if msg.GetAsync() {
