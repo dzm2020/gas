@@ -1,4 +1,5 @@
-// 限流插件：基于令牌桶，支持按连接限流或按消息 ID 限流，使用 golang.org/x/time/rate。
+// Package middleware
+// @Description: 限流插件：基于令牌桶，支持按连接限流或按消息 ID 限流，使用 golang.org/x/time/rate。
 package middleware
 
 import (

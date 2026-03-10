@@ -1,7 +1,9 @@
+// Package middleware
+// @Description: 加密插件：连接建立后客户端发送 cmd=0 act=0 携带 clientKey，服务端回复 serverKey，
+//				 双方根据 serverKey+clientKey 生成对称密钥，之后对 Body 做按位异或加解密。
+
 package middleware
 
-// 加密插件：连接建立后客户端发送 cmd=0 act=0 携带 clientKey，服务端回复 serverKey，
-// 双方根据 serverKey+clientKey 生成对称密钥，之后对 Body 做按位异或加解密。
 import (
 	"crypto/rand"
 

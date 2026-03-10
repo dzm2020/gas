@@ -1,4 +1,5 @@
-// 本文件实现连接对应的 Agent Actor：会话创建、消息解码后走中间件与 IHandler、以及 Push/SetValue/Shutdown 的 Actor 调用。
+// Package agent
+// @Description: 本文件实现连接对应的 Agent Actor：会话创建、消息解码后走中间件与 IHandler、以及 Push/SetValue/Shutdown 的 Actor 调用。
 package agent
 
 import (
@@ -7,7 +8,7 @@ import (
 
 	"github.com/duke-git/lancet/v2/maputil"
 	"github.com/dzm2020/gas/internal/component/gate/codec"
-	gateiface "github.com/dzm2020/gas/internal/component/gate/gateiface"
+	"github.com/dzm2020/gas/internal/component/gate/gateiface"
 	"github.com/dzm2020/gas/internal/component/gate/middleware"
 	"github.com/dzm2020/gas/internal/component/gate/protocol"
 	"github.com/dzm2020/gas/internal/component/gate/session"

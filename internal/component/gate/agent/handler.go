@@ -1,8 +1,7 @@
-// Package agent 定义与 Gate 协作的 Agent：每个连接对应一个 Actor，实现 IHandler 处理业务路由，并响应 Push/SetValue/Shutdown 等系统调用。
 package agent
 
 import (
-	gateiface "github.com/dzm2020/gas/internal/component/gate/gateiface"
+	"github.com/dzm2020/gas/internal/component/gate/gateiface"
 )
 
 // Factory 创建每个连接对应的 IHandler，由 Gate 在 OnConnect 时调用。

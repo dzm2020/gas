@@ -27,6 +27,19 @@ var (
 	errTransportIsNil = errors.New("transport is nil")
 )
 
+type Factory struct{}
+
+// FromRaw
+//
+//	@Description: 用 raw 与 ctx 构造带 transport 的 Session。
+//	@receiver m
+//	@param ctx
+//	@param raw
+//	@return iface.ISession
+func (m *Factory) FromRaw(ctx iface.IContext, raw *pb.Session) iface.ISession {
+	return New(raw, ctx)
+}
+
 // New
 //
 //	@Description: 用 raw 与 ctx 构造 Session 并绑定 transport。
