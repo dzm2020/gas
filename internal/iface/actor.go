@@ -3,8 +3,11 @@ package iface
 import (
 	"time"
 
+	"github.com/dzm2020/gas/internal/pb"
 	"github.com/dzm2020/gas/pkg/lib"
 )
+
+type Pid = pb.Pid
 
 type (
 	IMessageInvoker interface {
@@ -78,7 +81,7 @@ type (
 
 	ISession interface {
 		GetId() int64
-		Raw() *Session
+		Raw() *pb.Session
 		SyncValues() error // 同步values
 		SetString(key, value string)
 		GetString(key string) string
@@ -91,7 +94,7 @@ type (
 	// ISessionFactory 由上层（如 gate）实现，用于在 actor 处理消息时把 *Session 包装成可写的 ISession。
 	// actor 包仅依赖此接口，不依赖具体 session 实现。
 	ISessionFactory interface {
-		FromRaw(ctx IContext, raw *Session) ISession
+		FromRaw(ctx IContext, raw *pb.Session) ISession
 	}
 )
 
@@ -110,8 +113,8 @@ func (a *Actor) OnMessage(ctx IContext, msg interface{}) error {
 	return nil
 }
 
-// Equal 自定义逻辑相等判断
-func (o *Pid) Equal(other *Pid) bool {
+// EqualPid 自定义逻辑相等判断
+func EqualPid(o *Pid, other *Pid) bool {
 	// 先比对可比较字段
 	if o == nil && other == nil {
 		return true

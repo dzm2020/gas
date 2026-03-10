@@ -1,6 +1,6 @@
 package protocol
 
-const HeadLen = 13
+const HeadLen = 12
 
 func New(cmd, act uint8, data []byte) *Message {
 	return &Message{
@@ -13,6 +13,16 @@ func New(cmd, act uint8, data []byte) *Message {
 		},
 		Data: data,
 	}
+}
+
+func NewData(data []byte) *Message {
+	return New(0, 0, data)
+}
+
+func NewErr(err uint16) *Message {
+	msg := New(0, 0, nil)
+	msg.SetError(err)
+	return msg
 }
 
 type Message struct {
@@ -33,11 +43,11 @@ func (m *Message) ID() uint16 {
 }
 
 type Head struct {
-	Len   uint32 // 包体长度
-	Cmd   uint8  // 命令
-	Act   uint8  // 动作
-	Error uint16 // 错误码
-	Index uint32 // 序号
+	Len   uint32 // 包体长度 4
+	Cmd   uint8  // 命令 1
+	Act   uint8  // 动作 1
+	Error uint16 // 错误码 2
+	Index uint32 // 序号 4
 }
 
 func (h *Head) GetLen() uint32    { return h.Len }

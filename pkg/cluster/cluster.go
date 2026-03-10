@@ -3,6 +3,7 @@ package cluster
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/duke-git/lancet/v2/convertor"
@@ -106,6 +107,7 @@ func (r *Cluster) Send(nodeId uint64, message interface{}) (err error) {
 
 	subject := convertor.ToString(nodeId)
 
+	fmt.Printf("Cluster Send:  data%v \n", []byte(bytes))
 	return r.mq.Publish(subject, bytes)
 }
 

@@ -9,13 +9,7 @@ import (
 )
 
 var (
-	ErrMsgPackPack   = errors.New("msgpack打包错误")
-	ErrMsgPackUnPack = errors.New("msgpack解析错误")
-	ErrPBPack        = errors.New("pb打包错误")
-	ErrPBUnPack      = errors.New("pb解析错误")
-	ErrNotPBMsg      = errors.New("不是pb消息")
-	ErrJsonPack      = errors.New("json打包错误")
-	ErrJsonUnPack    = errors.New("json解析错误")
+	ErrNotPBMsg = errors.New("不是pb消息")
 )
 
 var (
@@ -52,6 +46,7 @@ func marshalPreCheck(msg interface{}) (data []byte, handled bool) {
 	return nil, false
 }
 
+// note:Go 的 encoding/json 会把非法 UTF-8 字节替换为 U+FFFD（UTF-8 为 0xEF 0xBF 0xBD）
 type jsonCodec struct{}
 
 func (p *jsonCodec) Unmarshal(data []byte, msg interface{}) error {

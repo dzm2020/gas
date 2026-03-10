@@ -9,6 +9,7 @@ import (
 	"github.com/dzm2020/gas/internal/component/gate/protocol"
 	"github.com/dzm2020/gas/internal/component/gate/session"
 	"github.com/dzm2020/gas/internal/iface"
+	"github.com/dzm2020/gas/internal/pb"
 	"github.com/dzm2020/gas/pkg/glog"
 	"github.com/dzm2020/gas/pkg/lib/xerror"
 	"github.com/dzm2020/gas/pkg/network"
@@ -45,11 +46,13 @@ type Agent struct {
 
 func (agent *Agent) OnInit(ctx iface.IContext, params []interface{}) error {
 	entity := agent.GetEntity()
-	s := ctx.System().SessionFactory().FromRaw(ctx, &iface.Session{
-		Id: entity.ID(),
-	})
-	agent.session = s.(*session.Session)
-	agent.session.SetAgent(ctx.ID())
+
+	agent.session = session.New(&pb.Session{
+		Id:     entity.ID(),
+		Agent:  ctx.ID(),
+		Values: make(map[string]string),
+	}, ctx)
+
 	agent.entity = entity
 	return agent.IHandler.OnInit(ctx, agent)
 }
@@ -60,10 +63,7 @@ func (agent *Agent) OnData(ctx iface.IContext, msg *protocol.Message) (err error
 	if err != nil || msg == nil {
 		return err
 	}
-	//  存储客户端消息
-	agent.session.SetCmd(msg.Cmd)
-	agent.session.SetAct(msg.Act)
-	agent.session.SetIndex(msg.Index)
+	agent.session.SetMessage(msg)
 	//  回调
 	return agent.IHandler.OnRoute(ctx, agent, msg.Data)
 }

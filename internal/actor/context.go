@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/dzm2020/gas/internal/iface"
+	"github.com/dzm2020/gas/internal/pb"
 	"github.com/dzm2020/gas/pkg/glog"
 	"github.com/dzm2020/gas/pkg/lib"
 
@@ -18,7 +19,7 @@ const DefaultCallTimeout = 3 * time.Second
 var _ iface.IContext = (*actorContext)(nil)
 
 type actorContext struct {
-	process        iface.IProcess       // 保存自己的 process 引用
+	process        iface.IProcess // 保存自己的 process 引用
 	pid            *iface.Pid
 	actor          iface.IActor
 	router         iface.IRouter
@@ -106,7 +107,7 @@ func (a *actorContext) handleMessage(m *iface.ActorMessage) error {
 }
 
 // execHandler 基于方法名执行处理器
-func (a *actorContext) execHandler(msg *iface.Message) ([]byte, error) {
+func (a *actorContext) execHandler(msg *pb.Message) ([]byte, error) {
 	var s iface.ISession
 	if msg.GetSession() != nil && a.sessionFactory != nil {
 		raw := convertor.DeepClone(msg.GetSession())

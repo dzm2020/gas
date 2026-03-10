@@ -3,6 +3,8 @@ package iface
 import (
 	"errors"
 	"fmt"
+
+	"github.com/dzm2020/gas/internal/pb"
 )
 
 var (
@@ -29,7 +31,7 @@ type (
 	}
 
 	ActorMessage struct {
-		*Message
+		*pb.Message
 		response ResponseFunc
 	}
 
@@ -55,12 +57,12 @@ func (m *TaskMessage) Validate() error {
 
 func NewActorMessage(from, to *Pid, methodName string, data []byte) *ActorMessage {
 	message := &ActorMessage{
-		Message: &Message{
+		Message: &pb.Message{
 			To:      to,
 			From:    from,
 			Method:  methodName,
 			Data:    data,
-			Session: &Session{},
+			Session: &pb.Session{},
 		},
 	}
 	return message
@@ -113,13 +115,17 @@ func NewPidWithName(name string, nodeId uint64) *Pid {
 }
 
 func NewResponse(data []byte, err error) *Response {
-	response := &Response{
+	response := &pb.Response{
 		Data: data,
 	}
 	if err != nil {
 		response.ErrMsg = err.Error()
 	}
-	return response
+	return &Response{Response: response}
+}
+
+type Response struct {
+	*pb.Response
 }
 
 func (r *Response) GetError() error {

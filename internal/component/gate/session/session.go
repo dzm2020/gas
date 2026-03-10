@@ -3,49 +3,31 @@
 package session
 
 import (
-	"encoding/json"
+	"encoding/base64"
 	"errors"
 	"strconv"
 
 	"github.com/dzm2020/gas/internal/component/gate/codec"
 	"github.com/dzm2020/gas/internal/component/gate/protocol"
 	"github.com/dzm2020/gas/internal/iface"
+	"github.com/dzm2020/gas/internal/pb"
 )
 
-// Transport 方法名，与对端 Agent 路由一致。
 const (
-	MethodPush     = "Push"     // 推送消息到客户端
-	MethodShutDown = "Shutdown" // 关闭连接
-	MethodSetValue = "SetValue" // 同步 Values 到对端
-)
-
-// Values 中与协议/客户端消息相关的约定 key。
-const (
-	KeyClientMsgCmd     = "client.cmd"     // 命令字
-	KeyClientMsgAct     = "client.act"     // 动作字
-	KeyClientMsgErrCode = "client.errCode" // 错误码
-	KeyClientMsgIndex   = "client.index"   // 序号
-	KeyAgent            = "client.agent"   // Agent Pid 的 JSON 序列化
+	KeyMessage = "clientMessage"
 )
 
 var (
 	errTransportIsNil = errors.New("transport is nil")
 )
 
-// New 仅用 id 构造 Session，transport 为 nil，仅可读；需写时由上层用 NewWithData 注入 transport。
-func New(id int64) *Session {
-	data := &iface.Session{
-		Id:     id,
-		Values: make(map[string]string),
-	}
-	return NewWithData(data, nil)
-}
-
-// NewWithData 用原始会话数据与 transport 构造 Session，用于处理请求时得到可写的 ISession。
-func NewWithData(data *iface.Session, transport ITransport) *Session {
+func New(raw *pb.Session, ctx iface.IContext) *Session {
 	s := &Session{
-		Session:   data,
-		transport: transport,
+		Session: raw,
+		transport: &transport{
+			ctx:   ctx,
+			agent: raw.GetAgent(),
+		},
 	}
 	if s.Values == nil {
 		s.Values = make(map[string]string)
@@ -55,15 +37,9 @@ func NewWithData(data *iface.Session, transport ITransport) *Session {
 
 // Session 封装 *iface.Session 并提供 Response/Push/Close 等写能力，通过 transport 下发到对端。
 type Session struct {
-	*iface.Session             // 原始数据
-	transport      ITransport  // 写操作下发；nil 时仅可读
-	agent          *iface.Pid  // 缓存；为 nil 时 GetAgent 从 Values 反序列化
-	middlewareRef  interface{} // 指向当前连接对应 agent 的 middleware 链（*[]Middleware），由 gate 注入，避免循环依赖用 interface{}
-}
-
-// Raw 返回底层 *iface.Session，供需要原始结构的调用方使用。
-func (a *Session) Raw() *iface.Session {
-	return a.Session
+	*pb.Session // 原始数据
+	transport   ITransport
+	msg         *protocol.Message
 }
 
 // SetString 在 Values 中设置字符串，不经过 transport 同步。
@@ -131,31 +107,29 @@ func (a *Session) SyncValues() error {
 	if err := a.check(); err != nil {
 		return err
 	}
-	bin, _ := json.Marshal(a.Values)
-	return a.transport.Send(a.GetAgent(), MethodSetValue, bin)
+	return a.transport.SetValue(a.Values)
 }
 
 // Response 向对端推送一条业务响应（走 Push 路由）。
 func (a *Session) Response(data []byte) error {
-	clientMsg := protocol.New(a.GetCmd(), a.GetAct(), data)
-	clientMsg.SetIndex(a.GetIndex())
+	clientMsg := protocol.NewData(data)
+	clientMsg.Copy(a.GetMessage())
 	if err := a.check(); err != nil {
 		return err
 	}
 	bin, _ := codec.Encode(clientMsg)
-	return a.transport.Send(a.GetAgent(), MethodPush, bin)
+	return a.transport.Push(bin)
 }
 
 // ResponseErr 设置 client.errCode 并向对端推送（无 body 的 Push）。
-func (a *Session) ResponseErr(code uint16) error {
-	clientMsg := protocol.New(a.GetCmd(), a.GetAct(), nil)
-	clientMsg.SetIndex(a.GetIndex())
-	clientMsg.SetError(code)
+func (a *Session) ResponseErr(errCode uint16) error {
+	clientMsg := protocol.NewErr(errCode)
+	clientMsg.Copy(a.GetMessage())
 	if err := a.check(); err != nil {
 		return err
 	}
 	bin, _ := codec.Encode(clientMsg)
-	return a.transport.Send(a.GetAgent(), MethodPush, bin)
+	return a.transport.Push(bin)
 }
 
 // Push 设置 cmd/act 并向对端推送一条消息（带 body）。
@@ -165,7 +139,7 @@ func (a *Session) Push(cmd, act uint8, data []byte) error {
 		return err
 	}
 	bin, _ := codec.Encode(clientMsg)
-	return a.transport.Send(a.GetAgent(), MethodPush, bin)
+	return a.transport.Push(bin)
 }
 
 // Close 通知对端关闭连接（Shutdown 路由）。
@@ -173,73 +147,55 @@ func (a *Session) Close() error {
 	if err := a.check(); err != nil {
 		return err
 	}
-	return a.transport.Send(a.GetAgent(), MethodShutDown, nil)
+	return a.transport.Close()
 }
 
-// SetAgent 将 Pid JSON 序列化后写入 Values，并更新缓存。
-func (a *Session) SetAgent(pid *iface.Pid) {
-	a.agent = pid
-	if pid == nil {
-		delete(a.Values, KeyAgent)
+func (a *Session) GetAgent() *iface.Pid {
+	return a.Agent
+}
+
+func (a *Session) Raw() *pb.Session {
+	if a.msg != nil {
+		a.setMessageEncoded(a.msg)
+	}
+	return a.Session
+}
+
+// setMessageEncoded 将 msg 编码为 base64 写入 Values[KeyMessage]，避免集群 JSON 序列化时
+// 将非法 UTF-8 字节（如 Index 的 0xDE）替换为 U+FFFD(0xEF) 导致回复消息 Index 错误。
+func (a *Session) setMessageEncoded(msg *protocol.Message) {
+	if msg == nil {
+		delete(a.Values, KeyMessage)
 		return
 	}
-	bin, _ := json.Marshal(pid)
-	a.Values[KeyAgent] = string(bin)
+	value, _ := codec.Encode(msg)
+	a.SetString(KeyMessage, base64.StdEncoding.EncodeToString(value))
 }
 
-// GetAgent 返回缓存的 agent；若为 nil 则从 Values 中 JSON 反序列化并缓存。
-func (a *Session) GetAgent() *iface.Pid {
-	if a.agent != nil {
-		return a.agent
-	}
-	val, ok := a.Values[KeyAgent]
-	if !ok || val == "" {
+// getMessageDecoded 从 Values[KeyMessage] 解码出 *protocol.Message，支持 base64 与原始字节（兼容旧数据）。
+func (a *Session) getMessageDecoded() *protocol.Message {
+	value := a.GetString(KeyMessage)
+	if value == "" {
 		return nil
 	}
-	var pid iface.Pid
-	if err := json.Unmarshal([]byte(val), &pid); err != nil {
-		return nil
+	raw, err := base64.StdEncoding.DecodeString(value)
+	if err != nil {
+		raw = []byte(value)
 	}
-	a.agent = &pid
-	return a.agent
+	msg, _, _ := codec.Decode(raw)
+	return msg
 }
 
-// SetCmd 设置 client.cmd 并同步到对端。
-func (a *Session) SetCmd(cmd uint8) {
-	a.SetUint64(KeyClientMsgCmd, uint64(cmd))
+// SetMessage 设置当前请求的客户端消息，并同步写入 Values[KeyMessage]（base64），
+// 确保经集群 JSON 序列化后 GetMessage 仍能拿到正确的 msg.Index。
+func (a *Session) SetMessage(msg *protocol.Message) {
+	a.msg = msg
+	a.setMessageEncoded(msg)
 }
 
-// GetCmd 从 Values 读取 client.cmd。
-func (a *Session) GetCmd() uint8 {
-	return uint8(a.GetUint64(KeyClientMsgCmd))
-}
-
-// SetAct 设置 client.act 并同步到对端。
-func (a *Session) SetAct(act uint8) {
-	a.SetUint64(KeyClientMsgAct, uint64(act))
-}
-
-// GetAct 从 Values 读取 client.act。
-func (a *Session) GetAct() uint8 {
-	return uint8(a.GetUint64(KeyClientMsgAct))
-}
-
-// SetIndex 设置 client.index 并同步到对端。
-func (a *Session) SetIndex(index uint32) {
-	a.SetUint64(KeyClientMsgIndex, uint64(index))
-}
-
-// GetIndex 从 Values 读取 client.index。
-func (a *Session) GetIndex() uint32 {
-	return uint32(a.GetUint64(KeyClientMsgIndex))
-}
-
-// SetErrCode 设置 client.errCode 并同步到对端。
-func (a *Session) SetErrCode(code int64) {
-	a.SetInt64(KeyClientMsgErrCode, code)
-}
-
-// GetErrCode 从 Values 读取 client.errCode。
-func (a *Session) GetErrCode() int64 {
-	return a.GetInt64(KeyClientMsgErrCode)
+func (a *Session) GetMessage() *protocol.Message {
+	if a.msg == nil {
+		a.msg = a.getMessageDecoded()
+	}
+	return a.msg
 }
