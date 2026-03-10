@@ -1,5 +1,6 @@
 // Package session 提供网关侧会话封装：携带连接/请求的会话数据（Values、Agent 等），
-// 并通过 ITransport 将 Response、Push、Close、SetValue 等操作下发到对端（如客户端连接，网关agent）。
+// 并通过 ITransport 将 Response、Push、Close、SetValue 等操作下发到对端（如客户端连接、网关 Agent）。
+// Message 在 Values 中以 base64 存储，避免集群 JSON 序列化时非法 UTF-8 导致 Index 错误。
 package session
 
 import (

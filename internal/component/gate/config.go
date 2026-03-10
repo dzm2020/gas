@@ -1,3 +1,4 @@
+// 本文件定义 Gate 的配置结构及转为 network.Option 的逻辑。
 package gate
 
 import (
@@ -6,7 +7,7 @@ import (
 	"github.com/dzm2020/gas/pkg/network"
 )
 
-// DefaultConfig 生成默认网关配置
+// DefaultConfig 返回默认网关配置（本机 9000、5 秒 KeepAlive、1024 发送队列、4096 读缓冲、最大 10000 连接）。
 func DefaultConfig() *Config {
 	return &Config{
 		Address:      "tcp://127.0.0.1:9000",
@@ -34,6 +35,7 @@ type Config struct {
 	TlsKeyFile string `json:"tlsKeyFile,omitempty" yaml:"tlsKeyFile,omitempty"`
 }
 
+// ToOptions 将 Config 转为 network 包使用的 Option 列表；仅当对应字段有效时才添加（如 KeepAlive>0、SendChanSize>0 等）。
 func ToOptions(c *Config) []network.Option {
 	var options []network.Option
 	if c.KeepAlive > 0 {

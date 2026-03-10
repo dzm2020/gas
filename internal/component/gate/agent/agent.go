@@ -1,3 +1,4 @@
+// 本文件实现连接对应的 Agent Actor：会话创建、消息解码后走中间件与 IHandler、以及 Push/SetValue/Shutdown 的 Actor 调用。
 package agent
 
 import (
@@ -17,8 +18,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// note:agent 还是需要用actor来处理逻辑，这样可以集群下通过actor消息调用agent接口,更方便agent功能扩展
-
+// IAgent 对外暴露的 Agent 能力：获取连接、Session、以及中间件链的配置（便于集群下通过 Actor 消息扩展）。
 type IAgent interface {
 	GetEntity() network.IConnection
 	GetSession() *session.Session
@@ -29,6 +29,7 @@ type IAgent interface {
 
 var _ IAgent = (*Agent)(nil)
 
+// New 构造 Agent，绑定连接与业务 IHandler；由 Gate.OnConnect 调用并 Spawn 为 Actor。
 func New(entity network.IConnection, handler IHandler) *Agent {
 	return &Agent{
 		entity:   entity,
@@ -36,14 +37,16 @@ func New(entity network.IConnection, handler IHandler) *Agent {
 	}
 }
 
+// Agent 每个客户端连接对应的 Actor：持有 entity、Session、中间件链，消息经 AfterDecode 后交给 IHandler.OnRoute，Push 前经 BeforeEncode。
 type Agent struct {
 	iface.Actor
 	IHandler
 	session     *session.Session
 	entity      network.IConnection
-	middlewares []middleware.IMiddleware // middlewares 由 Gate 在创建 session 时注入，Encode 前按顺序执行
+	middlewares []middleware.IMiddleware
 }
 
+// OnInit 初始化 Session（含当前 Agent Pid），并调用 IHandler.OnInit。
 func (agent *Agent) OnInit(ctx iface.IContext, params []interface{}) error {
 	entity := agent.GetEntity()
 
@@ -57,17 +60,17 @@ func (agent *Agent) OnInit(ctx iface.IContext, params []interface{}) error {
 	return agent.IHandler.OnInit(ctx, agent)
 }
 
+// OnData 收到 Gate 投递的协议消息：先走 AfterDecode 中间件，再 SetMessage 并调用 IHandler.OnRoute(ctx, agent, msg.Data)。
 func (agent *Agent) OnData(ctx iface.IContext, msg *protocol.Message) (err error) {
-	//  执行中间件
 	msg, err = middleware.RunAfterDecode(agent.GetMiddleware(), msg)
 	if err != nil || msg == nil {
 		return err
 	}
 	agent.session.SetMessage(msg)
-	//  回调
 	return agent.IHandler.OnRoute(ctx, agent, msg.Data)
 }
 
+// OnStop 委托 IHandler.OnStop 做清理。
 func (agent *Agent) OnStop(ctx iface.IContext) error {
 	return agent.IHandler.OnStop(ctx, agent)
 }
@@ -93,6 +96,7 @@ func (agent *Agent) GetMiddleware() []middleware.IMiddleware {
 	return agent.middlewares
 }
 
+// Push 由系统/对端调用：将 data 解包为 Message，经 BeforeEncode 中间件后编码并发送到 entity；用于响应或集群转发到客户端。
 func (agent *Agent) Push(ctx iface.IContext, data []byte) (err error) {
 	msg, _, _ := codec.Decode(data)
 	if len(agent.middlewares) > 0 {
@@ -115,6 +119,7 @@ func (agent *Agent) Push(ctx iface.IContext, data []byte) (err error) {
 	return agent.GetEntity().Send(bin)
 }
 
+// SetValue 处理对端同步的 Values：data 为 JSON map，与当前 session.Values 合并。
 func (agent *Agent) SetValue(ctx iface.IContext, data []byte) error {
 	values := make(map[string]string)
 	if err := json.Unmarshal(data, &values); err != nil {
@@ -124,6 +129,7 @@ func (agent *Agent) SetValue(ctx iface.IContext, data []byte) error {
 	return nil
 }
 
+// Shutdown 关闭网络连接并关闭当前 Actor 进程。
 func (agent *Agent) Shutdown(ctx iface.IContext, _ []byte) error {
 	glog.Info("关闭网络连接", zap.Int64("entityId", agent.GetEntity().ID()))
 	_ = agent.GetEntity().Close(nil)
