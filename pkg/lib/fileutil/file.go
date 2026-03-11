@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/dzm2020/gas/pkg/lib"
+	"github.com/dzm2020/gas/pkg/lib/serializer"
 	"gopkg.in/yaml.v3"
 )
 
@@ -14,7 +14,7 @@ func LoadJsonFile(path string, value interface{}) error {
 	if err != nil {
 		return err
 	}
-	return lib.Json.Unmarshal(data, value)
+	return serializer.Json.Unmarshal(data, value)
 }
 
 func LoadYamlFile(path string, value interface{}) error {

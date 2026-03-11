@@ -7,7 +7,8 @@ import (
 	"github.com/dzm2020/gas/internal/iface"
 	"github.com/dzm2020/gas/internal/pb"
 	"github.com/dzm2020/gas/pkg/glog"
-	"github.com/dzm2020/gas/pkg/lib"
+	"github.com/dzm2020/gas/pkg/lib/serializer"
+	"github.com/dzm2020/gas/pkg/lib/timer"
 
 	"github.com/duke-git/lancet/v2/convertor"
 	"go.uber.org/zap"
@@ -26,7 +27,7 @@ type actorContext struct {
 	msg            *iface.ActorMessage
 	system         iface.ISystem
 	timeout        time.Duration
-	serializer     lib.ISerializer
+	serializer     serializer.ISerializer
 	sessionFactory iface.ISessionFactory // 可选，由 System 注入，用于解耦 session 实现
 }
 
@@ -44,7 +45,7 @@ func (a *actorContext) Actor() iface.IActor {
 	return a.actor
 }
 
-func (a *actorContext) Serializer() lib.ISerializer {
+func (a *actorContext) Serializer() serializer.ISerializer {
 	return a.serializer
 }
 
@@ -66,8 +67,8 @@ func (a *actorContext) Unname() error {
 }
 
 // AfterFunc 注册一次性定时器
-func (a *actorContext) AfterFunc(duration time.Duration, task iface.Task) *lib.Timer {
-	return lib.AfterFunc(duration, func() {
+func (a *actorContext) AfterFunc(duration time.Duration, task iface.Task) *timer.Timer {
+	return timer.AfterFunc(duration, func() {
 		msg := iface.NewTaskMessage(task)
 		if err := a.process.PostMessage(msg); err != nil {
 			glog.Error("提交定时器任务失败", zap.Error(err))

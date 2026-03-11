@@ -37,7 +37,7 @@ Go 1.25.3+；依赖见 `go.mod`（如 zap、redis、nats、consul、viper、prot
 import (
     "github.com/dzm2020/gas/internal/actor"
     "github.com/dzm2020/gas/internal/iface"
-    "github.com/dzm2020/gas/pkg/lib"
+    "github.com/dzm2020/gas/pkg/lib/serializer"
 )
 
 // 实现 IActor
@@ -46,7 +46,7 @@ func (a *MyActor) OnInit(ctx iface.IContext, params []interface{}) error { retur
 func (a *MyActor) OnMessage(ctx iface.IContext, msg interface{}) error   { return nil }
 func (a *MyActor) OnStop(ctx iface.IContext) error                        { return nil }
 
-sys := actor.NewSystem(nodeID, lib.Json)
+sys := actor.NewSystem(nodeID, serializer.Json)
 pid := sys.Spawn(&MyActor{}, arg1, arg2)
 msg := iface.NewActorMessage(from, pid, "MethodName", data)
 _ = sys.Send(msg)

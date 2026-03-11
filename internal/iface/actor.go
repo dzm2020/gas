@@ -4,7 +4,8 @@ import (
 	"time"
 
 	"github.com/dzm2020/gas/internal/pb"
-	"github.com/dzm2020/gas/pkg/lib"
+	"github.com/dzm2020/gas/pkg/lib/serializer"
+	"github.com/dzm2020/gas/pkg/lib/timer"
 )
 
 type Pid = pb.Pid
@@ -28,7 +29,7 @@ type (
 		SessionFactory() ISessionFactory
 		SetSessionFactory(f ISessionFactory)
 
-		Serializer() lib.ISerializer
+		Serializer() serializer.ISerializer
 		Spawn(actor IActor, args ...interface{}) *Pid
 
 		Register(ctx IContext) error
@@ -52,7 +53,7 @@ type (
 	IContext interface {
 		IMessageInvoker
 		ID() *Pid
-		Serializer() lib.ISerializer
+		Serializer() serializer.ISerializer
 		Named(name string) error
 		Unname() error
 		GetName() string
@@ -64,7 +65,7 @@ type (
 		Send(to *Pid, methodName string, request interface{}) error
 		Call(to *Pid, methodName string, request interface{}, reply interface{}) error
 		Forward(to *Pid, method string) error
-		AfterFunc(duration time.Duration, task Task) *lib.Timer
+		AfterFunc(duration time.Duration, task Task) *timer.Timer
 		Shutdown() error
 	}
 	IActor interface {

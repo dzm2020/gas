@@ -9,7 +9,7 @@ import (
 	dis "github.com/dzm2020/gas/pkg/discovery"
 	discovery "github.com/dzm2020/gas/pkg/discovery/iface"
 	"github.com/dzm2020/gas/pkg/glog"
-	"github.com/dzm2020/gas/pkg/lib"
+	"github.com/dzm2020/gas/pkg/lib/serializer"
 	"github.com/dzm2020/gas/pkg/lib/stopper"
 	"github.com/dzm2020/gas/pkg/lib/xerror"
 	mq "github.com/dzm2020/gas/pkg/messageQue"
@@ -48,13 +48,13 @@ type ICluster interface {
 
 var _ ICluster = (*Cluster)(nil)
 
-func New(config *Config, serializer lib.ISerializer) (c *Cluster, err error) {
+func New(config *Config, ser serializer.ISerializer) (c *Cluster, err error) {
 	conf := DefaultConfig()
 	if config != nil {
 		conf = config
 	}
 	c = &Cluster{
-		serializer: serializer,
+		serializer: ser,
 	}
 	// 创建服务发现实例
 	c.IDiscovery, err = dis.NewFromConfig(*conf.Discovery)
@@ -71,7 +71,7 @@ func New(config *Config, serializer lib.ISerializer) (c *Cluster, err error) {
 
 type Cluster struct {
 	stopper.Stopper
-	serializer lib.ISerializer
+	serializer serializer.ISerializer
 	discovery.IDiscovery
 	mq        messageQue.IMessageQue
 	localInfo *discovery.Member

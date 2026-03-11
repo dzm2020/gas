@@ -6,7 +6,7 @@ import (
 
 	"github.com/dzm2020/gas/internal/iface"
 	"github.com/dzm2020/gas/pkg/glog"
-	"github.com/dzm2020/gas/pkg/lib"
+	"github.com/dzm2020/gas/pkg/lib/mpsc"
 
 	"go.uber.org/zap"
 )
@@ -26,14 +26,14 @@ var _ IMailbox = &Mailbox{}
 
 type Mailbox struct {
 	invoker      iface.IMessageInvoker
-	queue        *lib.Mpsc
+	queue        *mpsc.Mpsc
 	dispatch     IDispatcher
 	dispatchStat atomic.Int32
 }
 
 func newMailbox() *Mailbox {
 	m := &Mailbox{
-		queue: lib.NewMpsc(),
+		queue: mpsc.NewMpsc(),
 	}
 	return m
 }

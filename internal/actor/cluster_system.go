@@ -5,14 +5,15 @@ package actor
 import (
 	"github.com/dzm2020/gas/internal/iface"
 	"github.com/dzm2020/gas/pkg/cluster"
-	"github.com/dzm2020/gas/pkg/lib"
+	"github.com/dzm2020/gas/pkg/lib/serializer"
+	"github.com/dzm2020/gas/pkg/lib/timer"
 )
 
 // NewClusterSystem 创建集群版 Actor 系统。
-// selfNodeID 为当前节点 ID，serializer 用于序列化，transport 用于跨节点通信与集群元数据同步。
-func NewClusterSystem(selfNodeID uint64, serializer lib.ISerializer, transport cluster.ICluster) *ClusterSystem {
+// selfNodeID 为当前节点 ID，ser 用于序列化，transport 用于跨节点通信与集群元数据同步。
+func NewClusterSystem(selfNodeID uint64, ser serializer.ISerializer, transport cluster.ICluster) *ClusterSystem {
 	return &ClusterSystem{
-		System:     NewSystem(selfNodeID, serializer),
+		System:     NewSystem(selfNodeID, ser),
 		transport:  transport,
 		selfNodeID: selfNodeID,
 	}
@@ -44,7 +45,7 @@ func (s *ClusterSystem) Send(message *iface.ActorMessage) (err error) {
 
 // Call 同步调用：目标为本节点则走 System.Call，否则通过 transport 发往目标节点并等待响应。
 func (s *ClusterSystem) Call(message *iface.ActorMessage) (data []byte, err error) {
-	timeout := lib.DeadlineToTimeout(message.GetDeadline(), 0)
+	timeout := timer.DeadlineToTimeout(message.GetDeadline(), 0)
 	if s.isLocalMessage(message) {
 		return s.System.Call(message)
 	}

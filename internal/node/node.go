@@ -13,7 +13,7 @@ import (
 	"github.com/dzm2020/gas/internal/profile"
 	"github.com/dzm2020/gas/pkg/cluster"
 	"github.com/dzm2020/gas/pkg/glog"
-	"github.com/dzm2020/gas/pkg/lib"
+	"github.com/dzm2020/gas/pkg/lib/serializer"
 	"github.com/dzm2020/gas/pkg/lib/component"
 	"github.com/dzm2020/gas/pkg/lib/grs"
 	"github.com/dzm2020/gas/pkg/lib/xerror"
@@ -26,7 +26,7 @@ import (
 func New(path string) *Node {
 	node := &Node{
 		Member:     new(iface.Member),
-		serializer: lib.Json,
+		serializer: serializer.Json,
 		IManager:   component.NewComponentsMgr[iface.INode](),
 		path:       path,
 	}
@@ -39,7 +39,7 @@ type Node struct {
 	*iface.Member
 	component.IManager[iface.INode]
 	path       string
-	serializer lib.ISerializer
+	serializer serializer.ISerializer
 	panicHook  func(entry zapcore.Entry)
 }
 
@@ -64,13 +64,13 @@ func (n *Node) Cluster() cluster.ICluster {
 }
 
 // SetSerializer 设置序列化器
-func (n *Node) SetSerializer(ser lib.ISerializer) {
+func (n *Node) SetSerializer(ser serializer.ISerializer) {
 	n.serializer = ser
 }
 func (n *Node) SetPanicHook(hook func(entry zapcore.Entry)) {
 	n.panicHook = hook
 }
-func (n *Node) Serializer() lib.ISerializer {
+func (n *Node) Serializer() serializer.ISerializer {
 	return n.serializer
 }
 

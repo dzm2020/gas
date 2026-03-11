@@ -1,7 +1,4 @@
-// Package actor
-// @Description: 无锁消息队列
-
-package lib
+package mpsc
 
 import (
 	"sync/atomic"
@@ -34,7 +31,7 @@ func (q *Mpsc) Push(x interface{}) {
 
 func (q *Mpsc) Pop() interface{} {
 	tail := q.tail
-	next := (*node)(atomic.LoadPointer((*unsafe.Pointer)(unsafe.Pointer(&tail.next)))) // acquire
+	next := (*node)(atomic.LoadPointer((*unsafe.Pointer)(unsafe.Pointer(&tail.next))))
 	if next != nil {
 		q.tail = next
 		v := next.val

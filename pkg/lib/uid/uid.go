@@ -1,4 +1,4 @@
-package lib
+package uid
 
 import (
 	"errors"
@@ -9,17 +9,16 @@ import (
 
 const (
 	CEpoch         = 1474802888000
-	CWorkerIdBits  = 10 // Num of WorkerId Bits
-	CSSequenceBits = 12 // Num of Sequence Bits
+	CWorkerIdBits  = 10
+	CSSequenceBits = 12
 
 	CWorkerIdShift  = 12
 	CTimeStampShift = 22
 
-	CSequenceMask = 0xfff // equal as getSequenceMask()
-	CMaxWorker    = 0x3ff // equal as getMaxWorkerId()
+	CSequenceMask = 0xfff
+	CMaxWorker    = 0x3ff
 )
 
-// IdWorker Struct
 type IdWorker struct {
 	workerId      int64
 	lastTimeStamp int64
@@ -51,7 +50,6 @@ func getSequenceMask() int64 {
 	return -1 ^ -1<<CSSequenceBits
 }
 
-// return in ms
 func (iw *IdWorker) timeGen() int64 {
 	return time.Now().UnixNano() / 1000 / 1000
 }
@@ -90,7 +88,6 @@ func NextId() (ts int64, err error) {
 	return ts, nil
 }
 
-// ParseId Func: reverse uid to timestamp, workid, seq
 func ParseId(id int64) (t time.Time, ts int64, workerId int64, seq int64) {
 	seq = id & CSequenceMask
 	workerId = (id >> CWorkerIdShift) & CMaxWorker

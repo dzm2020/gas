@@ -10,7 +10,7 @@ import (
 	"github.com/dzm2020/gas/internal/component/gate/codec"
 	"github.com/dzm2020/gas/internal/component/gate/protocol"
 	"github.com/dzm2020/gas/internal/iface"
-	"github.com/dzm2020/gas/pkg/lib"
+	"github.com/dzm2020/gas/pkg/lib/serializer"
 	"github.com/dzm2020/gas/pkg/network"
 )
 
@@ -56,7 +56,7 @@ func (m *mockSystem) SetSessionFactory(_ iface.ISessionFactory) {}
 func (m *mockSystem) SessionFactory() iface.ISessionFactory     { return nil }
 func (m *mockSystem) NodeId() uint64                             { return 1 }
 func (m *mockSystem) NextID() uint64                            { return 1 }
-func (m *mockSystem) Serializer() lib.ISerializer               { return nil }
+func (m *mockSystem) Serializer() serializer.ISerializer { return nil }
 func (m *mockSystem) Add(*iface.Pid, iface.IProcess)             {}
 func (m *mockSystem) Remove(*iface.Pid) error                    { return nil }
 func (m *mockSystem) SubmitTask(pid *iface.Pid, task iface.Task) error {

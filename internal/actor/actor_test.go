@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/dzm2020/gas/internal/iface"
-	"github.com/dzm2020/gas/pkg/lib"
+	"github.com/dzm2020/gas/pkg/lib/serializer"
 )
 
 // 用于 Send/Call 测试的请求与响应类型（可 JSON 序列化）
@@ -59,7 +59,7 @@ func (a *echoActor) Echo(ctx iface.IContext, req *echoReq, resp *echoResp) error
 // -------------------- System 构造与进程查找 --------------------
 
 func TestNewSystem(t *testing.T) {
-	sys := NewSystem(testNodeID, lib.Json)
+	sys := NewSystem(testNodeID, serializer.Json)
 	if sys == nil {
 		t.Fatal("NewSystem returned nil")
 	}
@@ -69,7 +69,7 @@ func TestNewSystem(t *testing.T) {
 }
 
 func TestSystem_Register_GetProcess_Unregister(t *testing.T) {
-	sys := NewSystem(testNodeID, lib.Json)
+	sys := NewSystem(testNodeID, serializer.Json)
 
 	pid := &iface.Pid{NodeId: testNodeID, ActorId: 100}
 	ctx := &actorContext{
@@ -78,7 +78,7 @@ func TestSystem_Register_GetProcess_Unregister(t *testing.T) {
 		router:     GetRouterForActor(&testActor{}),
 		system:     sys,
 		timeout:    DefaultCallTimeout,
-		serializer: lib.Json,
+		serializer: serializer.Json,
 	}
 	mailbox := NewMailbox()
 	proc := NewProcess(mailbox)
@@ -117,7 +117,7 @@ func TestSystem_Register_GetProcess_Unregister(t *testing.T) {
 }
 
 func TestSystem_Named_Unname(t *testing.T) {
-	sys := NewSystem(testNodeID, lib.Json)
+	sys := NewSystem(testNodeID, serializer.Json)
 
 	pid := &iface.Pid{NodeId: testNodeID, ActorId: 101}
 	ctx := &actorContext{
@@ -126,7 +126,7 @@ func TestSystem_Named_Unname(t *testing.T) {
 		router:     GetRouterForActor(&testActor{}),
 		system:     sys,
 		timeout:    DefaultCallTimeout,
-		serializer: lib.Json,
+		serializer: serializer.Json,
 	}
 	mailbox := NewMailbox()
 	proc := NewProcess(mailbox)
@@ -153,7 +153,7 @@ func TestSystem_Named_Unname(t *testing.T) {
 }
 
 func TestSystem_Named_ErrNameAlreadyRegistered(t *testing.T) {
-	sys := NewSystem(testNodeID, lib.Json)
+	sys := NewSystem(testNodeID, serializer.Json)
 
 	pid1 := &iface.Pid{NodeId: testNodeID, ActorId: 201}
 	ctx1 := &actorContext{
@@ -162,7 +162,7 @@ func TestSystem_Named_ErrNameAlreadyRegistered(t *testing.T) {
 		router:     GetRouterForActor(&testActor{}),
 		system:     sys,
 		timeout:    DefaultCallTimeout,
-		serializer: lib.Json,
+		serializer: serializer.Json,
 	}
 	mb1 := NewMailbox()
 	ctx1.process = NewProcess(mb1)
@@ -178,7 +178,7 @@ func TestSystem_Named_ErrNameAlreadyRegistered(t *testing.T) {
 		router:     GetRouterForActor(&testActor{}),
 		system:     sys,
 		timeout:    DefaultCallTimeout,
-		serializer: lib.Json,
+		serializer: serializer.Json,
 	}
 	mb2 := NewMailbox()
 	ctx2.process = NewProcess(mb2)
@@ -190,7 +190,7 @@ func TestSystem_Named_ErrNameAlreadyRegistered(t *testing.T) {
 }
 
 func TestSystem_GetProcess_nilRef(t *testing.T) {
-	sys := NewSystem(testNodeID, lib.Json)
+	sys := NewSystem(testNodeID, serializer.Json)
 
 	if p := sys.GetProcess(nil); p != nil {
 		t.Error("GetProcess(nil) want nil, got process")
@@ -202,7 +202,7 @@ func TestSystem_GetProcess_nilRef(t *testing.T) {
 }
 
 func TestSystem_Spawn_returnsPid(t *testing.T) {
-	sys := NewSystem(testNodeID, lib.Json)
+	sys := NewSystem(testNodeID, serializer.Json)
 
 	pid := sys.Spawn(&testActor{})
 	if pid == nil {
@@ -217,7 +217,7 @@ func TestSystem_Spawn_returnsPid(t *testing.T) {
 }
 
 func TestSystem_SubmitTaskAndWait(t *testing.T) {
-	sys := NewSystem(testNodeID, lib.Json)
+	sys := NewSystem(testNodeID, serializer.Json)
 
 	pid := &iface.Pid{NodeId: testNodeID, ActorId: 301}
 	ctx := &actorContext{
@@ -226,7 +226,7 @@ func TestSystem_SubmitTaskAndWait(t *testing.T) {
 		router:     GetRouterForActor(&testActor{}),
 		system:     sys,
 		timeout:    DefaultCallTimeout,
-		serializer: lib.Json,
+		serializer: serializer.Json,
 	}
 	mailbox := NewMailbox()
 	proc := NewProcess(mailbox)
@@ -250,7 +250,7 @@ func TestSystem_SubmitTaskAndWait(t *testing.T) {
 }
 
 func TestSystem_ShutdownProcess(t *testing.T) {
-	sys := NewSystem(testNodeID, lib.Json)
+	sys := NewSystem(testNodeID, serializer.Json)
 
 	pid := &iface.Pid{NodeId: testNodeID, ActorId: 401}
 	ctx := &actorContext{
@@ -259,7 +259,7 @@ func TestSystem_ShutdownProcess(t *testing.T) {
 		router:     GetRouterForActor(&testActor{}),
 		system:     sys,
 		timeout:    DefaultCallTimeout,
-		serializer: lib.Json,
+		serializer: serializer.Json,
 	}
 	mailbox := NewMailbox()
 	proc := NewProcess(mailbox)
@@ -277,7 +277,7 @@ func TestSystem_ShutdownProcess(t *testing.T) {
 }
 
 func TestSystem_Shutdown(t *testing.T) {
-	sys := NewSystem(testNodeID, lib.Json)
+	sys := NewSystem(testNodeID, serializer.Json)
 
 	if err := sys.Shutdown(); err != nil {
 		t.Fatalf("Shutdown (empty): %v", err)
@@ -289,7 +289,7 @@ func TestSystem_Shutdown(t *testing.T) {
 }
 
 func TestSystem_Send_afterShutdown_returnsErr(t *testing.T) {
-	sys := NewSystem(testNodeID, lib.Json)
+	sys := NewSystem(testNodeID, serializer.Json)
 	_ = sys.Shutdown()
 
 	msg := iface.NewActorMessage(nil, &iface.Pid{NodeId: testNodeID, ActorId: 1}, "M", nil)
@@ -300,7 +300,7 @@ func TestSystem_Send_afterShutdown_returnsErr(t *testing.T) {
 }
 
 func TestSystem_sendToProcess_processNotFound(t *testing.T) {
-	sys := NewSystem(testNodeID, lib.Json)
+	sys := NewSystem(testNodeID, serializer.Json)
 
 	err := sys.SubmitTask(&iface.Pid{NodeId: testNodeID, ActorId: 99999}, func(iface.IContext) error { return nil })
 	if err == nil {
@@ -312,14 +312,14 @@ func TestSystem_sendToProcess_processNotFound(t *testing.T) {
 }
 
 func TestSystem_Send(t *testing.T) {
-	sys := NewSystem(testNodeID, lib.Json)
+	sys := NewSystem(testNodeID, serializer.Json)
 
 	pid := sys.Spawn(&sendCallTestActor{})
 	if pid == nil {
 		t.Fatal("Spawn returned nil")
 	}
 
-	data, err := lib.Json.Marshal(&appendReq{S: "hello"})
+	data, err := serializer.Json.Marshal(&appendReq{S: "hello"})
 	if err != nil {
 		t.Fatalf("Marshal: %v", err)
 	}
@@ -331,7 +331,7 @@ func TestSystem_Send(t *testing.T) {
 	_ = sys.SubmitTaskAndWait(pid, func(iface.IContext) error { return nil }, 2*time.Second)
 
 	// 通过 Call GetLast 校验异步 Append 已生效
-	emptyData, _ := lib.Json.Marshal(&emptyReq{})
+	emptyData, _ := serializer.Json.Marshal(&emptyReq{})
 	callMsg := iface.NewActorMessage(nil, pid, "GetLast", emptyData)
 	callMsg.Deadline = time.Now().Add(3 * time.Second).Unix()
 	reply, err := sys.Call(callMsg)
@@ -339,7 +339,7 @@ func TestSystem_Send(t *testing.T) {
 		t.Fatalf("Call GetLast: %v", err)
 	}
 	var resp getLastResp
-	if err := lib.Json.Unmarshal(reply, &resp); err != nil {
+	if err := serializer.Json.Unmarshal(reply, &resp); err != nil {
 		t.Fatalf("Unmarshal GetLast response: %v", err)
 	}
 	if resp.S != "hello" {
@@ -348,7 +348,7 @@ func TestSystem_Send(t *testing.T) {
 }
 
 func TestSystem_Call(t *testing.T) {
-	sys := NewSystem(testNodeID, lib.Json)
+	sys := NewSystem(testNodeID, serializer.Json)
 
 	pid := sys.Spawn(&echoActor{})
 	if pid == nil {
@@ -356,7 +356,7 @@ func TestSystem_Call(t *testing.T) {
 	}
 
 	req := &echoReq{Msg: "ping"}
-	data, err := lib.Json.Marshal(req)
+	data, err := serializer.Json.Marshal(req)
 	if err != nil {
 		t.Fatalf("Marshal: %v", err)
 	}
@@ -367,7 +367,7 @@ func TestSystem_Call(t *testing.T) {
 		t.Fatalf("Call Echo: %v", err)
 	}
 	var resp echoResp
-	if err := lib.Json.Unmarshal(reply, &resp); err != nil {
+	if err := serializer.Json.Unmarshal(reply, &resp); err != nil {
 		t.Fatalf("Unmarshal Echo response: %v", err)
 	}
 	if resp.Msg != "ping" {

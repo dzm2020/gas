@@ -12,7 +12,8 @@ import (
 	"github.com/dzm2020/gas/internal/component/gate/protocol"
 	"github.com/dzm2020/gas/internal/iface"
 	"github.com/dzm2020/gas/internal/pb"
-	"github.com/dzm2020/gas/pkg/lib"
+	"github.com/dzm2020/gas/pkg/lib/serializer"
+	"github.com/dzm2020/gas/pkg/lib/timer"
 )
 
 // ---------- mock IContext for transport (captures InvokerMessage) ----------
@@ -32,7 +33,7 @@ func (c *captureContext) InvokerMessage(msg interface{}) error {
 	}
 	return nil
 }
-func (c *captureContext) Serializer() lib.ISerializer     { return nil }
+func (c *captureContext) Serializer() serializer.ISerializer { return nil }
 func (c *captureContext) Message() *iface.ActorMessage   { return nil }
 func (c *captureContext) Actor() iface.IActor             { return nil }
 func (c *captureContext) Process() iface.IProcess         { return nil }
@@ -44,7 +45,7 @@ func (c *captureContext) SetCallTimeout(time.Duration)   {}
 func (c *captureContext) Send(*iface.Pid, string, interface{}) error { return nil }
 func (c *captureContext) Call(*iface.Pid, string, interface{}, interface{}) error { return nil }
 func (c *captureContext) Forward(*iface.Pid, string) error { return nil }
-func (c *captureContext) AfterFunc(time.Duration, iface.Task) *lib.Timer { return nil }
+func (c *captureContext) AfterFunc(time.Duration, iface.Task) *timer.Timer { return nil }
 func (c *captureContext) Shutdown() error                { return nil }
 
 func (c *captureContext) getLastMsg() *iface.ActorMessage {

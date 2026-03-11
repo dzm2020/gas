@@ -8,7 +8,9 @@ import (
 
 	"github.com/dzm2020/gas/internal/iface"
 	"github.com/dzm2020/gas/pkg/glog"
-	"github.com/dzm2020/gas/pkg/lib"
+	"github.com/dzm2020/gas/pkg/lib/serializer"
+	"github.com/dzm2020/gas/pkg/lib/timer"
+	"github.com/dzm2020/gas/pkg/lib/waiter"
 	"github.com/dzm2020/gas/pkg/lib/stopper"
 	"github.com/dzm2020/gas/pkg/lib/xerror"
 
@@ -66,11 +68,11 @@ func spawn(s iface.ISystem, actor iface.IActor, args ...interface{}) *iface.Pid 
 var _ iface.ISystem = (*System)(nil)
 
 // NewSystem 构造本节点 Actor 系统，node 用于生成 Pid 与获取节点信息。
-func NewSystem(selfNodeID uint64, serializer lib.ISerializer) *System {
+func NewSystem(selfNodeID uint64, ser serializer.ISerializer) *System {
 	return &System{
 		selfNodeID: selfNodeID,
 		autoId:     atomic.Uint64{},
-		serializer: serializer,
+		serializer: ser,
 		IdDict:     maputil.NewConcurrentMap[uint64, iface.IContext](10),
 		nameDict:   maputil.NewConcurrentMap[string, iface.IContext](10),
 	}
@@ -81,7 +83,7 @@ type System struct {
 	stopper.Stopper
 	selfNodeID     uint64
 	autoId         atomic.Uint64
-	serializer     lib.ISerializer
+	serializer     serializer.ISerializer
 	IdDict         *maputil.ConcurrentMap[uint64, iface.IContext] // ActorId -> IContext
 	nameDict       *maputil.ConcurrentMap[string, iface.IContext] // 名字 -> IContext
 	sessionFactory iface.ISessionFactory                          // 可选，用于从 *Session 构造 ISession，由 gate 等上层注入
@@ -94,7 +96,7 @@ func (s *System) NodeId() uint64 {
 	return s.selfNodeID
 }
 
-func (s *System) Serializer() lib.ISerializer {
+func (s *System) Serializer() serializer.ISerializer {
 	return s.serializer
 }
 
@@ -189,16 +191,16 @@ func (s *System) Send(message *iface.ActorMessage) error {
 
 // Call 向目标进程同步发送消息并等待响应，超时由 message.Deadline 决定。
 func (s *System) Call(message *iface.ActorMessage) (data []byte, err error) {
-	timeout := lib.DeadlineToTimeout(message.GetDeadline(), 0)
-	waiter := lib.NewChanWaiter[[]byte](timeout)
+timeout := timer.DeadlineToTimeout(message.GetDeadline(), 0)
+	w := waiter.NewChanWaiter[[]byte](timeout)
 	message.SetResponse(func(bin []byte, e error) {
-		waiter.Done(bin, e)
+		w.Done(bin, e)
 	})
 	if err = s.sendToProcess(message.To, message); err != nil {
-		waiter.Done(nil, err)
+		w.Done(nil, err)
 		return
 	}
-	data, err = waiter.Wait()
+	data, err = w.Wait()
 	return
 }
 
@@ -210,21 +212,21 @@ func (s *System) SubmitTask(to *iface.Pid, task iface.Task) error {
 
 // SubmitTaskAndWait 向指定进程投递任务并等待执行完成，超时由 timeout 控制。
 func (s *System) SubmitTaskAndWait(to *iface.Pid, task iface.Task, timeout time.Duration) (err error) {
-	waiter := lib.NewChanWaiter[[]byte](timeout)
+	w := waiter.NewChanWaiter[[]byte](timeout)
 
 	syncTask := func(ctx iface.IContext) error {
 		taskErr := task(ctx)
-		waiter.Done(nil, taskErr)
+		w.Done(nil, taskErr)
 		return taskErr
 	}
 
 	msg := iface.NewTaskMessage(syncTask)
 	if err = s.sendToProcess(to, msg); err != nil {
-		waiter.Done(nil, err)
+		w.Done(nil, err)
 		return err
 	}
 
-	_, err = waiter.Wait()
+	_, err = w.Wait()
 	return
 }
 

@@ -8,7 +8,7 @@ import (
 	dis "github.com/dzm2020/gas/pkg/discovery"
 	discovery "github.com/dzm2020/gas/pkg/discovery/iface"
 	"github.com/dzm2020/gas/pkg/glog"
-	"github.com/dzm2020/gas/pkg/lib"
+	"github.com/dzm2020/gas/pkg/lib/serializer"
 	mq "github.com/dzm2020/gas/pkg/messageQue"
 	messageQue "github.com/dzm2020/gas/pkg/messageQue/iface"
 	"go.uber.org/zap/zapcore"
@@ -41,7 +41,7 @@ func testConfig() *Config {
 
 func createCluster(t *testing.T) (ICluster, func()) {
 	t.Helper()
-	c, err := New(testConfig(), lib.Json)
+	c, err := New(testConfig(), serializer.Json)
 	if err != nil {
 		t.Skipf("New: %v (consul/nats 可能未启动)", err)
 	}
@@ -65,7 +65,7 @@ func TestErrNotFoundMember(t *testing.T) {
 
 func TestNew_WithRealConfig(t *testing.T) {
 	glog.SetLogLevel(zapcore.DebugLevel)
-	c, err := New(testConfig(), lib.Json)
+	c, err := New(testConfig(), serializer.Json)
 	if err != nil {
 		t.Skipf("New: %v (consul/nats 可能未启动)", err)
 	}
