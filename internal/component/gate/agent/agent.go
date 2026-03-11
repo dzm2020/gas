@@ -80,7 +80,7 @@ func (agent *Agent) OnInit(ctx iface.IContext, params []interface{}) error {
 //	@param ctx
 //	@param msg
 //	@return err
-func (agent *Agent) OnData(ctx iface.IContext, msg *protocol.Message) (err error) {
+func (agent *Agent) OnData(msg *protocol.Message) (err error) {
 	msg, err = middleware.RunAfterDecode(agent.GetMiddleware(), agent, msg)
 	if err != nil || msg == nil {
 		return err
@@ -110,7 +110,7 @@ func (agent *Agent) GetEntity() network.IConnection {
 
 // Context
 //
-//	@Description:
+//	@Description:获取agent actor context
 //	@receiver agent
 //	@return iface.IContext
 func (agent *Agent) Context() iface.IContext {
@@ -119,13 +119,18 @@ func (agent *Agent) Context() iface.IContext {
 
 // GetSession
 //
-//	@Description:
+//	@Description:获取session
 //	@receiver agent
 //	@return *session.Session
 func (agent *Agent) GetSession() *session.Session {
 	return agent.session
 }
 
+// AppendMiddleware
+//
+//	@Description: 添加中间件
+//	@receiver agent
+//	@param middlewares
 func (agent *Agent) AppendMiddleware(middlewares ...gateiface.IMiddleware) {
 	agent.middlewares = append(agent.middlewares, middlewares...)
 }
@@ -139,6 +144,11 @@ func (agent *Agent) SetMiddleware(chain []gateiface.IMiddleware) {
 	agent.middlewares = chain
 }
 
+// GetMiddleware
+//
+//	@Description: 获取中间件
+//	@receiver agent
+//	@return []gateiface.IMiddleware
 func (agent *Agent) GetMiddleware() []gateiface.IMiddleware {
 	return agent.middlewares
 }

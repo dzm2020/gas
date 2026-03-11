@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"bytes"
+	"errors"
 	"testing"
 	"time"
 
@@ -26,7 +27,7 @@ func TestRateLimit_ByConnection(t *testing.T) {
 		t.Fatalf("second: %v", err)
 	}
 	_, err = rl.AfterDecode(nil, msg)
-	if err == nil || err != ErrRateLimitExceeded {
+	if err == nil || !errors.Is(err, ErrRateLimitExceeded) {
 		t.Fatalf("third should be rate limited: %v", err)
 	}
 }
@@ -45,7 +46,7 @@ func TestRateLimit_ByMessageID(t *testing.T) {
 		t.Fatalf("msgOther should pass through: %v", err)
 	}
 	_, err = rl.AfterDecode(nil, msgLimit)
-	if err == nil || err != ErrRateLimitExceeded {
+	if err == nil || !errors.Is(err, ErrRateLimitExceeded) {
 		t.Fatalf("msgLimit second should be limited: %v", err)
 	}
 	time.Sleep(1100 * time.Millisecond)
@@ -142,9 +143,9 @@ type mockAgentForEncrypt struct {
 	push func(*protocol.Message) error
 }
 
-func (m *mockAgentForEncrypt) Context() iface.IContext                    { return nil }
-func (m *mockAgentForEncrypt) GetEntity() network.IConnection             { return nil }
-func (m *mockAgentForEncrypt) GetSession() *session.Session               { return nil }
+func (m *mockAgentForEncrypt) Context() iface.IContext                   { return nil }
+func (m *mockAgentForEncrypt) GetEntity() network.IConnection            { return nil }
+func (m *mockAgentForEncrypt) GetSession() *session.Session              { return nil }
 func (m *mockAgentForEncrypt) SetMiddleware([]gateiface.IMiddleware)     {}
 func (m *mockAgentForEncrypt) AppendMiddleware(...gateiface.IMiddleware) {}
 func (m *mockAgentForEncrypt) GetMiddleware() []gateiface.IMiddleware    { return nil }

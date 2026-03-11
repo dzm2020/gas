@@ -139,7 +139,7 @@ func TestAgent_OnData(t *testing.T) {
 	a := New(conn, h)
 	_ = a.OnInit(ctx, nil)
 	msg := protocol.New(1, 2, []byte("hello"))
-	err := a.OnData(ctx, msg)
+	err := a.OnData(msg)
 	if err != nil {
 		t.Fatalf("OnData: %v", err)
 	}
@@ -157,7 +157,7 @@ func TestAgent_OnData_MiddlewareError(t *testing.T) {
 	_ = a.OnInit(ctx, nil)
 	a.SetMiddleware([]gateiface.IMiddleware{mw})
 	msg := protocol.New(0, 0, []byte("x"))
-	err := a.OnData(ctx, msg)
+	err := a.OnData(msg)
 	if err != errMw {
 		t.Errorf("OnData want err %v, got %v", errMw, err)
 	}

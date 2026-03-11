@@ -44,6 +44,9 @@ type Config struct {
 //	@param c
 //	@return []network.Option
 func ToOptions(c *Config) []network.Option {
+	if c == nil {
+		return nil
+	}
 	var options []network.Option
 	if c.KeepAlive > 0 {
 		options = append(options, network.WithKeepAlive(time.Duration(c.KeepAlive)*time.Second))

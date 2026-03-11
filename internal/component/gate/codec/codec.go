@@ -20,6 +20,9 @@ const maxMsgSize = MaxMsgSize
 //	@return []byte
 //	@return error
 func Encode(msg *protocol.Message) ([]byte, error) {
+	if msg == nil {
+		return nil, errors.New("protocol encode msg is nil")
+	}
 	dataLen := uint32(len(msg.Data))
 	if dataLen >= maxMsgSize {
 		return nil, errors.New("message too large")

@@ -112,7 +112,7 @@ func (g *Gate) process(entity network.IConnection, msg *protocol.Message) (err e
 	}
 	return g.system.SubmitTask(pid, func(ctx iface.IContext) error {
 		a := ctx.Actor().(*agent.Agent)
-		return a.OnData(ctx, msg)
+		return a.OnData(msg)
 	})
 }
 

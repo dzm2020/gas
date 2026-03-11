@@ -54,7 +54,10 @@ func (m *transport) send(to *iface.Pid, method string, bin []byte) error {
 //	@param values
 //	@return error
 func (m *transport) SetValue(values map[string]string) error {
-	bin, _ := json.Marshal(values)
+	bin, err := json.Marshal(values)
+	if err != nil {
+		return err
+	}
 	return m.send(m.agent, MethodSetValue, bin)
 }
 
