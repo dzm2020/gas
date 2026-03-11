@@ -10,17 +10,16 @@ import (
 
 // 与对端 Agent 路由方法名一致，用于 Actor 消息的 method 字段。
 const (
-	MethodPush     = "HandlerPush"     // 推送消息到客户端
-	MethodSetValue = "HandlerSetValue" // 同步 Values 到对端
-	MethodShutDown = "HandlerShutdown" // 关闭连接
+	methodPush     = "HandlerPush"     // 推送消息到客户端
+	methodSetValue = "HandlerSetValue" // 同步 Values 到对端
+	methodShutDown = "HandlerShutdown" // 关闭连接
 )
 
-// ITransport
-// @Description: ITransport 将 Session 的写操作转成对 Agent 的 Actor 调用或系统消息。
-type ITransport interface {
-	Push(bin []byte) error
-	SetValue(values map[string]string) error
-	Close() error
+func newTransport(ctx iface.IContext, agent *iface.Pid) *transport {
+	return &transport{
+		ctx:   ctx,
+		agent: agent,
+	}
 }
 
 // transport
@@ -47,18 +46,18 @@ func (m *transport) send(to *iface.Pid, method string, bin []byte) error {
 	}
 }
 
-// SetValue
+// setValue
 //
 //	@Description:同步agent session values
 //	@receiver m
 //	@param values
 //	@return error
-func (m *transport) SetValue(values map[string]string) error {
+func (m *transport) setValue(values map[string]string) error {
 	bin, err := json.Marshal(values)
 	if err != nil {
 		return err
 	}
-	return m.send(m.agent, MethodSetValue, bin)
+	return m.send(m.agent, methodSetValue, bin)
 }
 
 // Push
@@ -67,8 +66,8 @@ func (m *transport) SetValue(values map[string]string) error {
 //	@receiver m
 //	@param bin
 //	@return error
-func (m *transport) Push(bin []byte) error {
-	return m.send(m.agent, MethodPush, bin)
+func (m *transport) push(bin []byte) error {
+	return m.send(m.agent, methodPush, bin)
 }
 
 // Close
@@ -76,6 +75,6 @@ func (m *transport) Push(bin []byte) error {
 //	@Description: 关闭客户端
 //	@receiver m
 //	@return error
-func (m *transport) Close() error {
-	return m.send(m.agent, MethodShutDown, nil)
+func (m *transport) close() error {
+	return m.send(m.agent, methodShutDown, nil)
 }

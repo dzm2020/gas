@@ -5,8 +5,8 @@ import (
 	"github.com/dzm2020/gas/pkg/lib/stopper"
 )
 
-// NewProcess 创建新的进程实例
-func NewProcess(mailbox IMailbox) *Process {
+// newProcess 创建新的进程实例
+func newProcess(mailbox IMailbox) *Process {
 	process := &Process{
 		mailbox: mailbox,
 	}

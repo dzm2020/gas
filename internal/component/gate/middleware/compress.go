@@ -35,7 +35,7 @@ func (c *Compress) AfterDecode(_ gateiface.IAgent, msg *protocol.Message) (*prot
 	if msg == nil || len(msg.Data) == 0 {
 		return msg, nil
 	}
-	if msg.Tag&TagCompressed == 0 {
+	if msg.GetTag()&TagCompressed == 0 {
 		return msg, nil
 	}
 	rd, err := gzip.NewReader(bytes.NewReader(msg.Data))
@@ -47,9 +47,9 @@ func (c *Compress) AfterDecode(_ gateiface.IAgent, msg *protocol.Message) (*prot
 	if err != nil {
 		return nil, ErrDecompress
 	}
-	head := *msg.Head
-	head.Tag &^= TagCompressed
-	return &protocol.Message{Head: &head, Data: data}, nil
+	newHead := msg.Head.Clone()
+	newHead.SetTag(newHead.GetTag() &^ TagCompressed)
+	return &protocol.Message{Head: newHead, Data: data}, nil
 }
 
 func (c *Compress) BeforeEncode(_ gateiface.IAgent, msg *protocol.Message) (*protocol.Message, error) {
@@ -70,7 +70,7 @@ func (c *Compress) BeforeEncode(_ gateiface.IAgent, msg *protocol.Message) (*pro
 	if err := w.Close(); err != nil {
 		return nil, err
 	}
-	head := *msg.Head
-	head.Tag |= TagCompressed
-	return &protocol.Message{Head: &head, Data: buf.Bytes()}, nil
+	newHead := msg.Head.Clone()
+	newHead.SetTag(newHead.GetTag() | TagCompressed)
+	return &protocol.Message{Head: newHead, Data: buf.Bytes()}, nil
 }

@@ -35,6 +35,9 @@ var _ gateiface.IAgent = (*Agent)(nil)
 //	@param handler
 //	@return *Agent
 func New(entity network.IConnection, handler IHandler) *Agent {
+	if handler == nil {
+		handler = new(Handler)
+	}
 	return &Agent{
 		entity:   entity,
 		IHandler: handler,

@@ -14,7 +14,7 @@ import (
 var _ gateiface.IMiddleware = (*Encrypt)(nil)
 
 // 约定：cmd=0 act=0 为密钥交换消息（客户端发 clientKey，服务端回 serverKey）。
-const KeyExchangeCmd, KeyExchangeAct = 0, 0
+const exchangeCmd, exchangeAct = 0, 0
 
 // TagEncrypted Head.Tag 的位：1 表示 Data 为 XOR 加密后内容（与 Compress 的 TagCompressed 可组合使用不同位）。
 const TagEncrypted = 1 << 1
@@ -82,12 +82,12 @@ func (e *Encrypt) AfterDecode(agent gateiface.IAgent, msg *protocol.Message) (*p
 	if msg == nil {
 		return nil, nil
 	}
-	if msg.Cmd != KeyExchangeCmd || msg.Act != KeyExchangeAct {
+	if msg.GetCmd() != exchangeCmd || msg.GetAct() != exchangeAct {
 		key := e.derivedKey
 		if len(key) == 0 {
 			return msg, nil
 		}
-		if msg.Tag&TagEncrypted == 0 {
+		if msg.GetTag()&TagEncrypted == 0 {
 			return msg, nil
 		}
 		if len(msg.Data) == 0 {
@@ -95,9 +95,9 @@ func (e *Encrypt) AfterDecode(agent gateiface.IAgent, msg *protocol.Message) (*p
 		}
 		plain := make([]byte, len(msg.Data))
 		xor(plain, msg.Data, key)
-		head := *msg.Head
-		head.Tag &^= TagEncrypted
-		return &protocol.Message{Head: &head, Data: plain}, nil
+		newHead := msg.Head.Clone()
+		newHead.SetTag(newHead.GetTag() &^ TagEncrypted)
+		return &protocol.Message{Head: newHead, Data: plain}, nil
 	}
 
 	if len(msg.Data) == 0 {
@@ -109,7 +109,7 @@ func (e *Encrypt) AfterDecode(agent gateiface.IAgent, msg *protocol.Message) (*p
 	if e.serverKey != nil {
 		// 服务端：收到客户端 clientKey，派生密钥后直接通过 agent.Push 回复 serverKey 并跳过业务处理
 		e.derivedKey = deriveKey(e.serverKey, msg.Data)
-		reply := protocol.New(KeyExchangeCmd, KeyExchangeAct, e.ServerKey())
+		reply := protocol.New(exchangeCmd, exchangeAct, e.ServerKey())
 		if err := agent.Push(reply); err == nil {
 			return nil, nil
 		}
@@ -132,7 +132,7 @@ func (e *Encrypt) BeforeEncode(_ gateiface.IAgent, msg *protocol.Message) (*prot
 	if msg == nil {
 		return nil, nil
 	}
-	if msg.Cmd == KeyExchangeCmd && msg.Act == KeyExchangeAct {
+	if msg.GetCmd() == exchangeCmd && msg.GetAct() == exchangeAct {
 		return msg, nil
 	} else {
 		key := e.derivedKey
@@ -144,8 +144,8 @@ func (e *Encrypt) BeforeEncode(_ gateiface.IAgent, msg *protocol.Message) (*prot
 		}
 		cipher := make([]byte, len(msg.Data))
 		xor(cipher, msg.Data, key)
-		head := *msg.Head
-		head.Tag |= TagEncrypted
-		return &protocol.Message{Head: &head, Data: cipher}, nil
+		newHead := msg.Head.Clone()
+		newHead.SetTag(newHead.GetTag() | TagEncrypted)
+		return &protocol.Message{Head: newHead, Data: cipher}, nil
 	}
 }

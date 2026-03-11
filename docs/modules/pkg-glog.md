@@ -1,63 +1,81 @@
 # pkg/glog 模块文档
 
+---
+
 ## 1. 模块功能概述
 
-`pkg/glog` 提供基于 zap 的全局日志：
+`pkg/glog` 基于 zap 提供全局日志：包 init 时自动调用 `Init(DefaultConfig())`，之后可通过 Init 重新初始化、通过 SetLogLevel/GetLevel 调整级别，通过 Debug/Info/…/Fatal 及 Debugf/…/Fatalf 写日志；Stop 用于进程退出前同步缓冲。
 
-- **初始化**：Init(cfg) 设置 AtomicLevel、EncoderConfig、lumberjack 与多 Core（文件 + 可选控制台），init() 时默认调用 Init(DefaultConfig())。
-- **级别**：SetLogLevel、GetLevel；Debug/Info/Warn/Error/Panic/Fatal 及 Debugf/Infof/.../Fatalf。
-- **行为**：Panic/Fatal 会 panic 或 os.Exit；Stop() 同步缓冲。
-- **配置**：Config 含 Path、MaxSize、MaxBackups、MaxAge、LocalTime、Compress、PrintConsole、Level 等，见 config.go。
+---
 
-## 2. 接口文档
+## 2. 配置（Config）
 
-### 2.1 初始化与配置
+### 2.1 Config 与 DefaultConfig
 
-| 函数 | 说明 |
-|------|------|
-| `Init(cfg *Config)` | 构建 zap Logger 与 SugaredLogger，存于 atomic.Value；cfg 为 nil 时用 DefaultConfig() |
-| `DefaultConfig() *Config` | 默认文件与控制台、级别等 |
-| `Stop() error` | Sync 当前 logger 与 sugared |
+| 类型/函数 | 说明 |
+|-----------|------|
+| `Config` | 配置结构体，含 json/yaml 标签，用于 Init。 |
+| `DefaultConfig() *Config` | 返回默认配置：Path "./logs/app.log"、Level "info"、PrintConsole true、MaxSize 500、MaxBackups 100、MaxAge 30、Compress false、LocalTime true。 |
 
-### 2.2 级别
+### 2.2 Config 字段
 
-| 函数 | 说明 |
-|------|------|
-| `SetLogLevel(level zapcore.Level)` | 设置级别 |
-| `GetLevel() zapcore.Level` | 当前级别 |
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `Path` | string | 日志文件路径。 |
+| `Level` | string | 级别：debug / info / warn / error / dpanic / panic / fatal（不区分大小写）。 |
+| `PrintConsole` | bool | 是否同时输出到控制台。 |
+| `MaxSize` | int | 单文件最大大小（MB），超过则切割。 |
+| `MaxBackups` | int | 最多保留的旧文件数。 |
+| `MaxAge` | int | 旧文件保留天数。 |
+| `Compress` | bool | 是否压缩旧文件。 |
+| `LocalTime` | bool | 是否使用本地时间。 |
 
-### 2.3 输出
+---
 
-| 函数 | 说明 |
-|------|------|
-| `Debug/Info/Warn/Error(msg string, fields ...zap.Field)` | 结构化 |
-| `Panic/Fatal(...)` | Panic 触发 panic，Fatal 调用 os.Exit(1) |
-| `Debugf/Infof/Warnf/Errorf/DPanicf/Panicf/Fatalf(template string, args ...interface{})` | 格式化 |
-
-### 2.4 扩展
+## 3. 初始化与级别
 
 | 函数 | 说明 |
 |------|------|
-| `WithOptions(opts ...zap.Option)` | 替换当前 logger |
+| `Init(cfg *Config)` | 初始化全局 logger：根据 cfg 设置 AtomicLevel、EncoderConfig、lumberjack 文件 Core，可选控制台 Core；构建 zap.Logger 与 SugaredLogger 并存入包级 atomic.Value。cfg 为 nil 时使用 DefaultConfig()。 |
+| `Stop() error` | 对当前 logger 与 sugared 分别 Sync，返回最后一次 Sync 的错误（若有）。进程退出前调用以刷盘。 |
+| `SetLogLevel(level zapcore.Level)` | 设置全局日志级别（原子生效）。 |
+| `GetLevel() zapcore.Level` | 返回当前全局日志级别。 |
+| `WithOptions(opts ...zap.Option)` | 在现有 logger 上应用 zap.Option（如 AddCallerSkip、Hooks），将新 logger 及其 Sugar 存回包级 atomic.Value，后续调用使用新 logger。 |
 
-## 3. 设计结构（协程模型与 struct 关系）
+---
 
-### 3.1 协程模型
+## 4. 结构化输出（msg + fields）
 
-- 无包内常驻 goroutine；写日志由调用方 goroutine 执行，zap 内部有缓冲与异步写（视配置而定）。
-- atomic.Value 存储 logger 指针，Init/WithOptions 时替换，并发读安全。
+以下函数签名均为 `(msg string, fields ...zap.Field)`，通过包内当前 logger 输出对应级别日志。
 
-### 3.2 Struct 关系
+| 函数 | 说明 |
+|------|------|
+| `Debug(msg string, fields ...zap.Field)` | 输出 Debug 级别，不改变程序流程。 |
+| `Info(msg string, fields ...zap.Field)` | 输出 Info 级别。 |
+| `Warn(msg string, fields ...zap.Field)` | 输出 Warn 级别。 |
+| `Error(msg string, fields ...zap.Field)` | 输出 Error 级别。 |
+| `Panic(msg string, fields ...zap.Field)` | 输出 Panic 级别并触发 panic；若 logger 未初始化则直接 panic(msg)。 |
+| `Fatal(msg string, fields ...zap.Field)` | 输出 Fatal 级别并调用 os.Exit(1)；若 logger 未初始化则直接 os.Exit(1)。 |
 
-```
-包级变量:
-  loggerValue, sugaredValue atomic.Value  (*zap.Logger, *zap.SugaredLogger)
-  atomicLevel zap.AtomicLevel
+---
 
-Init(cfg) -> 构建 cores (文件 + 可选控制台) -> zap.New -> Store
-```
+## 5. 格式化输出（template + args）
 
-### 3.3 依赖
+以下函数签名均为 `(template string, args ...interface{})`，使用 `fmt.Sprintf` 风格格式化，通过包内当前 SugaredLogger 输出。
 
-- go.uber.org/zap、zapcore
-- gopkg.in/natefinch/lumberjack.v2
+| 函数 | 说明 |
+|------|------|
+| `Debugf(template string, args ...interface{})` | 输出 Debug 级别。 |
+| `Infof(template string, args ...interface{})` | 输出 Info 级别。 |
+| `Warnf(template string, args ...interface{})` | 输出 Warn 级别。 |
+| `Errorf(template string, args ...interface{})` | 输出 Error 级别。 |
+| `DPanicf(template string, args ...interface{})` | 输出 DPanic 级别（开发模式下降级为 Error）。 |
+| `Panicf(template string, args ...interface{})` | 输出 Panic 级别并触发 panic；logger 未初始化时 panic(Sprintf(template, args...))。 |
+| `Fatalf(template string, args ...interface{})` | 输出 Fatal 级别并退出；logger 未初始化时 panic(Sprintf(...))（与 Fatal 的 os.Exit 略有不同，以代码为准）。 |
+
+---
+
+## 6. 依赖
+
+- `go.uber.org/zap`、`go.uber.org/zap/zapcore`
+- `gopkg.in/natefinch/lumberjack.v2`（日志文件切割与轮转）

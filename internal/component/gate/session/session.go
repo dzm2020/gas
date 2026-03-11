@@ -48,11 +48,8 @@ func (m *Factory) FromRaw(ctx iface.IContext, raw *pb.Session) iface.ISession {
 //	@return *Session
 func New(raw *pb.Session, ctx iface.IContext) *Session {
 	s := &Session{
-		Session: raw,
-		transport: &transport{
-			ctx:   ctx,
-			agent: raw.GetAgent(),
-		},
+		Session:   raw,
+		transport: newTransport(ctx, raw.GetAgent()),
 	}
 	if s.Values == nil {
 		s.Values = make(map[string]string)
@@ -63,7 +60,7 @@ func New(raw *pb.Session, ctx iface.IContext) *Session {
 // Session 封装 *iface.Session 并提供 Response/Push/Close 等写能力，通过 transport 下发到对端。
 type Session struct {
 	*pb.Session // 原始数据
-	transport   ITransport
+	transport   *transport
 	msg         *protocol.Message
 }
 
@@ -166,7 +163,7 @@ func (a *Session) SyncValues() error {
 	if err := a.check(); err != nil {
 		return err
 	}
-	return a.transport.SetValue(a.Values)
+	return a.transport.setValue(a.Values)
 }
 
 // Response
@@ -185,7 +182,7 @@ func (a *Session) Response(data []byte) error {
 	if err != nil {
 		return xerror.Wrapf(err, "session response encode failed")
 	}
-	return a.transport.Push(bin)
+	return a.transport.push(bin)
 }
 
 // ResponseErr
@@ -204,7 +201,7 @@ func (a *Session) ResponseErr(errCode uint16) error {
 	if err != nil {
 		return xerror.Wrapf(err, "session.ResponseErr encode failed")
 	}
-	return a.transport.Push(bin)
+	return a.transport.push(bin)
 }
 
 // Push
@@ -224,7 +221,7 @@ func (a *Session) Push(cmd, act uint8, data []byte) error {
 	if err != nil {
 		return err
 	}
-	return a.transport.Push(bin)
+	return a.transport.push(bin)
 }
 
 // Close
@@ -236,7 +233,7 @@ func (a *Session) Close() error {
 	if err := a.check(); err != nil {
 		return err
 	}
-	return a.transport.Close()
+	return a.transport.close()
 }
 
 func (a *Session) GetAgent() *iface.Pid {

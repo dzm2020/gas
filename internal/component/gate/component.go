@@ -4,6 +4,7 @@ package gate
 import (
 	"context"
 
+	"github.com/dzm2020/gas/internal/component/gate/gateiface"
 	"github.com/dzm2020/gas/internal/iface"
 	"github.com/dzm2020/gas/internal/profile"
 	"github.com/dzm2020/gas/pkg/lib/component"
@@ -16,16 +17,18 @@ const (
 // Component 网关组件：从 profile 读取配置，启动/停止 Gate。
 type Component struct {
 	component.BaseComponent[iface.INode]
-	*Gate
+	gateiface.IGate
 }
 
 // NewComponent
 //
 //	@Description: 创建网关组件，配置由 profile 覆盖。
 //	@return *Component
-func NewComponent() *Component {
+func NewComponent(factory gateiface.AgentHandlerFactory) *Component {
+	gate := &Gate{}
+	gate.SetAgentHandlerFactory(factory)
 	c := &Component{
-		Gate: &Gate{},
+		IGate: gate,
 	}
 	return c
 }
@@ -52,10 +55,11 @@ func (r *Component) Start(ctx context.Context, node iface.INode) error {
 		return err
 	}
 
-	r.Gate.Options = ToOptions(conf)
-	r.Gate.Address = conf.Address
-	r.Gate.MaxConn = int64(conf.MaxConn)
-	return r.Gate.Start(ctx, node.System())
+	r.IGate.AppendOptions(ToOptions(conf)...)
+	r.IGate.SetAddress(conf.Address)
+	r.IGate.SetMaximumOfConn(int64(conf.MaxConn))
+	r.IGate.SetSystem(node.System())
+	return r.IGate.Start(ctx)
 }
 
 // Stop
@@ -65,5 +69,5 @@ func (r *Component) Start(ctx context.Context, node iface.INode) error {
 //	@param ctx
 //	@return error
 func (r *Component) Stop(ctx context.Context) error {
-	return r.Gate.Stop(ctx)
+	return r.IGate.Stop(ctx)
 }

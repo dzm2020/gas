@@ -28,8 +28,8 @@ func TestEncode_Decode_RoundTrip(t *testing.T) {
 	if out == nil {
 		t.Fatal("Decode should return non-nil *protocol.Message")
 	}
-	if out.Cmd != 10 || out.Act != 20 {
-		t.Errorf("Cmd/Act want 10/20, got %d/%d", out.Cmd, out.Act)
+	if out.GetCmd() != 10 || out.GetAct() != 20 {
+		t.Errorf("Cmd/Act want 10/20, got %d/%d", out.GetCmd(), out.GetAct())
 	}
 	if !bytes.Equal(out.Data, []byte("hello world")) {
 		t.Errorf("Data want 'hello world', got %q", out.Data)
@@ -59,17 +59,17 @@ func TestDecode_PartialBody(t *testing.T) {
 func TestEncode_DoesNotMutateMsgLen(t *testing.T) {
 	data := []byte("abc")
 	msg := protocol.New(1, 2, data)
-	msg.Len = 999
+	msg.SetLen(999)
 
 	encoded, err := Encode(msg)
 	if err != nil {
 		t.Fatalf("Encode: %v", err)
 	}
-	if msg.Len != 999 {
-		t.Errorf("Encode must not mutate msg.Len: want 999, got %d", msg.Len)
+	if msg.GetLen() != 999 {
+		t.Errorf("Encode must not mutate msg.Len: want 999, got %d", msg.GetLen())
 	}
 	out, _, _ := Decode(encoded)
-	if out.Len != uint32(len(data)) {
-		t.Errorf("decoded Len want %d, got %d", len(data), out.Len)
+	if out.GetLen() != uint32(len(data)) {
+		t.Errorf("decoded Len want %d, got %d", len(data), out.GetLen())
 	}
 }

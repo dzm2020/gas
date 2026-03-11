@@ -38,7 +38,7 @@ func spawn(s iface.ISystem, actor iface.IActor, args ...interface{}) *iface.Pid 
 		process:    nil,
 		pid:        pid,
 		actor:      actor,
-		router:     GetRouterForActor(actor),
+		router:     getRouterForActor(actor),
 		system:     s,
 		timeout:    DefaultCallTimeout,
 		serializer: s.Serializer(),
@@ -46,8 +46,8 @@ func spawn(s iface.ISystem, actor iface.IActor, args ...interface{}) *iface.Pid 
 
 	ctx.sessionFactory = s.SessionFactory()
 
-	mailBox := NewMailbox()
-	process := NewProcess(mailBox)
+	mailBox := newMailbox()
+	process := newProcess(mailBox)
 	ctx.process = process
 
 	_ = s.Register(ctx)

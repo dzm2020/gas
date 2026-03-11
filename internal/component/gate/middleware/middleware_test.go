@@ -76,14 +76,14 @@ func TestCompress_RoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BeforeEncode: %v", err)
 	}
-	if enc.Tag&TagCompressed == 0 {
+	if enc.GetTag()&TagCompressed == 0 {
 		t.Error("Tag should have TagCompressed set")
 	}
 	dec, err := c.AfterDecode(nil, enc)
 	if err != nil {
 		t.Fatalf("AfterDecode: %v", err)
 	}
-	if dec.Tag&TagCompressed != 0 {
+	if dec.GetTag()&TagCompressed != 0 {
 		t.Error("Tag should clear TagCompressed after decode")
 	}
 	if string(dec.Data) != "hello world" {
@@ -101,7 +101,7 @@ func TestCompress_SkipSmall(t *testing.T) {
 	if out != msg {
 		t.Error("short data should not be compressed")
 	}
-	if out.Tag&TagCompressed != 0 {
+	if out.GetTag()&TagCompressed != 0 {
 		t.Error("Tag should not have TagCompressed")
 	}
 }
@@ -115,7 +115,7 @@ func TestEncrypt_KeyExchange_AutoReply(t *testing.T) {
 	for i := range clientKey {
 		clientKey[i] = byte(i)
 	}
-	clientKeyMsg := protocol.New(KeyExchangeCmd, KeyExchangeAct, clientKey)
+	clientKeyMsg := protocol.New(exchangeCmd, exchangeAct, clientKey)
 	var pushed [][]byte
 	agent := &mockAgentForEncrypt{push: func(msg *protocol.Message) error {
 		bin, _ := codec.Encode(msg)
@@ -133,8 +133,8 @@ func TestEncrypt_KeyExchange_AutoReply(t *testing.T) {
 		t.Fatalf("agent.Push should be called once, got %d", len(pushed))
 	}
 	dec, _, _ := codec.Decode(pushed[0])
-	if dec == nil || dec.Cmd != KeyExchangeCmd || dec.Act != KeyExchangeAct || !bytes.Equal(dec.Data, serverEnc.ServerKey()) {
-		t.Errorf("pushed message want (0,0, serverKey), got cmd=%d act=%d data=%v", dec.Cmd, dec.Act, dec.Data)
+	if dec == nil || dec.GetCmd() != exchangeCmd || dec.GetAct() != exchangeAct || !bytes.Equal(dec.Data, serverEnc.ServerKey()) {
+		t.Errorf("pushed message want (0,0, serverKey), got cmd=%d act=%d data=%v", dec.GetCmd(), dec.GetAct(), dec.Data)
 	}
 }
 
@@ -166,7 +166,7 @@ func TestEncrypt_KeyExchangeAndXOR(t *testing.T) {
 	noOpAgent := &mockAgentForEncrypt{push: func(*protocol.Message) error { return nil }}
 
 	// 1. 客户端发 (0,0, clientKey)
-	clientKeyMsg := protocol.New(KeyExchangeCmd, KeyExchangeAct, clientKey)
+	clientKeyMsg := protocol.New(exchangeCmd, exchangeAct, clientKey)
 	out, err := clientEnc.BeforeEncode(noOpAgent, clientKeyMsg)
 	if err != nil || out != clientKeyMsg {
 		t.Fatalf("client send key: %v", err)
@@ -184,7 +184,7 @@ func TestEncrypt_KeyExchangeAndXOR(t *testing.T) {
 		t.Fatalf("serverKey len want 32, got %d", len(serverKey))
 	}
 	// 3. 服务端回 (0,0, serverKey)
-	serverKeyMsg := protocol.New(KeyExchangeCmd, KeyExchangeAct, serverKey)
+	serverKeyMsg := protocol.New(exchangeCmd, exchangeAct, serverKey)
 	out, err = serverEnc.BeforeEncode(noOpAgent, serverKeyMsg)
 	if err != nil || out != serverKeyMsg {
 		t.Fatalf("server send key: %v", err)

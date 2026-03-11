@@ -31,15 +31,15 @@ func Encode(msg *protocol.Message) ([]byte, error) {
 	offset := 0
 	binary.BigEndian.PutUint32(buf[offset:], dataLen)
 	offset += 4
-	buf[offset] = msg.Cmd
+	buf[offset] = msg.GetCmd()
 	offset += 1
-	buf[offset] = msg.Act
+	buf[offset] = msg.GetAct()
 	offset += 1
-	binary.BigEndian.PutUint16(buf[offset:], msg.Error)
+	binary.BigEndian.PutUint16(buf[offset:], msg.GetError())
 	offset += 2
-	binary.BigEndian.PutUint32(buf[offset:], msg.Index)
+	binary.BigEndian.PutUint32(buf[offset:], msg.GetIndex())
 	offset += 4
-	buf[offset] = msg.Tag
+	buf[offset] = msg.GetTag()
 	offset += 1
 	copy(buf[offset:], msg.Data)
 	return buf, nil
@@ -65,24 +65,22 @@ func Decode(buf []byte) (*protocol.Message, int, error) {
 		return nil, 0, nil
 	}
 
-	msg := &protocol.Message{
-		Head: &protocol.Head{},
-	}
 	offset := 0
-	msg.Len = binary.BigEndian.Uint32(buf[offset : offset+4])
+	bodyLen := binary.BigEndian.Uint32(buf[offset : offset+4])
 	offset += 4
-	msg.Cmd = buf[offset]
+	cmd := buf[offset]
 	offset += 1
-	msg.Act = buf[offset]
+	act := buf[offset]
 	offset += 1
-	msg.Error = binary.BigEndian.Uint16(buf[offset : offset+2])
+	errCode := binary.BigEndian.Uint16(buf[offset : offset+2])
 	offset += 2
-	msg.Index = binary.BigEndian.Uint32(buf[offset : offset+4])
+	index := binary.BigEndian.Uint32(buf[offset : offset+4])
 	offset += 4
-	msg.Tag = buf[offset]
+	tag := buf[offset]
 	offset += 1
-	msg.Data = make([]byte, msg.Len)
-	copy(msg.Data, buf[offset:])
+	data := make([]byte, bodyLen)
+	copy(data, buf[offset:])
+	msg := protocol.NewDecoded(bodyLen, cmd, act, errCode, index, tag, data)
 
 	return msg, total, nil
 }

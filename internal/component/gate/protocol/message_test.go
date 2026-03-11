@@ -9,14 +9,14 @@ func TestNew(t *testing.T) {
 	if m == nil || m.Head == nil {
 		t.Fatal("New should return non-nil Message with Head")
 	}
-	if m.Cmd != 1 || m.Act != 2 {
-		t.Errorf("Cmd/Act want 1/2, got %d/%d", m.Cmd, m.Act)
+	if m.GetCmd() != 1 || m.GetAct() != 2 {
+		t.Errorf("Cmd/Act want 1/2, got %d/%d", m.GetCmd(), m.GetAct())
 	}
 	if string(m.Data) != "data" {
 		t.Errorf("Data want 'data', got %q", m.Data)
 	}
-	if m.Len != 0 || m.Error != 0 || m.Index != 0 || m.Tag != 0 {
-		t.Errorf("Head fields should be zero, got Len=%d Error=%d Index=%d Tag=%d", m.Len, m.Error, m.Index, m.Tag)
+	if m.GetLen() != 0 || m.GetError() != 0 || m.GetIndex() != 0 || m.GetTag() != 0 {
+		t.Errorf("Head fields should be zero, got Len=%d Error=%d Index=%d Tag=%d", m.GetLen(), m.GetError(), m.GetIndex(), m.GetTag())
 	}
 }
 
@@ -35,22 +35,22 @@ func TestNewErr(t *testing.T) {
 	if m == nil {
 		t.Fatal("NewErr should not return nil")
 	}
-	if m.Cmd != 0 || m.Act != 0 {
-		t.Errorf("Cmd/Act want 0/0, got %d/%d", m.Cmd, m.Act)
+	if m.GetCmd() != 0 || m.GetAct() != 0 {
+		t.Errorf("Cmd/Act want 0/0, got %d/%d", m.GetCmd(), m.GetAct())
 	}
-	if m.Error != 500 {
-		t.Errorf("Error want 500, got %d", m.Error)
+	if m.GetError() != 500 {
+		t.Errorf("Error want 500, got %d", m.GetError())
 	}
 }
 
 func TestMessage_Copy(t *testing.T) {
 	dst := New(0, 0, nil)
 	old := New(5, 6, nil)
-	old.Index = 100
-	old.Tag = 3
+	old.SetIndex(100)
+	old.SetTag(3)
 	dst.Copy(old)
-	if dst.Cmd != 5 || dst.Act != 6 || dst.Index != 100 || dst.Tag != 3 {
-		t.Errorf("Copy: want Cmd=5 Act=6 Index=100 Tag=3, got Cmd=%d Act=%d Index=%d Tag=%d", dst.Cmd, dst.Act, dst.Index, dst.Tag)
+	if dst.GetCmd() != 5 || dst.GetAct() != 6 || dst.GetIndex() != 100 || dst.GetTag() != 3 {
+		t.Errorf("Copy: want Cmd=5 Act=6 Index=100 Tag=3, got Cmd=%d Act=%d Index=%d Tag=%d", dst.GetCmd(), dst.GetAct(), dst.GetIndex(), dst.GetTag())
 	}
 	dst.Copy(nil) // 不应 panic
 }

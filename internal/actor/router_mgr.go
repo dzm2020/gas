@@ -22,8 +22,8 @@ type routerManager struct {
 	routers map[reflect.Type]iface.IRouter // 按 actor 类型缓存 router
 }
 
-// GetRouterForActor 获取指定 actor 类型的 router，如果不存在则创建并注册
-func GetRouterForActor(actor iface.IActor) iface.IRouter {
+// getRouterForActor 获取指定 actor 类型的 router，如果不存在则创建并注册
+func getRouterForActor(actor iface.IActor) iface.IRouter {
 	if actor == nil {
 		return NewRouter()
 	}

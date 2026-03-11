@@ -26,7 +26,7 @@ func (l *Log) AfterDecode(_ gateiface.IAgent, msg *protocol.Message) (*protocol.
 	if msg == nil {
 		return nil, nil
 	}
-	glog.Debug("gate.recv", zap.Uint8("cmd", msg.Cmd), zap.Uint8("act", msg.Act), zap.Uint32("len", msg.Len), zap.Uint8("tag", msg.Tag))
+	glog.Debug("gate.recv", zap.Uint8("cmd", msg.GetCmd()), zap.Uint8("act", msg.GetAct()), zap.Uint32("len", msg.GetLen()), zap.Uint8("tag", msg.GetTag()))
 	return msg, nil
 }
 
@@ -34,6 +34,6 @@ func (l *Log) BeforeEncode(_ gateiface.IAgent, msg *protocol.Message) (*protocol
 	if msg == nil {
 		return nil, nil
 	}
-	glog.Debug("gate.send", zap.Uint8("cmd", msg.Cmd), zap.Uint8("act", msg.Act), zap.Uint32("len", uint32(len(msg.Data))), zap.Uint8("tag", msg.Tag))
+	glog.Debug("gate.send", zap.Uint8("cmd", msg.GetCmd()), zap.Uint8("act", msg.GetAct()), zap.Uint32("len", uint32(len(msg.Data))), zap.Uint8("tag", msg.GetTag()))
 	return msg, nil
 }

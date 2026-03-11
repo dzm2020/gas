@@ -1,10 +1,11 @@
-package lib
+package fileutil
 
 import (
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/dzm2020/gas/pkg/lib"
 	"gopkg.in/yaml.v3"
 )
 
@@ -13,7 +14,7 @@ func LoadJsonFile(path string, value interface{}) error {
 	if err != nil {
 		return err
 	}
-	return Json.Unmarshal(data, value)
+	return lib.Json.Unmarshal(data, value)
 }
 
 func LoadYamlFile(path string, value interface{}) error {

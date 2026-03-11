@@ -112,8 +112,8 @@ func TestSession_ResponseErr(t *testing.T) {
 		t.Fatalf("want Method Push, got %v", msg)
 	}
 	dec, _, _ := codec.Decode(msg.GetData())
-	if dec == nil || dec.Error != 500 {
-		t.Errorf("ResponseErr code want 500, got %d", dec.Error)
+	if dec == nil || dec.GetError() != 500 {
+		t.Errorf("ResponseErr code want 500, got %d", dec.GetError())
 	}
 }
 
@@ -131,8 +131,8 @@ func TestSession_Push(t *testing.T) {
 		t.Fatalf("want Method Push, got %v", msg)
 	}
 	dec, _, _ := codec.Decode(msg.GetData())
-	if dec == nil || dec.Cmd != 1 || dec.Act != 2 || !bytes.Equal(dec.Data, []byte("body")) {
-		t.Errorf("Push Cmd/Act/Data want 1/2/body, got %d/%d/%q", dec.Cmd, dec.Act, dec.Data)
+	if dec == nil || dec.GetCmd() != 1 || dec.GetAct() != 2 || !bytes.Equal(dec.Data, []byte("body")) {
+		t.Errorf("Push Cmd/Act/Data want 1/2/body, got %d/%d/%q", dec.GetCmd(), dec.GetAct(), dec.Data)
 	}
 }
 
@@ -182,7 +182,7 @@ func TestSession_GetMessage_SetMessage_Raw(t *testing.T) {
 	msg := protocol.New(1, 2, []byte("d"))
 	s.SetMessage(msg)
 	got := s.GetMessage()
-	if got == nil || got.Cmd != 1 || got.Act != 2 || !bytes.Equal(got.Data, []byte("d")) {
+	if got == nil || got.GetCmd() != 1 || got.GetAct() != 2 || !bytes.Equal(got.Data, []byte("d")) {
 		t.Errorf("GetMessage want Cmd=1 Act=2 Data=d, got %v", got)
 	}
 	rawOut := s.Raw()
@@ -195,7 +195,7 @@ func TestSession_GetMessage_SetMessage_Raw(t *testing.T) {
 	}
 	decoded, _ := base64.StdEncoding.DecodeString(val)
 	dec, _, _ := codec.Decode(decoded)
-	if dec == nil || dec.Cmd != 1 {
+	if dec == nil || dec.GetCmd() != 1 {
 		t.Errorf("KeyMessage decode want Cmd=1, got %v", dec)
 	}
 }

@@ -1,11 +1,12 @@
 package actor
 
 import (
+	"runtime"
+	"sync/atomic"
+
 	"github.com/dzm2020/gas/internal/iface"
 	"github.com/dzm2020/gas/pkg/glog"
 	"github.com/dzm2020/gas/pkg/lib"
-	"runtime"
-	"sync/atomic"
 
 	"go.uber.org/zap"
 )
@@ -30,7 +31,7 @@ type Mailbox struct {
 	dispatchStat atomic.Int32
 }
 
-func NewMailbox() *Mailbox {
+func newMailbox() *Mailbox {
 	m := &Mailbox{
 		queue: lib.NewMpsc(),
 	}

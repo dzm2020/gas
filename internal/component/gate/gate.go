@@ -8,6 +8,7 @@ import (
 
 	"github.com/dzm2020/gas/internal/component/gate/agent"
 	"github.com/dzm2020/gas/internal/component/gate/codec"
+	"github.com/dzm2020/gas/internal/component/gate/gateiface"
 	"github.com/dzm2020/gas/internal/component/gate/protocol"
 	"github.com/dzm2020/gas/internal/component/gate/session"
 	"github.com/dzm2020/gas/internal/iface"
@@ -23,17 +24,90 @@ var (
 	ErrNoAgent = errors.New("gate: no agent bound to connection")
 )
 
+// 网络层回调处理
+var _ network.IHandler = (*handler)(nil)
+
+type handler struct {
+	gate *Gate
+}
+
+func (h *handler) OnConnect(conn network.IConnection) error {
+	return h.gate.onConnect(conn)
+}
+
+func (h *handler) OnMessage(conn network.IConnection, data []byte) (int, error) {
+	return h.gate.onMessage(conn, data)
+}
+
+func (h *handler) OnClose(conn network.IConnection, err error) {
+	h.gate.onClose(conn, err)
+}
+
 // Gate 网关核心：实现连接建立/消息回调/关闭，并委托 Agent Actor 处理业务。
 // 连接数由 count 原子计数，超过 MaxConn 时拒绝新连接。
 type Gate struct {
 	network.EmptyHandler
-	Address string           // 监听地址，如 tcp://127.0.0.1:9000
-	Options []network.Option // 网络选项（KeepAlive、缓冲区等）
-	Factory agent.Factory    // 创建 IHandler，用于每个连接对应一个 Agent
-	MaxConn int64            // 最大连接数，超过则 OnConnect 返回错误
-	count   atomic.Int64     // 当前连接数
-	system  iface.ISystem
-	server  network.IServer
+	address       string                        // 监听地址，如 tcp://127.0.0.1:9000
+	options       []network.Option              // 网络选项（KeepAlive、缓冲区等）
+	factory       gateiface.AgentHandlerFactory // 创建 IHandler，用于每个连接对应一个 Agent
+	maximumOfConn int64                         // 最大连接数，超过则 OnConnect 返回错误
+	count         atomic.Int64                  // 当前连接数
+	system        iface.ISystem
+	server        network.IServer
+}
+
+// AppendOptions
+//
+//	@Description: AppendOptions 设置网络选项（KeepAlive、缓冲区等）。
+//	@receiver g
+//	@param options
+func (g *Gate) AppendOptions(options ...network.Option) {
+	g.options = append(g.options, options...)
+}
+
+// SetMaximumOfConn
+//
+//	@Description: SetMaximumOfConn 设置最大连接数，超过则 OnConnect 返回错误。
+//	@receiver g
+//	@param n
+func (g *Gate) SetMaximumOfConn(n int64) {
+	g.maximumOfConn = n
+}
+
+// GetConnectionCount
+//
+//	@Description: 获取连接数
+//	@receiver g
+//	@return int64
+func (g *Gate) GetConnectionCount() int64 {
+	return g.count.Load()
+}
+
+// SetSystem
+//
+//	@Description: SetSystem 设置 Actor 系统，需在 Start 前调用。
+//	@receiver g
+//	@param system
+func (g *Gate) SetSystem(system iface.ISystem) {
+	g.system = system
+}
+
+// SetAgentHandlerFactory
+//
+//	@Description: SetAgentHandlerFactory 设置每连接对应的 IHandler 工厂。
+//	@receiver g
+//	@param f
+func (g *Gate) SetAgentHandlerFactory(f gateiface.AgentHandlerFactory) {
+	g.factory = f
+}
+
+// SetAddress
+//
+//	@Description: 设置监听地址
+//	@receiver g
+//	@param address
+func (g *Gate) SetAddress(address string) {
+	g.address = address
 }
 
 // Start
@@ -43,34 +117,33 @@ type Gate struct {
 //	@param ctx
 //	@param system
 //	@return err
-func (g *Gate) Start(ctx context.Context, system iface.ISystem) (err error) {
-	g.system = system
-	g.server, err = network.NewServer(g, g.Address, g.Options...)
+func (g *Gate) Start(ctx context.Context) (err error) {
+	g.server, err = network.NewServer(&handler{gate: g}, g.address, g.options...)
 	if err != nil {
 		return
 	}
-	system.SetSessionFactory(&session.Factory{})
+	g.system.SetSessionFactory(&session.Factory{})
 	return g.server.Start()
 }
 
-// OnConnect
+// onConnect
 //
 //	@Description: 新连接时创建 Agent 并绑定 Pid。
 //	@receiver g
 //	@param entity
 //	@return error
-func (g *Gate) OnConnect(entity network.IConnection) error {
-	if g.count.Load() > g.MaxConn {
+func (g *Gate) onConnect(entity network.IConnection) error {
+	if g.maximumOfConn > 0 && g.count.Load() >= g.maximumOfConn {
 		return errors.New("too many connections")
 	}
 	g.count.Add(1)
-	pid := g.system.Spawn(agent.New(entity, g.Factory()))
+	pid := g.system.Spawn(agent.New(entity, g.factory()))
 	entity.SetContext(pid)
 	glog.Debug("网关:创建Agent", zap.Int64("entityId", entity.ID()), zap.Any("pid", pid))
 	return nil
 }
 
-// OnMessage
+// onMessage
 //
 //	@Description: 解包字节流并投递到对应 Agent，返回已处理字节数。
 //	@receiver g
@@ -78,7 +151,7 @@ func (g *Gate) OnConnect(entity network.IConnection) error {
 //	@param data
 //	@return n
 //	@return err
-func (g *Gate) OnMessage(entity network.IConnection, data []byte) (n int, err error) {
+func (g *Gate) onMessage(entity network.IConnection, data []byte) (n int, err error) {
 	var msg *protocol.Message
 	var processN int
 	for len(data) > 0 {
@@ -116,13 +189,13 @@ func (g *Gate) process(entity network.IConnection, msg *protocol.Message) (err e
 	})
 }
 
-// OnClose
+// onClose
 //
 //	@Description: 连接关闭时减计数并关闭绑定的 Agent 进程。
 //	@receiver g
 //	@param entity
 //	@param wrong
-func (g *Gate) OnClose(entity network.IConnection, wrong error) {
+func (g *Gate) onClose(entity network.IConnection, wrong error) {
 	g.count.Add(-1)
 	pid, _ := entity.Context().(*iface.Pid)
 	if pid == nil {
