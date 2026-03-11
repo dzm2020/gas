@@ -82,7 +82,6 @@ type (
 	ISession interface {
 		GetId() int64
 		Raw() *pb.Session
-		SyncValues() error // 同步values
 		SetString(key, value string)
 		GetString(key string) string
 		SetUint64(key string, value uint64)
