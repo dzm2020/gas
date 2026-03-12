@@ -15,6 +15,7 @@ import (
 	"github.com/dzm2020/gas/internal/iface"
 	"github.com/dzm2020/gas/internal/pb"
 	"github.com/dzm2020/gas/pkg/glog"
+	"github.com/dzm2020/gas/pkg/lib/uid"
 	"github.com/dzm2020/gas/pkg/lib/xerror"
 	"github.com/dzm2020/gas/pkg/network"
 	"go.uber.org/zap"
@@ -34,13 +35,13 @@ var _ gateiface.IAgent = (*Agent)(nil)
 //	@param entity
 //	@param handler
 //	@return *Agent
-func New(entity network.IConnection, handler IHandler) *Agent {
+func New(entity network.IConnection, handler gateiface.IAgentHandler) *Agent {
 	if handler == nil {
-		handler = new(Handler)
+		handler = new(gateiface.AgentHandler)
 	}
 	return &Agent{
-		entity:   entity,
-		IHandler: handler,
+		entity:        entity,
+		IAgentHandler: handler,
 	}
 }
 
@@ -49,7 +50,7 @@ var _ IRemoteHandler = (*Agent)(nil)
 // Agent 每个客户端连接对应的 Actor：持有 entity、Session、中间件链，消息经 AfterDecode 后交给 IHandler.OnRoute，Push 前经 BeforeEncode。
 type Agent struct {
 	iface.Actor
-	IHandler
+	gateiface.IAgentHandler
 	ctx         iface.IContext
 	session     *session.Session
 	entity      network.IConnection
@@ -66,14 +67,16 @@ type Agent struct {
 func (agent *Agent) OnInit(ctx iface.IContext, params []interface{}) error {
 	agent.ctx = ctx
 	entity := agent.GetEntity()
+	//  session是跨集群的所以要保证集群唯一性
+	sessionID, _ := uid.NextId()
 	agent.session = session.New(&pb.Session{
-		Id:     entity.ID(),
+		Id:     sessionID,
 		Agent:  ctx.ID(),
 		Values: make(map[string]string),
 	}, ctx)
 
 	agent.entity = entity
-	return agent.IHandler.OnInit(agent)
+	return agent.IAgentHandler.OnInit(agent)
 }
 
 // OnData
@@ -89,7 +92,7 @@ func (agent *Agent) OnData(msg *protocol.Message) (err error) {
 		return err
 	}
 	agent.session.SetMessage(msg)
-	return agent.IHandler.OnRoute(agent, msg.Data)
+	return agent.IAgentHandler.OnRoute(agent, msg.Data)
 }
 
 // OnStop
@@ -99,7 +102,7 @@ func (agent *Agent) OnData(msg *protocol.Message) (err error) {
 //	@param ctx
 //	@return error
 func (agent *Agent) OnStop(ctx iface.IContext) error {
-	return agent.IHandler.OnStop(agent)
+	return agent.IAgentHandler.OnStop(agent)
 }
 
 // GetEntity

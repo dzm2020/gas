@@ -54,15 +54,15 @@ type IAgentHandler interface {
 	OnStop(agent IAgent) error
 }
 
-// BaseAgentHandlerFactory 空实现，便于业务只重写需要的方法。
-type BaseAgentHandlerFactory struct{}
+// AgentHandler 空实现，便于业务只重写需要的方法。
+type AgentHandler struct{}
 
-func (a *BaseAgentHandlerFactory) OnInit(agent IAgent) error {
+func (a *AgentHandler) OnInit(agent IAgent) error {
 	return nil
 }
-func (a *BaseAgentHandlerFactory) OnRoute(agent IAgent, data []byte) error {
+func (a *AgentHandler) OnRoute(agent IAgent, data []byte) error {
 	return nil
 }
-func (a *BaseAgentHandlerFactory) OnStop(agent IAgent) error {
+func (a *AgentHandler) OnStop(agent IAgent) error {
 	return nil
 }

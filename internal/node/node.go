@@ -17,6 +17,7 @@ import (
 	"github.com/dzm2020/gas/pkg/lib/component"
 	"github.com/dzm2020/gas/pkg/lib/grs"
 	"github.com/dzm2020/gas/pkg/lib/serializer"
+	"github.com/dzm2020/gas/pkg/lib/uid"
 	"github.com/dzm2020/gas/pkg/lib/xerror"
 
 	"go.uber.org/zap"
@@ -113,11 +114,13 @@ func (n *Node) Startup(comps ...component.IComponent[iface.INode]) (err error) {
 		return
 	}
 
+	uid.Init(int64(n.GetID()))
+
 	glog.Info("节点启动完成", zap.String("path", n.path), zap.Strings("component", n.IManager.GetComponentNames()))
 
 	//  所有组件注册完成后,再在集群中注册节点
 	if err = n.Cluster().Register(n.Info()); err != nil {
-		return xerror.Wrapf(err, "discovery Register fail")
+		return err
 	}
 
 	// 阻塞等待进程终止信号
