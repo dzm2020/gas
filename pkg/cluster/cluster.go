@@ -33,7 +33,7 @@ type ICluster interface {
 	Deregister(memberId uint64) error
 	Update(member *discovery.Member) error
 
-	Select(name string, strategy RouteStrategy) (uint64, error)
+	Select(tag string, strategy RouteStrategy) (uint64, error)
 
 	GetById(memberId uint64) *discovery.Member
 	GetByKind(kind string) map[uint64]*discovery.Member

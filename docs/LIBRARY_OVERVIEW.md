@@ -146,18 +146,18 @@ n.Startup(
 
 | 模块 | 文档 | 简要说明 |
 |------|------|----------|
-| internal/actor | [internal-actor.md](modules/internal-actor.md) | Actor 系统、进程、Mailbox、Router、Dispatcher |
-| internal/iface | [internal-iface.md](modules/internal-iface.md) | 全局接口与类型（Pid、Message、Session、Node、System、Actor 等） |
-| internal/node | [internal-node.md](modules/internal-node.md) | 节点生命周期与 Logger/Cluster/System 组件 |
-| internal/profile | [internal-profile.md](modules/internal-profile.md) | 配置加载（Viper YAML） |
-| internal/component/gate | [internal-component-gate.md](modules/internal-component-gate.md) | 网关、Agent、Session、协议、codec、中间件 |
-| internal/component/db/redis | [internal-component-db-redis.md](modules/internal-component-db-redis.md) | Redis 多实例组件 |
-| internal/pb | [internal-pb.md](modules/internal-pb.md) | Protobuf 生成类型 |
-| pkg/cluster | [pkg-cluster.md](modules/pkg-cluster.md) | 集群通信、发现、Send/Call、Select、Broadcast |
-| pkg/discovery | [pkg-discovery.md](modules/pkg-discovery.md) | 服务发现抽象与 Consul 实现 |
-| pkg/messageQue | [pkg-messageQue.md](modules/pkg-messageQue.md) | 消息队列抽象与 NATS 实现 |
-| pkg/network | [pkg-network.md](modules/pkg-network.md) | TCP/UDP/WebSocket 与 IHandler/IConnection/IServer |
-| pkg/glog | [pkg-glog.md](modules/pkg-glog.md) | 基于 zap 的全局日志 |
-| pkg/lib | [pkg-lib.md](modules/pkg-lib.md) | 序列化、stopper、component、mpsc、xerror 等工具 |
+| internal/actor | [actor.md](modules/actor.md) | Actor 系统、进程、Mailbox、Router、Dispatcher |
+| internal/iface | [iface.md](modules/iface.md) | 全局接口与类型（Pid、Message、Session、Node、System、Actor 等） |
+| internal/node | [node.md](modules/node.md) | 节点生命周期与 Logger/Cluster/System 组件 |
+| internal/profile | [profile.md](modules/profile.md) | 配置与 Profile 组件 |
+| internal/component/gate | [gate.md](modules/gate.md) | 网关、Agent、Session、协议、codec、中间件 |
+| internal/component/db/redis | [db-redis.md](modules/db-redis.md) | Redis 多实例组件 |
+| internal/pb | [pb.md](modules/pb.md) | Protobuf 生成类型 |
+| pkg/cluster | [cluster.md](modules/cluster.md) | 集群通信、ICluster、Send/Call、Select |
+| pkg/discovery | [cluster.md](modules/cluster.md) | 服务发现，文档已合并至 cluster |
+| pkg/messageQue | [cluster.md](modules/cluster.md) | 消息队列，文档已合并至 cluster |
+| pkg/network | [network.md](modules/network.md) | TCP/UDP/WebSocket 与 IHandler/IConnection/IServer |
+| pkg/glog | [glog.md](modules/glog.md) | 基于 zap 的全局日志 |
+| pkg/lib | [lib.md](modules/lib.md) | 序列化、stopper、component、mpsc、xerror 等工具 |
 
 更多细节、接口列表与协程/结构关系见各模块文档。
