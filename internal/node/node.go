@@ -8,14 +8,15 @@ import (
 	"syscall"
 	"time"
 
+	compcluster "github.com/dzm2020/gas/internal/component/cluster"
+	complogger "github.com/dzm2020/gas/internal/component/logger"
+	compprofile "github.com/dzm2020/gas/internal/component/profile"
+	compsystem "github.com/dzm2020/gas/internal/component/system"
 	"github.com/dzm2020/gas/internal/iface"
-	com "github.com/dzm2020/gas/internal/node/component"
-	"github.com/dzm2020/gas/internal/profile"
-	"github.com/dzm2020/gas/pkg/cluster"
 	"github.com/dzm2020/gas/pkg/glog"
-	"github.com/dzm2020/gas/pkg/lib/serializer"
 	"github.com/dzm2020/gas/pkg/lib/component"
 	"github.com/dzm2020/gas/pkg/lib/grs"
+	"github.com/dzm2020/gas/pkg/lib/serializer"
 	"github.com/dzm2020/gas/pkg/lib/xerror"
 
 	"go.uber.org/zap"
@@ -48,19 +49,27 @@ func (n *Node) Info() *iface.Member {
 }
 
 func (n *Node) System() iface.ISystem {
-	c := n.GetComponent(com.SystemName)
+	c := n.GetComponent(compsystem.Name)
 	if c == nil {
 		return nil
 	}
 	return c.(iface.ISystem)
 }
 
-func (n *Node) Cluster() cluster.ICluster {
-	c := n.GetComponent(com.ClusterName)
+func (n *Node) Cluster() iface.ICluster {
+	c := n.GetComponent(compcluster.Name)
 	if c == nil {
 		return nil
 	}
-	return c.(cluster.ICluster)
+	return c.(iface.ICluster)
+}
+
+func (n *Node) Profile() iface.IProfile {
+	c := n.GetComponent(compprofile.Name)
+	if c == nil {
+		return nil
+	}
+	return c.(iface.IProfile)
 }
 
 // SetSerializer 设置序列化器
@@ -81,17 +90,12 @@ func (n *Node) Startup(comps ...component.IComponent[iface.INode]) (err error) {
 		glog.Panic("panic", zap.Any("err", err), zap.String("stack", string(debug.Stack())))
 	})
 
-	profile.Init(n.path)
-
-	if err = profile.Get("node", n.Member); err != nil {
-		return
-	}
-
-	// 注册组件
+	// 注册组件（Profile 需为首个，负责加载配置并填充 node.Member）
 	components := []component.IComponent[iface.INode]{
-		com.NewLogger(n.panicHook),
-		com.NewCluster(),
-		com.NewSystem(),
+		compprofile.New(n.path),
+		complogger.New(n.panicHook),
+		compcluster.New(),
+		compsystem.New(),
 	}
 
 	components = append(components, comps...)

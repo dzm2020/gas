@@ -10,7 +10,6 @@ require (
 	github.com/hashicorp/consul/api v1.33.0
 	github.com/nats-io/nats.go v1.47.0
 	github.com/panjf2000/ants/v2 v2.11.3
-	github.com/panjf2000/gnet/v2 v2.9.5
 	github.com/spf13/viper v1.21.0
 	github.com/vmihailenco/msgpack/v5 v5.4.1
 	go.uber.org/atomic v1.9.0

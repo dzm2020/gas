@@ -3,8 +3,6 @@ package redis
 import (
 	"context"
 
-	"github.com/dzm2020/gas/internal/profile"
-
 	"github.com/dzm2020/gas/internal/iface"
 	"github.com/dzm2020/gas/pkg/lib/component"
 )
@@ -29,7 +27,7 @@ func (c *Component) Name() string {
 // Start 启动组件，初始化所有 Redis 连接并加载脚本
 func (c *Component) Start(ctx context.Context, node iface.INode) error {
 	var configs []*Config
-	if err := profile.Get(c.Name(), &configs); err != nil {
+	if err := node.Profile().Get(c.Name(), &configs); err != nil {
 		return err
 	}
 

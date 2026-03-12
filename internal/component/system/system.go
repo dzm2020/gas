@@ -1,20 +1,17 @@
-package component
+package system
 
 import (
 	"context"
 
 	"github.com/dzm2020/gas/internal/actor"
 	"github.com/dzm2020/gas/internal/iface"
-	"github.com/dzm2020/gas/internal/profile"
 	"github.com/dzm2020/gas/pkg/lib/component"
 )
 
-const (
-	SystemName = "system"
-)
+const Name = "system"
 
-// NewSystem 创建 actor 组件
-func NewSystem() *System {
+// New 创建 actor 组件
+func New() *System {
 	return &System{}
 }
 
@@ -24,11 +21,11 @@ type System struct {
 }
 
 func (c *System) Name() string {
-	return SystemName
+	return Name
 }
 
 func (c *System) Start(ctx context.Context, node iface.INode) error {
-	if profile.IsSingleNodeMode() {
+	if node.Profile().IsSingleNodeMode() {
 		c.ISystem = actor.NewSystem(node.GetID(), node.Serializer())
 	} else {
 		c.ISystem = actor.NewClusterSystem(node.GetID(), node.Serializer(), node.Cluster())

@@ -10,6 +10,8 @@
 - **路由与调度**：Router 基于反射按方法名路由；Dispatcher 支持 goroutine 与同步两种模式；Mailbox 使用 CAS 保证单 goroutine 处理，throughput 控制公平性。
 - **优雅关闭**：Stopper 标记关闭状态；Shutdown 向所有进程投递退出任务，进程在处理完 Mailbox 后执行 OnStop 并 Unregister。
 
+todo介绍下路由回调函数格式
+
 ## 2. 接口文档
 
 ### 2.1 对外构造与入口（本包提供，接口在 iface）

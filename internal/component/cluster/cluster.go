@@ -1,46 +1,45 @@
-package component
+package cluster
 
 import (
 	"context"
 
 	"github.com/dzm2020/gas/internal/iface"
 	"github.com/dzm2020/gas/internal/pb"
-	"github.com/dzm2020/gas/internal/profile"
-	"github.com/dzm2020/gas/pkg/cluster"
+	pkgcluster "github.com/dzm2020/gas/pkg/cluster"
 	"github.com/dzm2020/gas/pkg/glog"
 	"github.com/dzm2020/gas/pkg/lib/component"
 	"github.com/dzm2020/gas/pkg/lib/xerror"
 	"go.uber.org/zap"
 )
 
-const ClusterName = "cluster"
+const Name = "cluster"
 
 type Cluster struct {
 	component.BaseComponent[iface.INode]
-	cluster.ICluster
+	pkgcluster.ICluster
 	node iface.INode
 }
 
-func NewCluster() *Cluster {
+func New() *Cluster {
 	c := &Cluster{
-		ICluster: &cluster.Cluster{},
+		ICluster: &pkgcluster.Cluster{},
 	}
 	return c
 }
 
 func (r *Cluster) Name() string {
-	return ClusterName
+	return Name
 }
 
 func (r *Cluster) Start(ctx context.Context, node iface.INode) (err error) {
-	if profile.IsSingleNodeMode() {
+	if node.Profile().IsSingleNodeMode() {
 		return
 	}
 	r.node = node
 
-	conf := profile.GetCluster()
+	conf := node.Profile().GetCluster()
 
-	r.ICluster, err = cluster.New(conf, node.Serializer())
+	r.ICluster, err = pkgcluster.New(conf, node.Serializer())
 
 	if err != nil {
 		return err

@@ -21,23 +21,23 @@ type mockConn struct {
 	context interface{}
 }
 
-func (m *mockConn) ID() int64                                    { return m.id }
-func (m *mockConn) Send(data []byte) error                       { return nil }
-func (m *mockConn) Close(error) error                            { return nil }
-func (m *mockConn) LocalAddr() string                            { return "" }
-func (m *mockConn) RemoteAddr() string                           { return "" }
-func (m *mockConn) IsStop() bool                                 { return false }
-func (m *mockConn) Type() network.ConnType                       { return 0 }
-func (m *mockConn) Context() interface{}                         { return m.context }
-func (m *mockConn) SetContext(ctx interface{})                    { m.context = ctx }
-func (m *mockConn) SetReadBuffer(int) error                       { return nil }
-func (m *mockConn) SetWriteBuffer(int) error                      { return nil }
-func (m *mockConn) SetLinger(bool, int) error                     { return nil }
-func (m *mockConn) SetNoDelay(bool) error                         { return nil }
-func (m *mockConn) SetTCPKeepAlive(bool, time.Duration) error    { return nil }
-func (m *mockConn) OnConnect(network.IConnection) error           { return nil }
+func (m *mockConn) ID() int64                                          { return m.id }
+func (m *mockConn) Send(data []byte) error                             { return nil }
+func (m *mockConn) Close(error) error                                  { return nil }
+func (m *mockConn) LocalAddr() string                                  { return "" }
+func (m *mockConn) RemoteAddr() string                                 { return "" }
+func (m *mockConn) IsStop() bool                                       { return false }
+func (m *mockConn) Type() network.ConnType                             { return 0 }
+func (m *mockConn) Context() interface{}                               { return m.context }
+func (m *mockConn) SetContext(ctx interface{})                         { m.context = ctx }
+func (m *mockConn) SetReadBuffer(int) error                            { return nil }
+func (m *mockConn) SetWriteBuffer(int) error                           { return nil }
+func (m *mockConn) SetLinger(bool, int) error                          { return nil }
+func (m *mockConn) SetNoDelay(bool) error                              { return nil }
+func (m *mockConn) SetTCPKeepAlive(bool, time.Duration) error          { return nil }
+func (m *mockConn) OnConnect(network.IConnection) error                { return nil }
 func (m *mockConn) OnMessage(network.IConnection, []byte) (int, error) { return 0, nil }
-func (m *mockConn) OnClose(network.IConnection, error)            {}
+func (m *mockConn) OnClose(network.IConnection, error)                 {}
 
 // ---------- mock ISystem ----------
 
@@ -54,28 +54,28 @@ func (m *mockSystem) Spawn(actor iface.IActor, _ ...interface{}) *iface.Pid {
 }
 func (m *mockSystem) SetSessionFactory(_ iface.ISessionFactory) {}
 func (m *mockSystem) SessionFactory() iface.ISessionFactory     { return nil }
-func (m *mockSystem) NodeId() uint64                             { return 1 }
+func (m *mockSystem) NodeId() uint64                            { return 1 }
 func (m *mockSystem) NextID() uint64                            { return 1 }
-func (m *mockSystem) Serializer() serializer.ISerializer { return nil }
-func (m *mockSystem) Add(*iface.Pid, iface.IProcess)             {}
-func (m *mockSystem) Remove(*iface.Pid) error                    { return nil }
+func (m *mockSystem) Serializer() serializer.ISerializer        { return nil }
+func (m *mockSystem) Add(*iface.Pid, iface.IProcess)            {}
+func (m *mockSystem) Remove(*iface.Pid) error                   { return nil }
 func (m *mockSystem) SubmitTask(pid *iface.Pid, task iface.Task) error {
 	m.submitTaskPid = pid
 	m.submitTaskCalled = true
 	return nil
 }
 func (m *mockSystem) SubmitTaskAndWait(*iface.Pid, iface.Task, time.Duration) error { return nil }
-func (m *mockSystem) Send(*iface.ActorMessage) error            { return nil }
-func (m *mockSystem) Call(*iface.ActorMessage) ([]byte, error)   { return nil, nil }
+func (m *mockSystem) Send(*iface.ActorMessage) error                                { return nil }
+func (m *mockSystem) Call(*iface.ActorMessage) ([]byte, error)                      { return nil, nil }
 func (m *mockSystem) GetProcess(ref interface{}) iface.IProcess {
 	if pid, ok := ref.(*iface.Pid); ok && pid != nil {
 		return &mockProcess{sys: m, pid: pid}
 	}
 	return nil
 }
-func (m *mockSystem) GetAllProcesses() []iface.IProcess   { return nil }
+func (m *mockSystem) GetAllProcesses() []iface.IProcess    { return nil }
 func (m *mockSystem) ShutdownProcess(pid *iface.Pid) error { m.shutdownPid = pid; return nil }
-func (m *mockSystem) Shutdown() error                            { return nil }
+func (m *mockSystem) Shutdown() error                      { return nil }
 
 type mockProcess struct {
 	sys *mockSystem
@@ -83,11 +83,11 @@ type mockProcess struct {
 }
 
 func (p *mockProcess) PostMessage(iface.IMessage) error { return nil }
-func (p *mockProcess) Shutdown() error                 { p.sys.shutdownPid = p.pid; return nil }
-func (m *mockSystem) Register(iface.IContext) error              { return nil }
-func (m *mockSystem) Unregister(iface.IContext) error            { return nil }
-func (m *mockSystem) Named(iface.IContext) error                 { return nil }
-func (m *mockSystem) Unname(iface.IContext) error                { return nil }
+func (p *mockProcess) Shutdown() error                  { p.sys.shutdownPid = p.pid; return nil }
+func (m *mockSystem) Register(iface.IContext) error     { return nil }
+func (m *mockSystem) Unregister(iface.IContext) error   { return nil }
+func (m *mockSystem) Named(iface.IContext) error        { return nil }
+func (m *mockSystem) Unname(iface.IContext) error       { return nil }
 
 // ---------- tests ----------
 

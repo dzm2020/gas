@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/dzm2020/gas/internal/component/gate/codec"
-	gateiface "github.com/dzm2020/gas/internal/component/gate/gateiface"
+	"github.com/dzm2020/gas/internal/component/gate/gateiface"
 	"github.com/dzm2020/gas/internal/component/gate/protocol"
 	"github.com/dzm2020/gas/internal/component/gate/session"
 	"github.com/dzm2020/gas/internal/iface"
@@ -57,7 +57,7 @@ type mockContext struct {
 func (c *mockContext) ID() *iface.Pid                                          { return c.pid }
 func (c *mockContext) Actor() iface.IActor                                     { return c.actor }
 func (c *mockContext) InvokerMessage(interface{}) error                        { return nil }
-func (c *mockContext) Serializer() serializer.ISerializer { return nil }
+func (c *mockContext) Serializer() serializer.ISerializer                      { return nil }
 func (c *mockContext) Message() *iface.ActorMessage                            { return nil }
 func (c *mockContext) Process() iface.IProcess                                 { return nil }
 func (c *mockContext) System() iface.ISystem                                   { return c.system }
@@ -68,7 +68,7 @@ func (c *mockContext) SetCallTimeout(time.Duration)                            {
 func (c *mockContext) Send(*iface.Pid, string, interface{}) error              { return nil }
 func (c *mockContext) Call(*iface.Pid, string, interface{}, interface{}) error { return nil }
 func (c *mockContext) Forward(*iface.Pid, string) error                        { return nil }
-func (c *mockContext) AfterFunc(time.Duration, iface.Task) *timer.Timer { return nil }
+func (c *mockContext) AfterFunc(time.Duration, iface.Task) *timer.Timer        { return nil }
 func (c *mockContext) Shutdown() error                                         { return nil }
 
 // ---------- record handler ----------

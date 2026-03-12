@@ -54,7 +54,7 @@
 
 通过 WithXxx 配置（如缓冲区、KeepAlive 等），见 options.go。
 
-## 3. 设计结构（协程模型与 struct 关系）
+## 3. 设计结构
 
 ### 3.1 协程模型
 
@@ -75,9 +75,7 @@ BaseServer / TCPServer / UDPServer / WebSocketServer
 Connection: 实现 IConnection，持有 conn、id、context 等
 ```
 
-- **Gate** 实现 EmptyHandler，OnConnect/OnMessage/OnClose 中操作 Agent 与 System；OnMessage 里 codec.Decode 后 SubmitTask 到 Agent。
-
 ### 3.3 依赖
 
 - 标准库 net、context、time、sync/atomic
-- gorilla/websocket、panjf2000/gnet 等（视实现而定）
+- gorilla/websocket

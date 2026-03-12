@@ -33,20 +33,20 @@ func (c *captureContext) InvokerMessage(msg interface{}) error {
 	}
 	return nil
 }
-func (c *captureContext) Serializer() serializer.ISerializer { return nil }
-func (c *captureContext) Message() *iface.ActorMessage   { return nil }
-func (c *captureContext) Actor() iface.IActor             { return nil }
-func (c *captureContext) Process() iface.IProcess         { return nil }
-func (c *captureContext) System() iface.ISystem           { return nil }
-func (c *captureContext) Named(string) error             { return nil }
-func (c *captureContext) Unname() error                  { return nil }
-func (c *captureContext) GetName() string                { return "" }
-func (c *captureContext) SetCallTimeout(time.Duration)   {}
-func (c *captureContext) Send(*iface.Pid, string, interface{}) error { return nil }
+func (c *captureContext) Serializer() serializer.ISerializer                      { return nil }
+func (c *captureContext) Message() *iface.ActorMessage                            { return nil }
+func (c *captureContext) Actor() iface.IActor                                     { return nil }
+func (c *captureContext) Process() iface.IProcess                                 { return nil }
+func (c *captureContext) System() iface.ISystem                                   { return nil }
+func (c *captureContext) Named(string) error                                      { return nil }
+func (c *captureContext) Unname() error                                           { return nil }
+func (c *captureContext) GetName() string                                         { return "" }
+func (c *captureContext) SetCallTimeout(time.Duration)                            {}
+func (c *captureContext) Send(*iface.Pid, string, interface{}) error              { return nil }
 func (c *captureContext) Call(*iface.Pid, string, interface{}, interface{}) error { return nil }
-func (c *captureContext) Forward(*iface.Pid, string) error { return nil }
-func (c *captureContext) AfterFunc(time.Duration, iface.Task) *timer.Timer { return nil }
-func (c *captureContext) Shutdown() error                { return nil }
+func (c *captureContext) Forward(*iface.Pid, string) error                        { return nil }
+func (c *captureContext) AfterFunc(time.Duration, iface.Task) *timer.Timer        { return nil }
+func (c *captureContext) Shutdown() error                                         { return nil }
 
 func (c *captureContext) getLastMsg() *iface.ActorMessage {
 	c.mu.Lock()

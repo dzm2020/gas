@@ -6,7 +6,6 @@ import (
 
 	"github.com/dzm2020/gas/internal/component/gate/gateiface"
 	"github.com/dzm2020/gas/internal/iface"
-	"github.com/dzm2020/gas/internal/profile"
 	"github.com/dzm2020/gas/pkg/lib/component"
 )
 
@@ -51,7 +50,7 @@ func (r *Component) Name() string {
 //	@return error
 func (r *Component) Start(ctx context.Context, node iface.INode) error {
 	conf := DefaultConfig()
-	if err := profile.Get(r.Name(), conf); err != nil {
+	if err := node.Profile().Get(r.Name(), conf); err != nil {
 		return err
 	}
 
