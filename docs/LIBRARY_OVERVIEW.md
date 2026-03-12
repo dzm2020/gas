@@ -80,8 +80,9 @@ import (
 )
 
 n := node.New("conf.yaml")
+factory := func() gateiface.IAgentHandler { return &MyHandler{} }
 n.Startup(
-    gate.NewComponent(), // 从 profile 读 "gate" 配置并启动
+    gate.NewComponent(factory), // 从 profile 读 "gate" 配置并启动
 )
 // Startup 会阻塞直到收到退出信号
 ```
@@ -89,16 +90,210 @@ n.Startup(
 4. **Gate 配置**（profile 中 `gate`）：  
    `address`（如 `tcp://0.0.0.0:9000`）、`max_conn`、可选 `options`；业务通过 `Factory` 返回的 IHandler 注入到 Gate。
 
-### 2.4 集群模式
+### 2.4 集群模式示例
 
-- 配置中关闭单节点模式（如 `single-node: false`），并配置 `cluster.discovery`（如 consul）、`cluster.messageQueue`（如 nats）。
-- Node 启动时会创建 Cluster 组件并 Register 本节点；System 会使用 `actor.NewClusterSystem`，跨节点 Send/Call 经 cluster 的 MQ 与 Discovery 完成。
-- 业务侧仍使用 `system.Send(msg)` / `system.Call(msg)`，目标 Pid 的 NodeId 非本节点时由 ClusterSystem 自动转发。
+配置中关闭单节点模式并配置服务发现与消息队列后，Node 会创建 Cluster 组件并注册本节点，System 使用 `ClusterSystem`，跨节点 Send/Call 经 cluster 自动完成。**集群由多个进程组成**：同一份程序，用**不同配置文件**（不同 node.id、端口、监听地址）启动多个进程，各进程向同一套 discovery/mq 注册，即形成集群。
 
-### 2.5 按需挂载组件
+**节点 1 配置**（如 `conf/node1.yaml`）：
 
-- **Redis**：`redis.NewComponent()` 加入 Startup，profile 中配置 `redis` 数组。
-- **自定义组件**：实现 `component.IComponent[iface.INode]`，在 `Start(ctx, node)` 中从 `node` 取 System/Cluster 等，并注册到 Node 的 Manager；按注册顺序启动、逆序停止。
+```yaml
+single-node: false
+
+node:
+  kind: game
+  id: 1
+  address: "127.0.0.1"
+  port: 9001
+  tags: ["gate"]
+
+cluster:
+  name: my-cluster
+  discovery:
+    type: consul
+    config: { ... }
+  messageQueue:
+    type: nats
+    config: { ... }
+
+logger: { ... }
+gate:
+  address: "tcp://0.0.0.0:9001"
+  max_conn: 10000
+```
+
+**节点 2 配置**（如 `conf/node2.yaml`）：仅 node.id、port、gate.address 等与节点 1 区分，cluster/logger 等一致。
+
+```yaml
+single-node: false
+
+node:
+  kind: game
+  id: 2
+  address: "127.0.0.1"
+  port: 9002
+  tags: ["gate"]
+
+cluster: { ... }   # 与 node1 相同
+logger: { ... }
+gate:
+  address: "tcp://0.0.0.0:9002"
+  max_conn: 10000
+```
+
+**同一份 main：通过传入的配置路径区分节点**：
+
+```go
+package main
+
+import (
+	"os"
+	"github.com/dzm2020/gas/internal/node"
+	"github.com/dzm2020/gas/internal/component/gate"
+	"github.com/dzm2020/gas/internal/component/gate/gateiface"
+)
+
+func main() {
+	configPath := "conf/node1.yaml"
+	if len(os.Args) > 1 {
+		configPath = os.Args[1]
+	}
+
+	n := node.New(configPath)
+	factory := func() gateiface.IAgentHandler {
+		return &MyHandler{}
+	}
+
+	_ = n.Startup(gate.NewComponent(factory))
+}
+```
+
+**启动多个节点**（多进程、同机或不同机）：
+
+```bash
+# 终端 1：节点 1
+./myapp conf/node1.yaml
+
+# 终端 2：节点 2
+./myapp conf/node2.yaml
+
+# 更多节点同理，或通过环境变量、flag 等传入配置路径
+```
+
+两进程启动后，会分别向 discovery 注册、订阅 MQ；业务侧使用 `system.Send(msg)` / `system.Call(msg)` 时，目标 Pid 的 NodeId 非本节点则由 ClusterSystem 自动转发到对应节点。
+
+**节点间相互通信**：在能拿到 `node` 的地方（如自定义组件、或在创建 Handler 时注入 node），用 `node.Cluster().Select(tag, strategy)` 选目标节点，再构造目标节点上的 `Pid`，通过 `ctx.Send` / `ctx.Call` 发送即可；若目标在本节点则走本地，在其它节点则自动走集群转发。
+
+示例：本节点某 Actor 向带 `"gate"` 标签的其它节点上的 Named Actor `"Worker"` 发异步消息或同步请求。
+
+```go
+import (
+	"time"
+	"github.com/dzm2020/gas/internal/iface"
+	"github.com/dzm2020/gas/pkg/cluster"
+)
+
+// 假设当前在某个 Actor 的方法里，ctx 为 IContext，且能拿到 node（如通过 struct 注入）
+func callOtherNode(ctx iface.IContext, node iface.INode, data []byte) error {
+	clu := node.Cluster()
+	if clu == nil {
+		return nil // 单节点模式
+	}
+
+	// 按 tag 选一个节点（如 "gate"），策略可选 RouteRandom、RouteRoundRobin 等
+	targetNodeId, err := clu.Select("gate", cluster.RouteRandom)
+	if err != nil {
+		return err
+	}
+
+	// 构造目标节点上的进程：按名字寻址（对方需 Named("Worker")）
+	toPid := iface.NewPidWithName("Worker", targetNodeId)
+
+	// 异步发送：不等待回复
+	if err := ctx.Send(toPid, "DoWork", data); err != nil {
+		return err
+	}
+	return nil
+}
+
+// 同步调用：等待回复或超时
+func callOtherNodeSync(ctx iface.IContext, node iface.INode, req, reply interface{}) error {
+	clu := node.Cluster()
+	if clu == nil {
+		return nil
+	}
+	targetNodeId, err := clu.Select("gate", cluster.RouteRandom)
+	if err != nil {
+		return err
+	}
+	toPid := iface.NewPidWithName("Worker", targetNodeId)
+	ctx.SetCallTimeout(5 * time.Second)
+	return ctx.Call(toPid, "DoWork", req, reply)
+}
+```
+
+- **Select**：`cluster.Select(tag, strategy)` 从 discovery 按 tag 取成员列表，用策略选一个，返回其 `nodeId`。
+- **Pid**：`iface.NewPid(nodeId, actorId)` 按进程 ID 寻址；`iface.NewPidWithName("Worker", nodeId)` 按 Named 名字寻址（目标节点上需已 `Named("Worker")`）。
+- **Send/Call**：与单节点用法一致；目标 Pid 的 NodeId 非本节点时由 ClusterSystem 经 MQ 转发到对应节点并投递到目标 Actor。
+
+### 2.5 组件注册示例
+
+Node 内置 Profile、Logger、Cluster、System 四个组件；`Startup(comps ...)` 中传入的组件会按**注册顺序**启动、**逆序**停止。
+
+**挂载 Gate**（需提供 AgentHandler 工厂）：
+
+```go
+n := node.New("conf.yaml")
+factory := func() gateiface.IAgentHandler { return &MyHandler{} }
+_ = n.Startup(gate.NewComponent(factory))
+```
+
+**挂载 Redis**（profile 中配置 `redis` 数组）：
+
+```go
+import "github.com/dzm2020/gas/internal/component/db/redis"
+
+n := node.New("conf.yaml")
+_ = n.Startup(
+	gate.NewComponent(factory),
+	redis.NewComponent(),
+)
+```
+
+**自定义组件**：实现 `IComponent[iface.INode]`，在 `Start(ctx, node)` 中从 `node` 取 System、Cluster、Profile 等使用：
+
+```go
+import (
+	"context"
+	"github.com/dzm2020/gas/internal/iface"
+	"github.com/dzm2020/gas/pkg/lib/component"
+)
+
+const MyCompName = "mycomp"
+
+type MyComponent struct {
+	component.BaseComponent[iface.INode]
+}
+
+func NewMyComponent() *MyComponent {
+	return &MyComponent{}
+}
+
+func (c *MyComponent) Name() string { return MyCompName }
+
+func (c *MyComponent) Start(ctx context.Context, node iface.INode) error {
+	// 使用 node.System()、node.Cluster()、node.Profile() 等
+	_ = node.System()
+	_ = node.Cluster()
+	return nil
+}
+
+// 使用
+n := node.New("conf.yaml")
+_ = n.Startup(
+	gate.NewComponent(factory),
+	NewMyComponent(),
+)
+```
 
 ---
 
@@ -144,20 +339,20 @@ n.Startup(
 
 ## 四、模块索引
 
-| 模块 | 文档 | 简要说明 |
-|------|------|----------|
-| internal/actor | [actor.md](modules/actor.md) | Actor 系统、进程、Mailbox、Router、Dispatcher |
-| internal/iface | [iface.md](modules/iface.md) | 全局接口与类型（Pid、Message、Session、Node、System、Actor 等） |
-| internal/node | [node.md](modules/node.md) | 节点生命周期与 Logger/Cluster/System 组件 |
+以下为各模块文档入口，接口与实现细节见对应链接。
+
+| 模块 | 文档 | 说明 |
+|------|------|------|
+| internal/actor | [actor.md](modules/actor.md) | Actor 系统、进程、Mailbox、Router、路由函数 |
+| internal/iface | [iface.md](modules/iface.md) | Pid、Message、Session、Node、System、Actor 等接口 |
+| internal/node | [node.md](modules/node.md) | 节点生命周期与内置组件 |
 | internal/profile | [profile.md](modules/profile.md) | 配置与 Profile 组件 |
 | internal/component/gate | [gate.md](modules/gate.md) | 网关、Agent、Session、协议、codec、中间件 |
-| internal/component/db/redis | [db-redis.md](modules/db-redis.md) | Redis 多实例组件 |
+| internal/component/db/redis | [db-redis.md](../tools/discard/db-redis.md) | Redis 多实例组件 |
 | internal/pb | [pb.md](modules/pb.md) | Protobuf 生成类型 |
-| pkg/cluster | [cluster.md](modules/cluster.md) | 集群通信、ICluster、Send/Call、Select |
-| pkg/discovery | [cluster.md](modules/cluster.md) | 服务发现，文档已合并至 cluster |
-| pkg/messageQue | [cluster.md](modules/cluster.md) | 消息队列，文档已合并至 cluster |
-| pkg/network | [network.md](modules/network.md) | TCP/UDP/WebSocket 与 IHandler/IConnection/IServer |
+| pkg/cluster | [cluster.md](modules/cluster.md) | ICluster、Send/Call、Select（discovery/messageQue 见该文档） |
+| pkg/network | [network.md](modules/network.md) | TCP/UDP/WebSocket、IHandler/IConnection/IServer |
 | pkg/glog | [glog.md](modules/glog.md) | 基于 zap 的全局日志 |
-| pkg/lib | [lib.md](modules/lib.md) | 序列化、stopper、component、mpsc、xerror 等工具 |
+| pkg/lib | [lib.md](lib.md) | 序列化、stopper、component、mpsc、xerror 等 |
 
-更多细节、接口列表与协程/结构关系见各模块文档。
+更多细节、接口列表与设计结构见各模块文档。

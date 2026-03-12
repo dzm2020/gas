@@ -24,12 +24,13 @@ import (
 )
 
 // New 创建节点实例
-func New(path string) *Node {
+func New(path string, configType string) *Node {
 	node := &Node{
 		Member:     new(iface.Member),
 		serializer: serializer.Json,
 		IManager:   component.NewComponentsMgr[iface.INode](),
 		path:       path,
+		configType: configType,
 	}
 	return node
 }
@@ -40,6 +41,7 @@ type Node struct {
 	*iface.Member
 	component.IManager[iface.INode]
 	path       string
+	configType string
 	serializer serializer.ISerializer
 	panicHook  func(entry zapcore.Entry)
 }
@@ -92,7 +94,7 @@ func (n *Node) Startup(comps ...component.IComponent[iface.INode]) (err error) {
 
 	// 注册组件（Profile 需为首个，负责加载配置并填充 node.Member）
 	components := []component.IComponent[iface.INode]{
-		compprofile.New(n.path),
+		compprofile.New(n.path, n.configType),
 		complogger.New(n.panicHook),
 		compcluster.New(),
 		compsystem.New(),

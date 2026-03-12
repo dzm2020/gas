@@ -8,7 +8,6 @@ import (
 	"github.com/dzm2020/gas/pkg/glog"
 	"github.com/dzm2020/gas/pkg/lib/component"
 	"github.com/spf13/viper"
-	"go.uber.org/zap"
 )
 
 const Name = "profile"
@@ -18,13 +17,14 @@ var _ iface.IProfile = (*Profile)(nil)
 // Profile 配置加载组件：持有一个 viper 实例
 type Profile struct {
 	component.BaseComponent[iface.INode]
-	path string
-	vp   *viper.Viper
+	path       string
+	configType string
+	vp         *viper.Viper
 }
 
 // New 创建配置组件，path 为配置文件路径。
-func New(path string) *Profile {
-	return &Profile{path: path}
+func New(path string, configType string) *Profile {
+	return &Profile{path: path, configType: configType}
 }
 
 func (c *Profile) Name() string {
@@ -34,6 +34,7 @@ func (c *Profile) Name() string {
 func (c *Profile) Start(ctx context.Context, node iface.INode) error {
 	c.vp = viper.New()
 	c.vp.SetConfigFile(c.path)
+	c.vp.SetConfigType(c.configType)
 	if err := c.vp.ReadInConfig(); err != nil {
 		return err
 	}
@@ -51,7 +52,7 @@ func (c *Profile) IsSingleNodeMode() bool {
 func (c *Profile) GetCluster() *cluster.Config {
 	conf := cluster.DefaultConfig()
 	if err := c.Get("cluster", conf); err != nil {
-		glog.Fatal("get cluster config", zap.Error(err))
+		return conf
 	}
 	return conf
 }
@@ -59,7 +60,7 @@ func (c *Profile) GetCluster() *cluster.Config {
 func (c *Profile) GetLogger() *glog.Config {
 	conf := glog.DefaultConfig()
 	if err := c.Get("logger", conf); err != nil {
-		glog.Fatal("get logger config", zap.Error(err))
+		return conf
 	}
 	return conf
 }
