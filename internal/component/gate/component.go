@@ -23,11 +23,11 @@ type Component struct {
 //
 //	@Description: 创建网关组件，配置由 profile 覆盖。
 //	@return *Component
-func NewComponent(factory gateiface.AgentHandlerFactory) *Component {
-	gate := &Gate{}
-	gate.SetAgentHandlerFactory(factory)
+func NewComponent(handler gateiface.IBusinessHandler) *Component {
 	c := &Component{
-		IGate: gate,
+		IGate: &Gate{
+			handler: handler,
+		},
 	}
 	return c
 }

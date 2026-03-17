@@ -40,8 +40,11 @@ type (
 
 		SubmitTask(pid *Pid, task Task) (err error)
 		SubmitTaskAndWait(pid *Pid, task Task, timeout time.Duration) (err error)
-		Send(message *ActorMessage) (err error)
-		Call(message *ActorMessage) (data []byte, err error)
+
+		SendMessage(message *ActorMessage) (err error)
+		CallMessage(message *ActorMessage) (data []byte, err error)
+		Send(from, to *Pid, methodName string, request interface{}) (err error)
+		Call(from, to *Pid, methodName string, request interface{}, reply interface{}, timeout time.Duration) (err error)
 
 		GetProcess(ref interface{}) IProcess
 		GetAllProcesses() []IProcess
@@ -64,7 +67,9 @@ type (
 		SetCallTimeout(timeout time.Duration)
 		Send(to *Pid, methodName string, request interface{}) error
 		Call(to *Pid, methodName string, request interface{}, reply interface{}) error
-		Forward(to *Pid, method string) error
+		SendMessage(message *ActorMessage) (err error)
+		CallMessage(message *ActorMessage) (data []byte, err error)
+		ForwardMessage(pid *Pid, methodName string) error
 		AfterFunc(duration time.Duration, task Task) *timer.Timer
 		Shutdown() error
 	}

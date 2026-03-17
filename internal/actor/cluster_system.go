@@ -1,8 +1,10 @@
 package actor
 
 // Package actor cluster_system.go 提供集群版 Actor 系统（ClusterSystem），在嵌入的 System 基础上
-// 通过 transport 支持跨节点消息（Send/Call）
+// 通过 transport 支持跨节点消息（SendMessage/CallMessage、Send/Call）。
 import (
+	"time"
+
 	"github.com/dzm2020/gas/internal/iface"
 	"github.com/dzm2020/gas/pkg/cluster"
 	"github.com/dzm2020/gas/pkg/lib/serializer"
@@ -35,25 +37,24 @@ func (s *ClusterSystem) isLocalMessage(message *iface.ActorMessage) bool {
 	return message.GetTo().GetNodeId() == s.NodeId()
 }
 
-// Send 发送消息：目标为本节点则走 System.Send，否则通过 transport 发往目标节点。
-func (s *ClusterSystem) Send(message *iface.ActorMessage) (err error) {
+// SendMessage 发送已构造的 ActorMessage：本节点走 System.SendMessage，跨节点走 transport。
+func (s *ClusterSystem) SendMessage(message *iface.ActorMessage) (err error) {
 	if s.isLocalMessage(message) {
-		return s.System.Send(message)
+		return s.System.SendMessage(message)
 	}
-	return s.transport.Send(message.To.NodeId, message)
+	return s.transport.Send(message.GetTo().GetNodeId(), message)
 }
 
-// Call 同步调用：目标为本节点则走 System.Call，否则通过 transport 发往目标节点并等待响应。
-func (s *ClusterSystem) Call(message *iface.ActorMessage) (data []byte, err error) {
+// CallMessage 同步发送已构造的 ActorMessage：本节点走 System.CallMessage，跨节点走 transport。
+func (s *ClusterSystem) CallMessage(message *iface.ActorMessage) (data []byte, err error) {
 	timeout := timer.DeadlineToTimeout(message.GetDeadline(), 0)
 	if s.isLocalMessage(message) {
-		return s.System.Call(message)
+		return s.System.CallMessage(message)
 	}
-	data, err = s.transport.Call(message.To.NodeId, message, timeout)
+	data, err = s.transport.Call(message.GetTo().GetNodeId(), message, timeout)
 	if err != nil {
 		return nil, err
 	}
-	//  解析返回值
 	response := &iface.Response{}
 	if err = s.Serializer().Unmarshal(data, response); err != nil {
 		return nil, err
@@ -62,4 +63,31 @@ func (s *ClusterSystem) Call(message *iface.ActorMessage) (data []byte, err erro
 		return nil, response.GetError()
 	}
 	return response.GetData(), nil
+}
+
+// Send 便捷版：构造消息后发送，与 IContext.Send 参数形式一致。
+func (s *ClusterSystem) Send(from, to *iface.Pid, methodName string, request interface{}) error {
+	bin, err := s.Serializer().Marshal(request)
+	if err != nil {
+		return err
+	}
+	message := iface.NewActorMessage(from, to, methodName, bin)
+	message.Async = true
+	return s.SendMessage(message)
+}
+
+// Call 便捷版：构造消息后同步调用，响应反序列化到 reply。超时由 SetCallTimeout 设置。
+func (s *ClusterSystem) Call(from, to *iface.Pid, methodName string, request interface{}, reply interface{}, timeout time.Duration) error {
+	bin, err := s.Serializer().Marshal(request)
+	if err != nil {
+		return err
+	}
+	message := iface.NewActorMessage(from, to, methodName, bin)
+	message.Async = false
+	message.Deadline = time.Now().Add(timeout).Unix()
+	data, err := s.CallMessage(message)
+	if err != nil {
+		return err
+	}
+	return s.Serializer().Unmarshal(data, reply)
 }

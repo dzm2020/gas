@@ -35,13 +35,13 @@ var _ gateiface.IAgent = (*Agent)(nil)
 //	@param entity
 //	@param handler
 //	@return *Agent
-func New(entity network.IConnection, handler gateiface.IAgentHandler) *Agent {
+func New(entity network.IConnection, handler gateiface.IBusinessHandler) *Agent {
 	if handler == nil {
 		handler = new(gateiface.AgentHandler)
 	}
 	return &Agent{
-		entity:        entity,
-		IAgentHandler: handler,
+		entity:           entity,
+		IBusinessHandler: handler,
 	}
 }
 
@@ -50,7 +50,7 @@ var _ IRemoteHandler = (*Agent)(nil)
 // Agent 每个客户端连接对应的 Actor：持有 entity、Session、中间件链，消息经 AfterDecode 后交给 IHandler.OnRoute，Push 前经 BeforeEncode。
 type Agent struct {
 	iface.Actor
-	gateiface.IAgentHandler
+	gateiface.IBusinessHandler
 	ctx         iface.IContext
 	session     *session.Session
 	entity      network.IConnection
@@ -76,7 +76,7 @@ func (agent *Agent) OnInit(ctx iface.IContext, params []interface{}) error {
 	}, ctx)
 
 	agent.entity = entity
-	return agent.IAgentHandler.OnInit(agent)
+	return agent.IBusinessHandler.OnInit(agent)
 }
 
 // OnData
@@ -91,8 +91,19 @@ func (agent *Agent) OnData(msg *protocol.Message) (err error) {
 	if err != nil || msg == nil {
 		return err
 	}
+
+	agent.prepareRequest(msg)
+
+	return agent.IBusinessHandler.OnRoute(agent, msg.Data)
+}
+
+func (agent *Agent) prepareRequest(msg *protocol.Message) {
 	agent.session.SetMessage(msg)
-	return agent.IAgentHandler.OnRoute(agent, msg.Data)
+
+	actorMessage := agent.ctx.Message()
+	actorMessage.To = agent.ctx.ID()
+	actorMessage.Data = msg.Data
+	actorMessage.Session = agent.session.Raw()
 }
 
 // OnStop
@@ -102,7 +113,7 @@ func (agent *Agent) OnData(msg *protocol.Message) (err error) {
 //	@param ctx
 //	@return error
 func (agent *Agent) OnStop(ctx iface.IContext) error {
-	return agent.IAgentHandler.OnStop(agent)
+	return agent.IBusinessHandler.OnStop(agent)
 }
 
 // GetEntity

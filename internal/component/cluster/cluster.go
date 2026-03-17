@@ -77,10 +77,10 @@ func (r *Cluster) OnMessage(data []byte, response func(data []byte) error) {
 
 	system := r.node.System()
 	if msg.GetAsync() {
-		err = system.Send(msg)
+		err = system.SendMessage(msg)
 	} else {
-		//  调用本地actor
-		responseData, responseErr := system.Call(msg)
+		//  调用本地 actor（传输层已有完整 Message，使用 CallMessage）
+		responseData, responseErr := system.CallMessage(msg)
 		//  打包结果
 		responseMessage := iface.NewResponse(responseData, responseErr)
 		responseData, err = r.node.Serializer().Marshal(responseMessage)

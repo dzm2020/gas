@@ -9,9 +9,9 @@ import (
 	"github.com/dzm2020/gas/internal/iface"
 	"github.com/dzm2020/gas/pkg/glog"
 	"github.com/dzm2020/gas/pkg/lib/serializer"
+	"github.com/dzm2020/gas/pkg/lib/stopper"
 	"github.com/dzm2020/gas/pkg/lib/timer"
 	"github.com/dzm2020/gas/pkg/lib/waiter"
-	"github.com/dzm2020/gas/pkg/lib/stopper"
 	"github.com/dzm2020/gas/pkg/lib/xerror"
 
 	"github.com/duke-git/lancet/v2/maputil"
@@ -184,24 +184,51 @@ func (s *System) Unname(ctx iface.IContext) error {
 	return nil
 }
 
-// Send 向目标进程异步发送消息（仅本节点）。
-func (s *System) Send(message *iface.ActorMessage) error {
-	return s.sendToProcess(message.To, message)
+// SendMessage 向目标进程异步发送已构造的 ActorMessage（仅本节点）。
+func (s *System) SendMessage(message *iface.ActorMessage) error {
+	return s.sendToProcess(message.GetTo(), message)
 }
 
-// Call 向目标进程同步发送消息并等待响应，超时由 message.Deadline 决定。
-func (s *System) Call(message *iface.ActorMessage) (data []byte, err error) {
-timeout := timer.DeadlineToTimeout(message.GetDeadline(), 0)
+// CallMessage 向目标进程同步发送已构造的 ActorMessage 并等待响应，超时由 message.Deadline 决定。
+func (s *System) CallMessage(message *iface.ActorMessage) (data []byte, err error) {
+	timeout := timer.DeadlineToTimeout(message.GetDeadline(), 0)
 	w := waiter.NewChanWaiter[[]byte](timeout)
 	message.SetResponse(func(bin []byte, e error) {
 		w.Done(bin, e)
 	})
-	if err = s.sendToProcess(message.To, message); err != nil {
+	if err = s.sendToProcess(message.GetTo(), message); err != nil {
 		w.Done(nil, err)
 		return
 	}
 	data, err = w.Wait()
 	return
+}
+
+// Send 便捷版：按 from/to/methodName/request 构造消息并异步发送。
+func (s *System) Send(from, to *iface.Pid, methodName string, request interface{}) error {
+	data, err := s.serializer.Marshal(request)
+	if err != nil {
+		return err
+	}
+	message := iface.NewActorMessage(from, to, methodName, data)
+	message.Async = true
+	return s.SendMessage(message)
+}
+
+// Call 便捷版：按 from/to/methodName/request 构造消息并同步调用，响应反序列化到 reply。超时由 SetCallTimeout 设置。
+func (s *System) Call(from, to *iface.Pid, methodName string, request interface{}, reply interface{}, timeout time.Duration) error {
+	data, err := s.serializer.Marshal(request)
+	if err != nil {
+		return err
+	}
+	message := iface.NewActorMessage(from, to, methodName, data)
+	message.Async = false
+	message.Deadline = time.Now().Add(timeout).Unix()
+	respData, err := s.CallMessage(message)
+	if err != nil {
+		return err
+	}
+	return s.serializer.Unmarshal(respData, reply)
 }
 
 // SubmitTask 向指定进程投递异步任务。

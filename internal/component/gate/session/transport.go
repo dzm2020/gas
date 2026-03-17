@@ -42,7 +42,7 @@ func (m *transport) send(to *iface.Pid, method string, bin []byte) error {
 	if iface.EqualPid(to, m.ctx.ID()) {
 		return m.ctx.InvokerMessage(msg)
 	} else {
-		return m.ctx.System().Send(msg)
+		return m.ctx.System().SendMessage(msg)
 	}
 }
 

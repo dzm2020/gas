@@ -15,7 +15,6 @@ type IGate interface {
 	SetMaximumOfConn(n int64)
 	GetConnectionCount() int64
 	SetSystem(system iface.ISystem)
-	SetAgentHandlerFactory(f AgentHandlerFactory)
 	SetAddress(address string)
 	Start(ctx context.Context) (err error)
 	Stop(ctx context.Context) error
@@ -44,11 +43,8 @@ type IMiddleware interface {
 	BeforeEncode(agent IAgent, msg *protocol.Message) (*protocol.Message, error)
 }
 
-// AgentHandlerFactory 创建每个连接对应的 IHandler，由 Gate 在 OnConnect 时调用。
-type AgentHandlerFactory func() IAgentHandler
-
-// IAgentHandler 业务侧实现的接口：初始化、按消息路由、停止时清理。
-type IAgentHandler interface {
+// IBusinessHandler 业务侧实现的接口：初始化、按消息路由、停止时清理。
+type IBusinessHandler interface {
 	OnInit(agent IAgent) error
 	OnRoute(agent IAgent, data []byte) error
 	OnStop(agent IAgent) error

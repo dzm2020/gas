@@ -32,6 +32,8 @@ type (
 		IMember
 		component.IManager[INode]
 		Info() *Member
+		SetConfigPath(path string)
+		SetConfigType(typ string)
 		Serializer() serializer.ISerializer
 		SetSerializer(ser serializer.ISerializer)
 		System() ISystem

@@ -13,6 +13,7 @@ import (
 	"github.com/dzm2020/gas/internal/component/gate/session"
 	"github.com/dzm2020/gas/internal/iface"
 	"github.com/dzm2020/gas/pkg/glog"
+	"github.com/dzm2020/gas/pkg/lib/reflectutil"
 	"github.com/dzm2020/gas/pkg/network"
 
 	"go.uber.org/atomic"
@@ -25,21 +26,21 @@ var (
 )
 
 // 网络层回调处理
-var _ network.IHandler = (*handler)(nil)
+var _ network.IHandler = (*gateHandler)(nil)
 
-type handler struct {
+type gateHandler struct {
 	gate *Gate
 }
 
-func (h *handler) OnConnect(conn network.IConnection) error {
+func (h *gateHandler) OnConnect(conn network.IConnection) error {
 	return h.gate.onConnect(conn)
 }
 
-func (h *handler) OnMessage(conn network.IConnection, data []byte) (int, error) {
+func (h *gateHandler) OnMessage(conn network.IConnection, data []byte) (int, error) {
 	return h.gate.onMessage(conn, data)
 }
 
-func (h *handler) OnClose(conn network.IConnection, err error) {
+func (h *gateHandler) OnClose(conn network.IConnection, err error) {
 	h.gate.onClose(conn, err)
 }
 
@@ -47,11 +48,11 @@ func (h *handler) OnClose(conn network.IConnection, err error) {
 // 连接数由 count 原子计数，超过 MaxConn 时拒绝新连接。
 type Gate struct {
 	network.EmptyHandler
-	address       string                        // 监听地址，如 tcp://127.0.0.1:9000
-	options       []network.Option              // 网络选项（KeepAlive、缓冲区等）
-	factory       gateiface.AgentHandlerFactory // 创建 IHandler，用于每个连接对应一个 Agent
-	maximumOfConn int64                         // 最大连接数，超过则 OnConnect 返回错误
-	count         atomic.Int64                  // 当前连接数
+	address       string                     // 监听地址，如 tcp://127.0.0.1:9000
+	options       []network.Option           // 网络选项（KeepAlive、缓冲区等）
+	handler       gateiface.IBusinessHandler // 创建 IHandler，用于每个连接对应一个 Agent
+	maximumOfConn int64                      // 最大连接数，超过则 OnConnect 返回错误
+	count         atomic.Int64               // 当前连接数
 	system        iface.ISystem
 	server        network.IServer
 }
@@ -92,15 +93,6 @@ func (g *Gate) SetSystem(system iface.ISystem) {
 	g.system = system
 }
 
-// SetAgentHandlerFactory
-//
-//	@Description: SetAgentHandlerFactory 设置每连接对应的 IHandler 工厂。
-//	@receiver g
-//	@param f
-func (g *Gate) SetAgentHandlerFactory(f gateiface.AgentHandlerFactory) {
-	g.factory = f
-}
-
 // SetAddress
 //
 //	@Description: 设置监听地址
@@ -118,7 +110,7 @@ func (g *Gate) SetAddress(address string) {
 //	@param system
 //	@return err
 func (g *Gate) Start(ctx context.Context) (err error) {
-	g.server, err = network.NewServer(&handler{gate: g}, g.address, g.options...)
+	g.server, err = network.NewServer(&gateHandler{gate: g}, g.address, g.options...)
 	if err != nil {
 		return
 	}
@@ -137,7 +129,8 @@ func (g *Gate) onConnect(entity network.IConnection) error {
 		return errors.New("too many connections")
 	}
 	g.count.Add(1)
-	pid := g.system.Spawn(agent.New(entity, g.factory()))
+	handler := reflectutil.NewInstance(g.handler).(gateiface.IBusinessHandler)
+	pid := g.system.Spawn(agent.New(entity, handler))
 	entity.SetContext(pid)
 	glog.Debug("网关:创建Agent", zap.Int64("entityId", entity.ID()), zap.Any("pid", pid))
 	return nil

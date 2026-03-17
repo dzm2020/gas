@@ -25,14 +25,15 @@ import (
 )
 
 // New 创建节点实例
-func New(path string, configType string) *Node {
+func New() *Node {
 	node := &Node{
 		Member:     new(iface.Member),
 		serializer: serializer.Json,
 		IManager:   component.NewComponentsMgr[iface.INode](),
-		path:       path,
-		configType: configType,
+		path:       "config.yml",
+		configType: "yaml",
 	}
+	node.ctx, node.cancel = context.WithCancel(context.Background())
 	return node
 }
 
@@ -45,10 +46,20 @@ type Node struct {
 	configType string
 	serializer serializer.ISerializer
 	panicHook  func(entry zapcore.Entry)
+	ctx        context.Context
+	cancel     context.CancelFunc
 }
 
 func (n *Node) Info() *iface.Member {
 	return n.Member
+}
+
+func (n *Node) SetConfigPath(path string) {
+	n.path = path
+}
+
+func (n *Node) SetConfigType(typ string) {
+	n.configType = typ
 }
 
 func (n *Node) System() iface.ISystem {
@@ -79,9 +90,11 @@ func (n *Node) Profile() iface.IProfile {
 func (n *Node) SetSerializer(ser serializer.ISerializer) {
 	n.serializer = ser
 }
+
 func (n *Node) SetPanicHook(hook func(entry zapcore.Entry)) {
 	n.panicHook = hook
 }
+
 func (n *Node) Serializer() serializer.ISerializer {
 	return n.serializer
 }
@@ -109,7 +122,7 @@ func (n *Node) Startup(comps ...component.IComponent[iface.INode]) (err error) {
 	}
 
 	//  启动组件
-	if err = n.IManager.Start(context.Background(), n); err != nil {
+	if err = n.IManager.Start(n.ctx, n); err != nil {
 		glog.Error("组件启动失败", zap.Error(err))
 		return
 	}
@@ -118,7 +131,7 @@ func (n *Node) Startup(comps ...component.IComponent[iface.INode]) (err error) {
 
 	glog.Info("节点启动完成", zap.String("path", n.path), zap.Strings("component", n.IManager.GetComponentNames()))
 
-	//  所有组件注册完成后,再在集群中注册节点
+	//  所有组件注册完成后,在集群中注册节点
 	if err = n.Cluster().Register(n.Info()); err != nil {
 		return err
 	}
@@ -135,12 +148,12 @@ func (n *Node) Startup(comps ...component.IComponent[iface.INode]) (err error) {
 func (n *Node) shutdown() error {
 	defer glog.Info("节点停止运行完成")
 	glog.Info("节点开始停止运行")
-	if err := n.IManager.Stop(context.Background()); err != nil {
+	if err := n.IManager.Stop(n.ctx); err != nil {
 		glog.Error("组件停止失败", zap.Error(err))
 		return err
 	}
-	shutdownTimeout := 30 * time.Second
-	timeoutCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
-	defer cancel()
+	timeout := 30 * time.Second
+	timeoutCtx, _ := context.WithTimeout(n.ctx, timeout)
+	defer n.cancel()
 	return grs.Shutdown(timeoutCtx)
 }

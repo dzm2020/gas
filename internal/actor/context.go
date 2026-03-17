@@ -79,7 +79,11 @@ func (a *actorContext) AfterFunc(duration time.Duration, task iface.Task) *timer
 func (a *actorContext) Message() *iface.ActorMessage {
 	return a.msg
 }
+
 func (a *actorContext) InvokerMessage(msg interface{}) error {
+	//  重置下消息
+	a.msg = &iface.ActorMessage{Message: &pb.Message{}}
+	//  处理消息
 	switch m := msg.(type) {
 	case *iface.TaskMessage:
 		return m.Task(a)
@@ -118,49 +122,30 @@ func (a *actorContext) execHandler(msg *pb.Message) ([]byte, error) {
 }
 
 func (a *actorContext) Send(pid *iface.Pid, methodName string, request interface{}) (err error) {
-	var data []byte
-	data, err = a.serializer.Marshal(request)
-	if err != nil {
-		return
-	}
-
-	message := iface.NewActorMessage(a.pid, pid, methodName, data)
-	message.Async = true
-	return a.system.Send(message)
+	return a.system.Send(a.pid, pid, methodName, request)
 }
 
 func (a *actorContext) SetCallTimeout(timeout time.Duration) {
 	a.timeout = timeout
 }
 
-// Call 带超时的同步调用
+// Call 带超时的同步调用（超时由 SetCallTimeout 设置，未设置时使用系统默认）
 func (a *actorContext) Call(to *iface.Pid, methodName string, request interface{}, reply interface{}) (err error) {
-	var data []byte
-	data, err = a.serializer.Marshal(request)
-	if err != nil {
-		return
-	}
-
-	message := iface.NewActorMessage(a.pid, to, methodName, data)
-	message.Deadline = time.Now().Add(a.timeout).Unix()
-	message.Async = false
-
-	data, err = a.system.Call(message)
-	if err != nil {
-		return
-	}
-	return a.serializer.Unmarshal(data, reply)
+	return a.system.Call(a.pid, to, methodName, request, reply, a.timeout)
 }
 
-func (a *actorContext) Forward(to *iface.Pid, method string) error {
-	if a.Message() == nil {
-		return ErrMessageIsNil
-	}
-	message := convertor.DeepClone(a.Message())
-	message.To = to
-	message.Method = method
+func (a *actorContext) SendMessage(message *iface.ActorMessage) (err error) {
+	return a.system.SendMessage(message)
+}
+func (a *actorContext) CallMessage(message *iface.ActorMessage) (data []byte, err error) {
+	return a.system.CallMessage(message)
+}
 
-	return a.system.Send(message)
+func (a *actorContext) ForwardMessage(pid *iface.Pid, methodName string) error {
+	msg := a.Message()
+	msg.To = pid
+	msg.Method = methodName
+	return a.system.SendMessage(msg)
 }
 
 func (a *actorContext) Shutdown() error {
