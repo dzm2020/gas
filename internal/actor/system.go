@@ -3,7 +3,6 @@ package actor
 // system.go 实现单节点 Actor 系统（System）：进程创建与注册、名字管理、本地消息与任务派发、优雅关闭。
 import (
 	"errors"
-	"sync/atomic"
 	"time"
 
 	"github.com/dzm2020/gas/internal/iface"
@@ -11,6 +10,7 @@ import (
 	"github.com/dzm2020/gas/pkg/lib/serializer"
 	"github.com/dzm2020/gas/pkg/lib/stopper"
 	"github.com/dzm2020/gas/pkg/lib/timer"
+	"github.com/dzm2020/gas/pkg/lib/uid"
 	"github.com/dzm2020/gas/pkg/lib/waiter"
 	"github.com/dzm2020/gas/pkg/lib/xerror"
 
@@ -68,10 +68,10 @@ func spawn(s iface.ISystem, actor iface.IActor, args ...interface{}) *iface.Pid 
 var _ iface.ISystem = (*System)(nil)
 
 // NewSystem 构造本节点 Actor 系统，node 用于生成 Pid 与获取节点信息。
+// ActorId 由 pkg/lib/uid 雪花算法生成，需在 Spawn 前调用 uid.Init(workerId)（Node 启动时已调用）。
 func NewSystem(selfNodeID uint64, ser serializer.ISerializer) *System {
 	return &System{
 		selfNodeID: selfNodeID,
-		autoId:     atomic.Uint64{},
 		serializer: ser,
 		IdDict:     maputil.NewConcurrentMap[uint64, iface.IContext](10),
 		nameDict:   maputil.NewConcurrentMap[string, iface.IContext](10),
@@ -79,10 +79,10 @@ func NewSystem(selfNodeID uint64, ser serializer.ISerializer) *System {
 }
 
 // System 单节点 Actor 系统：维护进程表与名字表，负责本节点内 Spawn/消息/任务/关闭。
+// ActorId 使用雪花算法（uid）生成，全局唯一且节点重启后不重用，避免 B 重启后 A 持旧 Pid 误路由。
 type System struct {
 	stopper.Stopper
 	selfNodeID     uint64
-	autoId         atomic.Uint64
 	serializer     serializer.ISerializer
 	IdDict         *maputil.ConcurrentMap[uint64, iface.IContext] // ActorId -> IContext
 	nameDict       *maputil.ConcurrentMap[string, iface.IContext] // 名字 -> IContext
@@ -90,7 +90,12 @@ type System struct {
 }
 
 func (s *System) NextID() uint64 {
-	return s.autoId.Add(1)
+	// 使用分布式UID,避免节点重启导致消息路由错误
+	id, err := uid.NextId()
+	if err != nil {
+		glog.Panic("雪花算法生成 ActorId 失败", zap.Error(err))
+	}
+	return uint64(id)
 }
 func (s *System) NodeId() uint64 {
 	return s.selfNodeID
