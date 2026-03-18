@@ -15,7 +15,8 @@ import (
 )
 
 // newBaseConn 初始化基类连接
-// 创建并初始化一个 baseConn 实例，设置所有必要的字段和缓冲区
+// 创建并初始化一个 baseConn 实例，设置所有必要的字段和缓冲区。
+// connMgr 为所属 Server 的连接管理器，关闭时从其中移除；可为 nil（如测试场景）。
 //
 // 参数:
 //   - ctx: 上下文，用于控制连接的生命周期
@@ -24,11 +25,12 @@ import (
 //   - conn: 底层的网络连接
 //   - remoteAddr: 远程地址
 //   - options: 连接选项配置
+//   - connMgr: 所属 Server 的 ConnManager，关闭时 Remove 本连接；nil 则不注册到任何 manager
 //
 // 返回值:
 //   - *baseConn: 初始化完成的连接基类实例
 func newBaseConn(ctx context.Context, network string,
-	typ ConnType, conn net.Conn, remoteAddr net.Addr, options *Options) *baseConn {
+	typ ConnType, conn net.Conn, remoteAddr net.Addr, options *Options, connMgr *ConnManager) *baseConn {
 	bc := &baseConn{
 		id:          genConnID(),
 		network:     network,
@@ -40,6 +42,7 @@ func newBaseConn(ctx context.Context, network string,
 		sendChan:    make(chan []byte, options.SendChanSize),
 		writeBuffer: buffer.New(options.SendBufferSize),
 		readBuffer:  buffer.New(options.ReadBufSize),
+		connMgr:     connMgr,
 	}
 	bc.ctx, bc.cancel = context.WithCancel(ctx)
 	glog.Info("新建网络连接", zap.Int64("connectionId", bc.ID()),
@@ -69,6 +72,7 @@ type baseConn struct {
 	remoteAddr      net.Addr           // 远程地址
 	writeBuffer     buffer.IBuffer     // 写缓冲区，用于批量写入优化
 	readBuffer      buffer.IBuffer     // 读缓冲区，用于处理粘包
+	connMgr         *ConnManager       // 所属 Server 的连接管理器，关闭时从此移除
 }
 
 // ID 返回连接的唯一ID
@@ -357,7 +361,9 @@ func (b *baseConn) Close(connection IConnection, err error) {
 		return
 	}
 	b.OnClose(connection, err)
-	RemoveConnection(connection)
+	if b.connMgr != nil {
+		b.connMgr.Remove(connection)
+	}
 	b.cancel()
 	return
 }

@@ -11,25 +11,26 @@ import (
 // ------------------------------ UDP虚拟连接 ------------------------------
 
 type UDPConnection struct {
-	*baseConn  // 嵌入基类
-	remoteAddr *net.UDPAddr
-	conn       *net.UDPConn // 底层UDP连接（全局共享）
-	connKey    string       // 连接键值（用于从管理器中移除）
-	rcvChan    chan []byte
-	sendChan   chan<- *udpPacket
+	*baseConn     // 嵌入基类
+	remoteAddr    *net.UDPAddr
+	conn          *net.UDPConn // 底层UDP连接（由 UDPServer 共享）
+	connKey       string       // 连接键值（用于从管理器中移除）
+	rcvChan       chan []byte
+	sendChan      chan<- *udpPacket
+	udpConnMgr    *ConnManager // 与 baseConn.connMgr 同一实例，用于 RemoveUDP
 }
 
 func newUDPConnection(ctx context.Context, conn *net.UDPConn, typ ConnType, remoteAddr *net.UDPAddr, server *UDPServer) *UDPConnection {
-	base := newBaseConn(ctx, "udp", typ, conn, remoteAddr, server.options)
-
+	base := newBaseConn(ctx, "udp", typ, conn, remoteAddr, server.options, server.connMgr)
 	connKey := remoteAddr.String()
 	udpConn := &UDPConnection{
-		baseConn:   base,
-		remoteAddr: remoteAddr,
-		conn:       conn,
-		connKey:    connKey,
-		rcvChan:    make(chan []byte, server.options.UdpRcvChanSize),
-		sendChan:   server.sendChan,
+		baseConn:    base,
+		remoteAddr:  remoteAddr,
+		conn:        conn,
+		connKey:     connKey,
+		rcvChan:     make(chan []byte, server.options.UdpRcvChanSize),
+		sendChan:    server.sendChan,
+		udpConnMgr:  server.connMgr,
 	}
 	return udpConn
 }
@@ -86,8 +87,9 @@ func (c *UDPConnection) Close(err error) (w error) {
 	if !c.Stop() {
 		return ErrConnectionClosed
 	}
-
-	RemoveUDPConnection(c.connKey)
+	if c.udpConnMgr != nil {
+		c.udpConnMgr.RemoveUDP(c.connKey)
+	}
 	c.baseConn.Close(c, err)
 
 	glog.Info("UDP连接断开", zap.Int64("connectionId", c.ID()), zap.Error(err))

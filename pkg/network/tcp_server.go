@@ -71,9 +71,9 @@ func (s *TCPServer) newTcpCon(conn net.Conn) {
 		}
 		return
 	}
-	connection := newTCPConnection(s.ctx, tcpCon, Accept, s.options)
+	connection := newTCPConnection(s.ctx, tcpCon, Accept, s.options, s.connMgr)
 	connection.SetHandler(s.handler)
-	AddConnection(connection)
+	s.connMgr.Add(connection)
 
 	s.waitGroup.Add(1)
 	grs.Go(func(ctx context.Context) {

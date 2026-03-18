@@ -15,8 +15,8 @@ type WebSocketConnection struct {
 	conn      *websocket.Conn
 }
 
-func newWebSocketConnection(ctx context.Context, conn *websocket.Conn, typ ConnType, options *Options) *WebSocketConnection {
-	base := newBaseConn(ctx, "ws", typ, conn.NetConn(), conn.RemoteAddr(), options)
+func newWebSocketConnection(ctx context.Context, conn *websocket.Conn, typ ConnType, options *Options, connMgr *ConnManager) *WebSocketConnection {
+	base := newBaseConn(ctx, "ws", typ, conn.NetConn(), conn.RemoteAddr(), options, connMgr)
 	return &WebSocketConnection{
 		baseConn: base,
 		conn:     conn,

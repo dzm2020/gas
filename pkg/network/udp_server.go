@@ -103,7 +103,7 @@ func (s *UDPServer) readLoop() {
 		}
 
 		connKey := remoteAddrCopy.String()
-		udpConn, exists := GetUDPConnection(connKey)
+		udpConn, exists := s.connMgr.GetUDP(connKey)
 		if !exists {
 			udpConn = s.addConnection(connKey, remoteAddrCopy)
 		}
@@ -134,20 +134,18 @@ func (s *UDPServer) writeLoop() {
 
 func (s *UDPServer) addConnection(connKey string, remoteAddr *net.UDPAddr) *UDPConnection {
 	// 双重检查，避免并发创建
-	udpConn, exists := GetUDPConnection(connKey)
+	udpConn, exists := s.connMgr.GetUDP(connKey)
 	if exists {
 		return udpConn
 	}
-
 	udpConn = newUDPConnection(s.ctx, s.conn, Accept, remoteAddr, s)
-
 	// 双重检查：如果添加时已存在，使用已存在的连接
-	existingConn, added := AddUDPConnection(connKey, udpConn)
+	existingConn, added := s.connMgr.AddUDP(connKey, udpConn)
 	if !added {
 		return existingConn
 	}
 	udpConn.SetHandler(s.handler)
-	AddConnection(udpConn)
+	s.connMgr.Add(udpConn)
 
 	// 只有成功添加后才启动 goroutine
 	s.waitGroup.Add(1)

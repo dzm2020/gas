@@ -16,6 +16,7 @@ func newBaseServer(network, address string, handler IHandler, option ...Option) 
 		address:      address,
 		protoAddress: fmt.Sprintf("%s:%s", network, address),
 		handler:      handler,
+		connMgr:      NewConnManager(),
 	}
 	server.ctx, server.cancel = context.WithCancel(context.Background())
 	return server
@@ -30,6 +31,7 @@ type baseServer struct {
 	waitGroup        sync.WaitGroup
 	ctx              context.Context
 	cancel           context.CancelFunc
+	connMgr          *ConnManager // 本实例连接管理，避免多 Server 共用全局
 }
 
 func (s *baseServer) Addr() string {

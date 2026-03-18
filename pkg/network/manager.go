@@ -5,113 +5,118 @@ import (
 	"sync/atomic"
 )
 
-var (
+// ConnManager 按服务器实例管理连接，避免多 Server 共用包级全局导致互相干扰。
+// 每个 baseServer 持有一个 ConnManager，创建连接时传入，关闭时从本实例的 manager 移除。
+type ConnManager struct {
 	mu          sync.RWMutex
-	connections = make(map[int64]IConnection) // key: 连接ID, value: 连接对象
-	count       atomic.Int64                   // 连接数量（原子操作，用于快速查询）
+	connections map[int64]IConnection
+	count       atomic.Int64
 
-	// UDP连接管理
-	udpConnections = make(map[string]*UDPConnection) // key: 地址字符串, value: UDP连接对象
-	udpConnMutex   sync.RWMutex                      // 保护udpConnections并发
-)
+	udpMu          sync.RWMutex
+	udpConnections map[string]*UDPConnection
+}
 
-func AddConnection(conn IConnection) {
+// NewConnManager 创建连接管理器，供 baseServer 使用。
+func NewConnManager() *ConnManager {
+	return &ConnManager{
+		connections:    make(map[int64]IConnection),
+		udpConnections: make(map[string]*UDPConnection),
+	}
+}
+
+func (m *ConnManager) Add(conn IConnection) {
 	if conn == nil {
 		return
 	}
-	mu.Lock()
-	defer mu.Unlock()
-	if _, exists := connections[conn.ID()]; !exists {
-		connections[conn.ID()] = conn
-		count.Add(1)
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, exists := m.connections[conn.ID()]; !exists {
+		m.connections[conn.ID()] = conn
+		m.count.Add(1)
 	}
 }
 
-func RemoveConnection(conn IConnection) {
+func (m *ConnManager) Remove(conn IConnection) {
 	if conn == nil {
 		return
 	}
-	mu.Lock()
-	defer mu.Unlock()
-	if _, exists := connections[conn.ID()]; exists {
-		delete(connections, conn.ID())
-		count.Add(-1)
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, exists := m.connections[conn.ID()]; exists {
+		delete(m.connections, conn.ID())
+		m.count.Add(-1)
 	}
 }
 
-func GetConnection(id int64) IConnection {
-	mu.RLock()
-	defer mu.RUnlock()
-	return connections[id]
+func (m *ConnManager) Get(id int64) IConnection {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.connections[id]
 }
 
-func ConnectionCount() int64 {
-	return count.Load()
+func (m *ConnManager) ConnectionCount() int64 {
+	return m.count.Load()
 }
 
-// GetAllConnections 返回当前所有连接的副本；先复制 keys 再按 key 取连接，缩短单次持锁时间。
-func GetAllConnections() []IConnection {
-	mu.RLock()
-	keys := make([]int64, 0, len(connections))
-	for id := range connections {
+// GetAll 返回当前所有连接的副本；先复制 keys 再按 key 取连接，缩短单次持锁时间。
+func (m *ConnManager) GetAll() []IConnection {
+	m.mu.RLock()
+	keys := make([]int64, 0, len(m.connections))
+	for id := range m.connections {
 		keys = append(keys, id)
 	}
-	mu.RUnlock()
-	mu.RLock()
-	defer mu.RUnlock()
+	m.mu.RUnlock()
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	conns := make([]IConnection, 0, len(keys))
 	for _, id := range keys {
-		if conn := connections[id]; conn != nil {
+		if conn := m.connections[id]; conn != nil {
 			conns = append(conns, conn)
 		}
 	}
 	return conns
 }
 
-func RangeConnections(fn func(conn IConnection) bool) {
-	mu.RLock()
-	defer mu.RUnlock()
-	for _, conn := range connections {
+func (m *ConnManager) Range(fn func(conn IConnection) bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	for _, conn := range m.connections {
 		if !fn(conn) {
 			break
 		}
 	}
 }
 
-func ClearConnections() {
-	mu.Lock()
-	defer mu.Unlock()
-	connections = make(map[int64]IConnection)
-	count.Store(0)
+func (m *ConnManager) Clear() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.connections = make(map[int64]IConnection)
+	m.count.Store(0)
 }
 
-// ------------------------------ UDP连接管理 ------------------------------
-
-// AddUDPConnection 添加UDP连接，如果已存在则返回已存在的连接和false，否则添加并返回true
-func AddUDPConnection(connKey string, conn *UDPConnection) (*UDPConnection, bool) {
+// AddUDP 添加 UDP 虚拟连接，若 key 已存在则返回已存在的连接和 false。
+func (m *ConnManager) AddUDP(connKey string, conn *UDPConnection) (*UDPConnection, bool) {
 	if conn == nil {
 		return nil, false
 	}
-	udpConnMutex.Lock()
-	defer udpConnMutex.Unlock()
-	if existing, exists := udpConnections[connKey]; exists {
+	m.udpMu.Lock()
+	defer m.udpMu.Unlock()
+	if existing, exists := m.udpConnections[connKey]; exists {
 		return existing, false
 	}
-	udpConnections[connKey] = conn
+	m.udpConnections[connKey] = conn
 	return conn, true
 }
 
-// RemoveUDPConnection 移除UDP连接
-func RemoveUDPConnection(connKey string) {
-	udpConnMutex.Lock()
-	defer udpConnMutex.Unlock()
-	delete(udpConnections, connKey)
+func (m *ConnManager) RemoveUDP(connKey string) {
+	m.udpMu.Lock()
+	defer m.udpMu.Unlock()
+	delete(m.udpConnections, connKey)
 }
 
-// GetUDPConnection 获取UDP连接
-func GetUDPConnection(connKey string) (*UDPConnection, bool) {
-	udpConnMutex.RLock()
-	defer udpConnMutex.RUnlock()
-	conn, ok := udpConnections[connKey]
+func (m *ConnManager) GetUDP(connKey string) (*UDPConnection, bool) {
+	m.udpMu.RLock()
+	defer m.udpMu.RUnlock()
+	conn, ok := m.udpConnections[connKey]
 	return conn, ok
 }

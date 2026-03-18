@@ -20,8 +20,8 @@ type TCPConnection struct {
 	msgBatch [][]byte // 写循环内复用，避免 batchWriteMsg 每次分配
 }
 
-func newTCPConnection(ctx context.Context, conn *net.TCPConn, typ ConnType, options *Options) *TCPConnection {
-	base := newBaseConn(ctx, "tcp", typ, conn, conn.RemoteAddr(), options)
+func newTCPConnection(ctx context.Context, conn *net.TCPConn, typ ConnType, options *Options, connMgr *ConnManager) *TCPConnection {
+	base := newBaseConn(ctx, "tcp", typ, conn, conn.RemoteAddr(), options, connMgr)
 	tcpConn := &TCPConnection{
 		baseConn: base,
 		tmpBuf:   make([]byte, options.ReadBufSize),
@@ -31,9 +31,10 @@ func newTCPConnection(ctx context.Context, conn *net.TCPConn, typ ConnType, opti
 }
 
 // NewTCPConnection 从已有的 *net.TCPConn 创建 TCPConnection，供测试或自定义 listener 集成使用。
+// connMgr 可为 nil（测试时）；非 nil 时连接关闭会从该 manager 移除。
 // 调用方如需完整读写需自行启动 readLoop/writeLoop；仅用于回调测试时可只调用 OnConnect/OnMessage/OnClose。
 func NewTCPConnection(ctx context.Context, conn *net.TCPConn, typ ConnType, opts ...Option) *TCPConnection {
-	return newTCPConnection(ctx, conn, typ, loadOptions(opts...))
+	return newTCPConnection(ctx, conn, typ, loadOptions(opts...), nil)
 }
 
 func (c *TCPConnection) readLoop() {
