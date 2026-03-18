@@ -10,10 +10,14 @@ import (
 	"go.uber.org/zap"
 )
 
+// maxBatchWriteSize 单次批量写入的最大消息条数，避免内存占用过高
+const maxBatchWriteSize = 100
+
 type TCPConnection struct {
-	*baseConn // 嵌入基类
-	conn      *net.TCPConn
-	tmpBuf    []byte
+	*baseConn   // 嵌入基类
+	conn     *net.TCPConn
+	tmpBuf   []byte
+	msgBatch [][]byte // 写循环内复用，避免 batchWriteMsg 每次分配
 }
 
 func newTCPConnection(ctx context.Context, conn *net.TCPConn, typ ConnType, options *Options) *TCPConnection {
@@ -91,19 +95,22 @@ func (c *TCPConnection) writeLoop() {
 }
 
 func (c *TCPConnection) batchWriteMsg(msg []byte) error {
-	const maxBatchSize = 100 // 限制批量写入的最大消息数，避免内存占用过高
-	var msgList = [][]byte{msg}
-	batchCount := 0
-	for len(c.sendChan) > 0 && batchCount < maxBatchSize-1 {
+	if c.msgBatch == nil {
+		c.msgBatch = make([][]byte, 0, maxBatchWriteSize)
+	}
+	c.msgBatch = c.msgBatch[:0]
+	if msg != nil {
+		c.msgBatch = append(c.msgBatch, msg)
+	}
+	for len(c.sendChan) > 0 && len(c.msgBatch) < maxBatchWriteSize-1 {
 		select {
-		case msg := <-c.sendChan:
-			msgList = append(msgList, msg)
-			batchCount++
+		case m := <-c.sendChan:
+			c.msgBatch = append(c.msgBatch, m)
 		default:
 			break
 		}
 	}
-	return c.write(c.conn, msgList...)
+	return c.write(c.conn, c.msgBatch...)
 }
 
 func (c *TCPConnection) Close(err error) (w error) {

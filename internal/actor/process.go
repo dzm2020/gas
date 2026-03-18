@@ -2,7 +2,9 @@ package actor
 
 import (
 	"github.com/dzm2020/gas/internal/iface"
+	"github.com/dzm2020/gas/pkg/glog"
 	"github.com/dzm2020/gas/pkg/lib/stopper"
+	"go.uber.org/zap"
 )
 
 // newProcess 创建新的进程实例
@@ -35,9 +37,11 @@ func (p *Process) Shutdown() error {
 	if !p.Stop() {
 		return nil
 	}
-	// 创建一个退出任务，通过 mailbox 发送，确保在消息处理完成后才执行退出
+	// 创建一个退出任务，通过 mailbox 发送，确保在消息处理完成后才执行退出；Unregister 为尽力清理，失败仅打日志。
 	msg := iface.NewTaskMessage(func(ctx iface.IContext) error {
-		_ = ctx.System().Unregister(ctx)
+		if unregErr := ctx.System().Unregister(ctx); unregErr != nil {
+			glog.Debug("进程 Unregister 失败", zap.Any("pid", ctx.ID()), zap.Error(unregErr))
+		}
 		return ctx.Actor().OnStop(ctx)
 	})
 	return p.mailbox.PostMessage(msg)

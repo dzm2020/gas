@@ -70,7 +70,9 @@ func (s *UDPServer) listen() (err error) {
 
 	udpConn, ok := ln.(*net.UDPConn)
 	if !ok {
-		_ = ln.Close()
+		if closeErr := ln.Close(); closeErr != nil {
+			glog.Error("关闭 PacketConn 时出错", zap.Error(closeErr))
+		}
 		return fmt.Errorf("failed to convert PacketConn to UDPConn")
 	}
 	s.conn = udpConn
@@ -78,8 +80,8 @@ func (s *UDPServer) listen() (err error) {
 }
 
 func (s *UDPServer) readLoop() {
+	buf := make([]byte, s.options.ReadBufSize)
 	for !s.IsStop() {
-		buf := make([]byte, s.options.ReadBufSize)
 		n, remoteAddr, err := s.conn.ReadFromUDP(buf)
 		if err != nil {
 			if !errors.Is(err, net.ErrClosed) {
@@ -90,6 +92,9 @@ func (s *UDPServer) readLoop() {
 		if n == 0 {
 			continue
 		}
+		// 复制后再投递，避免 buf 被下一轮 ReadFromUDP 覆盖
+		packet := make([]byte, n)
+		copy(packet, buf[:n])
 
 		remoteAddrCopy := convertor.DeepClone(remoteAddr)
 		if remoteAddrCopy == nil {
@@ -102,7 +107,7 @@ func (s *UDPServer) readLoop() {
 		if !exists {
 			udpConn = s.addConnection(connKey, remoteAddrCopy)
 		}
-		udpConn.writeRcvChan(buf[:n])
+		udpConn.writeRcvChan(packet)
 	}
 }
 
@@ -164,8 +169,9 @@ func (s *UDPServer) Shutdown(ctx context.Context) {
 	if !s.Stop() {
 		return
 	}
-
-	_ = s.conn.Close()
+	if err := s.conn.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
+		glog.Error("关闭 UDP 连接时出错", zap.String("address", s.Addr()), zap.Error(err))
+	}
 	s.baseServer.Shutdown(ctx)
 
 	glog.Debug("UDP服务器已关闭", zap.String("address", s.Addr()))

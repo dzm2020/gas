@@ -54,6 +54,9 @@ type healthKeeper struct {
 	once    sync.Once
 }
 
+// ttlCheckRatio TTL 检查间隔为 HealthTTL 的 1/ttlCheckRatio，避免临近过期才续期
+const ttlCheckRatio = 2
+
 func (keeper *healthKeeper) Register() error {
 	var err error
 	keeper.once.Do(func() {
@@ -77,6 +80,9 @@ func (keeper *healthKeeper) Update(member *iface.Member) error {
 
 func (keeper *healthKeeper) register() error {
 	member := keeper.member.Load()
+	if member == nil {
+		return fmt.Errorf("healthKeeper member is nil")
+	}
 	config := keeper.config
 	registration := &api.AgentServiceRegistration{
 		ID:      convertor.ToString(member.GetID()),
@@ -96,7 +102,7 @@ func (keeper *healthKeeper) register() error {
 }
 
 func (keeper *healthKeeper) updateTTLLoop() {
-	ticker := time.NewTicker(keeper.config.HealthTTL / 2)
+	ticker := time.NewTicker(keeper.config.HealthTTL / ttlCheckRatio)
 	defer func() {
 		ticker.Stop()
 		_ = keeper.shutdown()
@@ -114,6 +120,9 @@ func (keeper *healthKeeper) updateTTLLoop() {
 
 func (keeper *healthKeeper) updateTTL() {
 	member := keeper.member.Load()
+	if member == nil {
+		return
+	}
 	options := &api.QueryOptions{}
 	options = options.WithContext(keeper.ctx)
 	if err := keeper.client.Agent().UpdateTTLOpts(keeper.checkId, "", member.GetStatus(), options); err != nil {
@@ -126,6 +135,9 @@ func (keeper *healthKeeper) updateTTL() {
 
 func (keeper *healthKeeper) deregister() error {
 	member := keeper.member.Load()
+	if member == nil {
+		return nil
+	}
 	err := keeper.client.Agent().ServiceDeregister(convertor.ToString(member.GetID()))
 	if err != nil {
 		glog.Error("注销服务失败", zap.Uint64("memberId", member.GetID()), zap.Error(err))

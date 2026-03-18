@@ -28,7 +28,8 @@ var (
 )
 
 const (
-	DefaultDispatcherThroughput = 1024 // 默认调度器吞吐量
+	DefaultDispatcherThroughput = 1024       // 默认调度器吞吐量
+	defaultMapInitSize          = 10         // IdDict/nameDict 初始容量
 )
 
 // spawn 创建并注册新 Actor 进程，投递 OnInit 任务后返回 Pid。
@@ -56,6 +57,7 @@ func spawn(s iface.ISystem, actor iface.IActor, args ...interface{}) *iface.Pid 
 
 	mailBox.RegisterHandlers(ctx, NewDefaultDispatcher(DefaultDispatcherThroughput))
 
+	// 注意：OnInit 任务提交失败仅打日志，不返回给调用方；Spawn 仍返回 Pid，进程已注册但未完成初始化。
 	if err := s.SubmitTask(pid, func(ctx iface.IContext) error {
 		return ctx.Actor().OnInit(ctx, args)
 	}); err != nil {
@@ -73,8 +75,8 @@ func NewSystem(selfNodeID uint64, ser serializer.ISerializer) *System {
 	return &System{
 		selfNodeID: selfNodeID,
 		serializer: ser,
-		IdDict:     maputil.NewConcurrentMap[uint64, iface.IContext](10),
-		nameDict:   maputil.NewConcurrentMap[string, iface.IContext](10),
+		IdDict:     maputil.NewConcurrentMap[uint64, iface.IContext](defaultMapInitSize),
+		nameDict:   maputil.NewConcurrentMap[string, iface.IContext](defaultMapInitSize),
 	}
 }
 

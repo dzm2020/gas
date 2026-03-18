@@ -2,6 +2,7 @@ package network
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/dzm2020/gas/pkg/glog"
@@ -83,8 +84,12 @@ func (c *WebSocketConnection) Close(err error) (w error) {
 
 	// 优雅关闭连接（发送关闭帧，避免1006）
 	timeout := time.Now().Add(1 * time.Second)
-	_ = c.conn.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""), timeout)
-	_ = c.conn.Close()
+	if err := c.conn.WriteControl(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""), timeout); err != nil && !errors.Is(err, websocket.ErrCloseSent) {
+		glog.Debug("WebSocket WriteControl 关闭帧失败", zap.Int64("connectionId", c.ID()), zap.Error(err))
+	}
+	if err := c.conn.Close(); err != nil {
+		glog.Debug("WebSocket conn.Close 失败", zap.Int64("connectionId", c.ID()), zap.Error(err))
+	}
 
 	c.baseConn.Close(c, err)
 

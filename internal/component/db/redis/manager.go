@@ -37,14 +37,23 @@ func Has(id int) bool {
 // Range 遍历所有客户端并执行回调函数
 func Range(fn func(client *Client)) {
 	dbs.Range(func(key, value interface{}) bool {
-		fn(value.(*Client))
+		client, ok := value.(*Client)
+		if !ok {
+			return true
+		}
+		fn(client)
 		return true
 	})
 }
 
 func Close() {
 	dbs.Range(func(key, value interface{}) bool {
-		_ = value.(*Client).Close()
+		client, ok := value.(*Client)
+		if !ok {
+			dbs.Delete(key)
+			return true
+		}
+		_ = client.Close()
 		dbs.Delete(key)
 		return true
 	})

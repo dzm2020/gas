@@ -1,3 +1,5 @@
+// Package actor 的 router：路由注册（AutoRegister/RegisterMethod）、路由表（Router/routerEntry）、
+// 消息分发（Handle/handleSyncMessage/handleAsyncMessage/handleSessionMessage）均在本文件中。
 package actor
 
 import (

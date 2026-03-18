@@ -68,7 +68,10 @@ func (agent *Agent) OnInit(ctx iface.IContext, params []interface{}) error {
 	agent.ctx = ctx
 	entity := agent.GetEntity()
 	//  session是跨集群的所以要保证集群唯一性
-	sessionID, _ := uid.NextId()
+	sessionID, err := uid.NextId()
+	if err != nil {
+		return xerror.Wrapf(err, "uid.NextId for session")
+	}
 	agent.session = session.New(&pb.Session{
 		Id:     sessionID,
 		Agent:  ctx.ID(),

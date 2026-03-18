@@ -93,7 +93,8 @@ func (r *Cluster) OnMessage(data []byte, response func(data []byte) error) {
 }
 
 func (r *Cluster) Stop(ctx context.Context) error {
-	//  注销
-	_ = r.Deregister(r.node.GetID())
+	if err := r.Deregister(r.node.GetID()); err != nil {
+		glog.Debug("集群注销节点失败", zap.Uint64("nodeId", r.node.GetID()), zap.Error(err))
+	}
 	return r.ICluster.Shutdown(ctx)
 }

@@ -66,7 +66,9 @@ func (s *TCPServer) newTcpCon(conn net.Conn) {
 	tcpCon, ok := conn.(*net.TCPConn)
 	if !ok {
 		glog.Error("连接类型错误，期望 *net.TCPConn", zap.String("address", s.Addr()))
-		_ = conn.Close()
+		if closeErr := conn.Close(); closeErr != nil {
+			glog.Error("关闭非 TCPConn 时出错", zap.Error(closeErr))
+		}
 		return
 	}
 	connection := newTCPConnection(s.ctx, tcpCon, Accept, s.options)
@@ -98,8 +100,9 @@ func (s *TCPServer) Shutdown(ctx context.Context) {
 	if !s.Stop() {
 		return
 	}
-
-	_ = s.listener.Close()
+	if err := s.listener.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
+		glog.Error("关闭 TCP listener 时出错", zap.String("address", s.Addr()), zap.Error(err))
+	}
 	s.baseServer.Shutdown(ctx)
 
 	glog.Debug("TCP服务器关闭", zap.String("address", s.Addr()))

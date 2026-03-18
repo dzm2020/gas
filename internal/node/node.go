@@ -2,6 +2,7 @@ package node
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/signal"
 	"runtime/debug"
@@ -131,7 +132,10 @@ func (n *Node) Startup(comps ...component.IComponent[iface.INode]) (err error) {
 
 	glog.Info("节点启动完成", zap.String("path", n.path), zap.Strings("component", n.IManager.GetComponentNames()))
 
-	//  所有组件注册完成后,在集群中注册节点
+	//  所有组件注册完成后,在集群中注册节点（非单节点模式下需已注册 cluster 组件）
+	if n.Cluster() == nil {
+		return errors.New("cluster 组件未注册，无法注册节点；非单节点模式请在 Startup 前注册 cluster 组件")
+	}
 	if err = n.Cluster().Register(n.Info()); err != nil {
 		return err
 	}
@@ -153,7 +157,8 @@ func (n *Node) shutdown() error {
 		return err
 	}
 	timeout := 30 * time.Second
-	timeoutCtx, _ := context.WithTimeout(n.ctx, timeout)
+	timeoutCtx, cancel := context.WithTimeout(n.ctx, timeout)
+	defer cancel()
 	defer n.cancel()
 	return grs.Shutdown(timeoutCtx)
 }

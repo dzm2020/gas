@@ -9,8 +9,14 @@ import (
 	"github.com/panjf2000/ants/v2"
 )
 
+const defaultPoolSize = 5000
+
 func init() {
-	pool, _ = ants.NewPool(5000)
+	var err error
+	pool, err = ants.NewPool(defaultPoolSize)
+	if err != nil {
+		panic("grs: ants.NewPool failed: " + err.Error())
+	}
 }
 
 var (

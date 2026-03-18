@@ -130,6 +130,7 @@ func (d *discovery) rangeWatcher(f func(watcher *Watcher) bool) {
 	}
 }
 
+// getOrCreateWatcher 获取或创建 kind 对应的 watcher；watchers 仅由本方法及 Watch/Unwatch 等内部路径使用，外部勿直接依赖 watchers map。
 func (d *discovery) getOrCreateWatcher(name string) *Watcher {
 	watcher := d.getWatcher(name)
 	if watcher != nil {

@@ -38,6 +38,7 @@ func newMailbox() *Mailbox {
 	return m
 }
 
+// RegisterHandlers 注册消息处理与调度器，必须在首次 PostMessage 前调用（由 spawn 内完成）。
 func (mb *Mailbox) RegisterHandlers(invoker iface.IMessageInvoker, dispatcher IDispatcher) {
 	mb.invoker = invoker
 	mb.dispatch = dispatcher
@@ -45,6 +46,10 @@ func (mb *Mailbox) RegisterHandlers(invoker iface.IMessageInvoker, dispatcher ID
 
 func (mb *Mailbox) PostMessage(msg interface{}) error {
 	if msg == nil {
+		return nil
+	}
+	if mb.dispatch == nil || mb.invoker == nil {
+		glog.Error("Mailbox 未 RegisterHandlers 即 PostMessage，消息将被丢弃", zap.Any("msg", msg))
 		return nil
 	}
 	mb.queue.Push(msg)
@@ -75,10 +80,11 @@ func (mb *Mailbox) schedule() error {
 // 这样其他 goroutine 可以继续处理队列中的消息
 func (mb *Mailbox) process() {
 	defer func() {
-		// 确保无论是否发生 panic，状态都能被重置
-		// 使用 CompareAndSwap 确保原子性
 		mb.dispatchStat.CompareAndSwap(running, idle)
 	}()
+	if mb.invoker == nil {
+		return
+	}
 	mb.run()
 }
 

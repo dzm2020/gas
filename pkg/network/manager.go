@@ -49,12 +49,21 @@ func ConnectionCount() int64 {
 	return count.Load()
 }
 
+// GetAllConnections 返回当前所有连接的副本；先复制 keys 再按 key 取连接，缩短单次持锁时间。
 func GetAllConnections() []IConnection {
 	mu.RLock()
+	keys := make([]int64, 0, len(connections))
+	for id := range connections {
+		keys = append(keys, id)
+	}
+	mu.RUnlock()
+	mu.RLock()
 	defer mu.RUnlock()
-	conns := make([]IConnection, 0, len(connections))
-	for _, conn := range connections {
-		conns = append(conns, conn)
+	conns := make([]IConnection, 0, len(keys))
+	for _, id := range keys {
+		if conn := connections[id]; conn != nil {
+			conns = append(conns, conn)
+		}
 	}
 	return conns
 }

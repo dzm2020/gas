@@ -1,11 +1,17 @@
 package reflectutil
 
-import "reflect"
+import (
+	"reflect"
+)
 
 // NewInstance 通过反射创建传入对象的新实例，返回该对象的指针
-// 参数：任意类型的对象（值/指针都支持）
+// 参数：任意类型的对象（值/指针都支持），不能为 nil
 // 返回值：新对象的指针（interface{} 类型，可断言为原类型指针）
+// 若 obj 为 nil 会 panic，调用方需保证传入非 nil。
 func NewInstance(obj interface{}) interface{} {
+	if obj == nil {
+		panic("reflectutil.NewInstance: obj must not be nil")
+	}
 	// 1. 获取传入对象的反射类型
 	objType := reflect.TypeOf(obj)
 

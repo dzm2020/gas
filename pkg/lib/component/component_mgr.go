@@ -32,12 +32,13 @@ type IManager[T any] interface {
 }
 
 type Manager[T any] struct {
-	components *maputil.ConcurrentMap[string, IComponent[T]]
-	order      []string // 保存组件注册顺序
-	orderMu    sync.RWMutex
-	started    atomic.Bool
-	stopped    atomic.Bool
-	stopOnce   sync.Once
+	components   *maputil.ConcurrentMap[string, IComponent[T]]
+	order        []string // 保存组件注册顺序
+	orderMu      sync.RWMutex
+	started      atomic.Bool
+	stopped      atomic.Bool
+	stopOnce     sync.Once
+	firstStopErr error // 首次 Stop 时的错误，后续 Stop 调用仍返回该错误
 }
 
 // NewComponentsMgr 创建新的生命周期管理器
@@ -166,9 +167,8 @@ func (cm *Manager[T]) Start(ctx context.Context, t T) (err error) {
 }
 
 // Stop 停止所有已注册的组件
-// 按注册顺序的逆序依次停止，确保依赖关系正确
+// 按注册顺序的逆序依次停止，确保依赖关系正确；首次调用返回停止过程中的错误，后续调用仍返回该错误。
 func (cm *Manager[T]) Stop(ctx context.Context) error {
-	var err error
 	cm.stopOnce.Do(func() {
 		if !cm.started.Load() {
 			return
@@ -191,10 +191,9 @@ func (cm *Manager[T]) Stop(ctx context.Context) error {
 			}
 		}
 
-		err = cm.stopComponents(ctx, components)
+		cm.firstStopErr = cm.stopComponents(ctx, components)
 	})
-
-	return err
+	return cm.firstStopErr
 }
 
 // stopComponents 停止组件列表（组件列表应该已经是逆序的）

@@ -5,6 +5,14 @@ import (
 	"time"
 )
 
+const (
+	defaultSendBufferSize  = 1024 * 4  // 4KB
+	defaultReadBufSize     = 1024 * 4  // 4KB
+	defaultUdpRcvChanSize  = 1024
+	defaultSendChanSize    = 1024
+	defaultHeartTimeoutSec = 5
+)
+
 type Option func(*Options)
 type Options struct {
 	TLSCertFile string                     // TLS 证书文件路径
@@ -23,12 +31,11 @@ type Options struct {
 
 func loadOptions(options ...Option) *Options {
 	opts := &Options{
-		//Codec:          &EmptyCodec{},
-		HeartTimeout:   5 * time.Second,
-		SendBufferSize: 1024 * 4,
-		ReadBufSize:    1024 * 4,
-		UdpRcvChanSize: 1024,
-		SendChanSize:   1024,
+		HeartTimeout:   defaultHeartTimeoutSec * time.Second,
+		SendBufferSize: defaultSendBufferSize,
+		ReadBufSize:    defaultReadBufSize,
+		UdpRcvChanSize: defaultUdpRcvChanSize,
+		SendChanSize:   defaultSendChanSize,
 		ReuseAddr:      true,
 		ReusePort:      false,
 	}

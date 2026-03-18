@@ -125,6 +125,12 @@ func (g *Gate) Start(ctx context.Context) (err error) {
 //	@param entity
 //	@return error
 func (g *Gate) onConnect(entity network.IConnection) error {
+	if g.handler == nil {
+		return errors.New("gate: handler is nil, call SetAgentHandlerFactory before Start")
+	}
+	if g.system == nil {
+		return errors.New("gate: system is nil, call SetSystem before Start")
+	}
 	if g.maximumOfConn > 0 && g.count.Load() >= g.maximumOfConn {
 		return errors.New("too many connections")
 	}
@@ -194,7 +200,9 @@ func (g *Gate) onClose(entity network.IConnection, wrong error) {
 	if pid == nil {
 		return
 	}
-	_ = g.system.ShutdownProcess(pid)
+	if err := g.system.ShutdownProcess(pid); err != nil {
+		glog.Debug("关闭 Agent 进程失败", zap.Any("pid", pid), zap.Error(err))
+	}
 }
 
 // Stop

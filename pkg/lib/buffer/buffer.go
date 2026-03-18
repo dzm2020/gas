@@ -5,6 +5,12 @@ import (
 	"io"
 )
 
+const (
+	defaultInitialCap = 4096           // 默认初始容量 4KB
+	capacityGrowthMul = 2              // 扩容倍数
+	maxBufferCap      = 1024 * 1024 * 10 // 单 buffer 最大容量 10MB
+)
+
 type IBuffer interface {
 	Len() int
 	Cap() int
@@ -34,7 +40,7 @@ type Buffer struct {
 // New 创建一个指定初始容量的缓冲区
 func New(initialCap int) *Buffer {
 	if initialCap <= 0 {
-		initialCap = 4096 // 默认初始容量4KB
+		initialCap = defaultInitialCap
 	}
 	return &Buffer{
 		buf:   make([]byte, initialCap),
@@ -69,11 +75,16 @@ func (b *Buffer) Bytes() []byte {
 	return b.buf[b.r:b.w]
 }
 
-// Readable 返回可读取的数据切片（复制，避免外部修改内部缓冲区）
+// Readable 返回可读取数据的副本，会分配新切片；热路径可考虑使用 Bytes() 或 View()（只读勿改）。
 func (b *Buffer) Readable() []byte {
 	data := make([]byte, b.Len())
 	copy(data, b.buf[b.r:b.w])
 	return data
+}
+
+// View 返回可读区间的切片视图，调用方不得修改返回的切片内容，仅在下一次 Write/Read/Reset 前有效。
+func (b *Buffer) View() []byte {
+	return b.buf[b.r:b.w]
 }
 
 // 确保有足够的写入空间，不够则扩容
@@ -93,9 +104,9 @@ func (b *Buffer) ensureSpace(n int) {
 	if b.Available() < n {
 		newCap := b.cap
 		for newCap-b.w < n {
-			newCap *= 2                // 每次翻倍扩容
-			if newCap > 1024*1024*10 { // 最大容量限制（10MB）
-				newCap = 1024*1024*10 + n
+			newCap *= capacityGrowthMul
+			if newCap > maxBufferCap {
+				newCap = maxBufferCap + n
 			}
 		}
 		newBuf := make([]byte, newCap)

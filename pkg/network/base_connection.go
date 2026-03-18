@@ -205,6 +205,9 @@ func (b *baseConn) heartLoop(connection IConnection) {
 // 参数 connection: 连接接口
 // 返回值: 如果返回错误，连接将被关闭
 func (b *baseConn) onConnect(connection IConnection) error {
+	if b.handler == nil {
+		return errors.New("connection handler is nil")
+	}
 	return b.handler.OnConnect(connection)
 }
 
@@ -216,6 +219,9 @@ func (b *baseConn) onConnect(connection IConnection) error {
 //
 // 返回值: 如果返回错误，连接将被关闭
 func (b *baseConn) OnMessage(conn IConnection, data []byte) (int, error) {
+	if b.handler == nil {
+		return 0, errors.New("connection handler is nil")
+	}
 	return b.handler.OnMessage(conn, data)
 }
 
@@ -225,7 +231,9 @@ func (b *baseConn) OnMessage(conn IConnection, data []byte) (int, error) {
 //   - conn: 连接接口
 //   - err: 关闭原因，可能为 nil（正常关闭）
 func (b *baseConn) OnClose(conn IConnection, err error) {
-	b.handler.OnClose(conn, err)
+	if b.handler != nil {
+		b.handler.OnClose(conn, err)
+	}
 }
 
 // Send 发送消息（线程安全）
