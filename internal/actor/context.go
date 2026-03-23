@@ -2,6 +2,7 @@
 package actor
 
 import (
+	"errors"
 	"time"
 
 	"github.com/dzm2020/gas/internal/iface"
@@ -38,6 +39,28 @@ func (a *actorContext) ID() *iface.Pid {
 func (a *actorContext) System() iface.ISystem {
 	return a.system
 }
+
+func (a *actorContext) Subscribe(topic string, handler iface.EventHandler) (iface.IEventSubscription, error) {
+	if a.system == nil {
+		return nil, errors.New("event: system 未初始化")
+	}
+	return a.system.Subscribe(topic, a.ID(), handler)
+}
+
+func (a *actorContext) PublishLocal(topic string, payload []byte) {
+	if a.system == nil {
+		return
+	}
+	a.system.PublishLocal(topic, payload)
+}
+
+func (a *actorContext) PublishCluster(topic string, payload []byte) error {
+	if a.system == nil {
+		return ErrEventNoCluster
+	}
+	return a.system.PublishCluster(topic, payload)
+}
+
 func (a *actorContext) Process() iface.IProcess {
 	return a.process
 }

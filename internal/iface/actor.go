@@ -23,6 +23,8 @@ type (
 	}
 
 	ISystem interface {
+		IEventBus
+
 		NodeId() uint64
 		NextID() uint64
 
@@ -69,6 +71,10 @@ type (
 		Call(to *Pid, methodName string, request interface{}, reply interface{}) error
 		SendMessage(message *ActorMessage) (err error)
 		CallMessage(message *ActorMessage) (data []byte, err error)
+		// Subscribe 在本 Actor（ctx.ID()）上订阅事件；PublishLocal / PublishCluster 委托本节点 ISystem。
+		Subscribe(topic string, handler EventHandler) (IEventSubscription, error)
+		PublishLocal(topic string, payload []byte)
+		PublishCluster(topic string, payload []byte) error
 		ForwardMessage(pid *Pid, methodName string) error
 		AfterFunc(duration time.Duration, task Task) *timer.Timer
 		Shutdown() error

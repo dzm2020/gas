@@ -1,35 +1,131 @@
 package actor
 
 // Package actor cluster_system.go 提供集群版 Actor 系统（ClusterSystem），在嵌入的 System 基础上
-// 通过 transport 支持跨节点消息（SendMessage/CallMessage、Send/Call）。
+// 通过 transport 支持跨节点消息（SendMessage/CallMessage、Send/Call），并挂载可 PublishCluster 的事件总线、订阅 gas.event.>。
 import (
+	"errors"
 	"time"
 
+	"github.com/duke-git/lancet/v2/convertor"
 	"github.com/dzm2020/gas/internal/iface"
+	"github.com/dzm2020/gas/internal/pb"
 	"github.com/dzm2020/gas/pkg/cluster"
+	"github.com/dzm2020/gas/pkg/glog"
 	"github.com/dzm2020/gas/pkg/lib/serializer"
 	"github.com/dzm2020/gas/pkg/lib/timer"
+	messageQue "github.com/dzm2020/gas/pkg/messageQue/iface"
+	"go.uber.org/zap"
 )
 
-// NewClusterSystem 创建集群版 Actor 系统。
-// selfNodeID 为当前节点 ID，ser 用于序列化，transport 用于跨节点通信与集群元数据同步。
-func NewClusterSystem(selfNodeID uint64, ser serializer.ISerializer, transport cluster.ICluster) *ClusterSystem {
-	return &ClusterSystem{
-		System:     NewSystem(selfNodeID, ser),
-		transport:  transport,
-		selfNodeID: selfNodeID,
+type eventSubscriber struct {
+	system *System
+}
+
+// OnMessage 实现 messageQue.ISubscriber：将 MQ 消息解码后对本机 eventBus 做 PublishLocal。
+func (c *eventSubscriber) OnMessage(data []byte, _ func([]byte) error) {
+	env := &pb.EventEnvelope{}
+	if err := c.system.Serializer().Unmarshal(data, env); err != nil {
+		return
+	}
+	if env.Topic == "" {
+		return
+	}
+	c.system.PublishLocal(env.Topic, env.Payload)
+}
+
+type messageSubscriber struct {
+	system *System
+}
+
+func (r *messageSubscriber) OnMessage(data []byte, response func(data []byte) error) {
+	message := &pb.Message{}
+	var err error
+	defer func() {
+		if err != nil {
+			glog.Error("集群：处理消息失败", zap.Error(err), zap.Any("message", message))
+		}
+	}()
+
+	ser := r.system.Serializer()
+	if err = ser.Unmarshal(data, message); err != nil {
+		return
+	}
+	msg := &iface.ActorMessage{Message: message}
+
+	glog.Debug("集群：处理消息", zap.Any("message", message))
+
+	system := r.system
+	if msg.GetAsync() {
+		err = system.SendMessage(msg)
+	} else {
+		//  调用本地 actor（传输层已有完整 Message，使用 CallMessage）
+		responseData, responseErr := system.CallMessage(msg)
+		//  打包结果
+		responseMessage := iface.NewResponse(responseData, responseErr)
+		responseData, err = ser.Marshal(responseMessage)
+		if err != nil {
+			return
+		}
+		//  写入到消息队列
+		err = response(responseData)
 	}
 }
 
+var (
+	_ iface.IEventBus = (*ClusterSystem)(nil)
+	_ iface.ISystem   = (*ClusterSystem)(nil)
+)
+
+// NewClusterSystem 创建集群版 Actor 系统：事件可 PublishCluster；启动时订阅 gas.event.> 并解码投递本地订阅者。
+func NewClusterSystem(selfNodeID uint64, ser serializer.ISerializer, transport cluster.ICluster) (*ClusterSystem, error) {
+	if transport == nil {
+		return nil, errors.New("actor: cluster transport 不能为空")
+	}
+	sys := newSystem(selfNodeID, ser)
+	//  订阅事件
+	sub, err := transport.Subscribe(EventNATSSubscribePattern, &eventSubscriber{system: sys})
+	if err != nil {
+		return nil, err
+	}
+
+	//  消息订阅
+	if _, err = transport.Subscribe(convertor.ToString(selfNodeID), &messageSubscriber{system: sys}); err != nil {
+		return nil, err
+	}
+
+	return &ClusterSystem{
+		System:     sys,
+		transport:  transport,
+		selfNodeID: selfNodeID,
+		eventSub:   sub,
+	}, nil
+}
+
 // ClusterSystem 在 System 之上增加集群能力：本地消息走嵌入的 System，跨节点走 transport。
+// 事件订阅与 PublishLocal 使用嵌入 *System 的 IEventBus；PublishCluster 由本类型实现。
 type ClusterSystem struct {
-	*System                     // 本地 Actor 系统，负责本节点进程与消息
+	*System // 本地 Actor 系统，负责本节点进程与消息
 	selfNodeID uint64           // 本节点ID
-	transport  cluster.ICluster // 集群传输，用于跨节点 Send/Call
+	transport  cluster.ICluster // 集群传输，用于跨节点 Send/Call 与事件 MQ
+	eventSub   messageQue.ISubscription
 }
 
 func (s *ClusterSystem) Spawn(actor iface.IActor, args ...interface{}) *iface.Pid {
 	return spawn(s, actor, args...)
+}
+
+// EventBus 返回本节点完整事件接口（Subscribe/PublishLocal 来自 *System，PublishCluster 为集群实现）。
+func (s *ClusterSystem) EventBus() iface.IEventBus {
+	return s
+}
+
+// Shutdown 先取消集群事件 MQ 订阅，再关闭本地 Actor 系统。
+func (s *ClusterSystem) Shutdown() error {
+	if s.eventSub != nil {
+		_ = s.eventSub.Unsubscribe()
+		s.eventSub = nil
+	}
+	return s.System.Shutdown()
 }
 
 // isLocalMessage 判断消息目标是否为本节点（按 NodeId 比较）。
@@ -90,4 +186,24 @@ func (s *ClusterSystem) Call(from, to *iface.Pid, methodName string, request int
 		return err
 	}
 	return s.Serializer().Unmarshal(data, reply)
+}
+
+func (s *ClusterSystem) PublishCluster(topic string, payload []byte) error {
+	if topic == "" {
+		return ErrEventTopicEmpty
+	}
+	if s.transport == nil {
+		return ErrEventNoCluster
+	}
+
+	env := &pb.EventEnvelope{
+		Topic:      topic,
+		Payload:    payload,
+		SourceNode: s.selfNodeID,
+	}
+	data, err := s.Serializer().Marshal(env)
+	if err != nil {
+		return err
+	}
+	return s.transport.PublishSubject(EventNATSSubjectPrefix+topic, data)
 }

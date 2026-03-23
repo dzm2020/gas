@@ -27,9 +27,13 @@ func (c *System) Name() string {
 func (c *System) Start(ctx context.Context, node iface.INode) error {
 	if node.Profile().IsSingleNodeMode() {
 		c.ISystem = actor.NewSystem(node.GetID(), node.Serializer())
-	} else {
-		c.ISystem = actor.NewClusterSystem(node.GetID(), node.Serializer(), node.Cluster())
+		return nil
 	}
+	cs, err := actor.NewClusterSystem(node.GetID(), node.Serializer(), node.Cluster())
+	if err != nil {
+		return err
+	}
+	c.ISystem = cs
 	return nil
 }
 

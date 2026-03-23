@@ -28,8 +28,8 @@ var (
 )
 
 const (
-	DefaultDispatcherThroughput = 1024       // 默认调度器吞吐量
-	defaultMapInitSize          = 10         // IdDict/nameDict 初始容量
+	DefaultDispatcherThroughput = 1024 // 默认调度器吞吐量
+	defaultMapInitSize          = 10   // IdDict/nameDict 初始容量
 )
 
 // spawn 创建并注册新 Actor 进程，投递 OnInit 任务后返回 Pid。
@@ -69,21 +69,29 @@ func spawn(s iface.ISystem, actor iface.IActor, args ...interface{}) *iface.Pid 
 
 var _ iface.ISystem = (*System)(nil)
 
-// NewSystem 构造本节点 Actor 系统，node 用于生成 Pid 与获取节点信息。
+// NewSystem 构造本节点 Actor 系统：嵌入仅本节点的 eventBus；对外 IEventBus 为 localEventBus（PublishCluster 返回 ErrEventNoCluster）。
 // ActorId 由 pkg/lib/uid 雪花算法生成，需在 Spawn 前调用 uid.Init(workerId)（Node 启动时已调用）。
 func NewSystem(selfNodeID uint64, ser serializer.ISerializer) *System {
-	return &System{
+	return newSystem(selfNodeID, ser)
+}
+
+func newSystem(selfNodeID uint64, ser serializer.ISerializer) *System {
+	s := &System{
 		selfNodeID: selfNodeID,
 		serializer: ser,
 		IdDict:     maputil.NewConcurrentMap[uint64, iface.IContext](defaultMapInitSize),
 		nameDict:   maputil.NewConcurrentMap[string, iface.IContext](defaultMapInitSize),
 	}
+	s.IEventBus = newLocalEventBus(selfNodeID, s)
+	return s
 }
 
 // System 单节点 Actor 系统：维护进程表与名字表，负责本节点内 Spawn/消息/任务/关闭。
+// 嵌入 *eventBus 仅处理本节点订阅与 PublishLocal；IEventBus 由 eventIface 提供（单节点为 localEventBus，集群构造时换为 clusterEventBus）。
 // ActorId 使用雪花算法（uid）生成，全局唯一且节点重启后不重用，避免 B 重启后 A 持旧 Pid 误路由。
 type System struct {
 	stopper.Stopper
+	iface.IEventBus
 	selfNodeID     uint64
 	serializer     serializer.ISerializer
 	IdDict         *maputil.ConcurrentMap[uint64, iface.IContext] // ActorId -> IContext

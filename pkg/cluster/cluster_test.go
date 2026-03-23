@@ -46,8 +46,8 @@ func createCluster(t *testing.T) (ICluster, func()) {
 		t.Skipf("New: %v (consul/nats 可能未启动)", err)
 	}
 	ctx := context.Background()
-	if err := c.Start(ctx); err != nil {
-		t.Skipf("Start: %v (consul/nats 可能未启动)", err)
+	if err := c.Run(ctx); err != nil {
+		t.Skipf("Run: %v (consul/nats 可能未启动)", err)
 	}
 	return c, func() { _ = c.Shutdown(ctx) }
 }
@@ -73,8 +73,8 @@ func TestNew_WithRealConfig(t *testing.T) {
 		t.Fatal("New returned nil cluster")
 	}
 	ctx := context.Background()
-	if err := c.Start(ctx); err != nil {
-		t.Skipf("Start: %v (consul/nats 可能未启动)", err)
+	if err := c.Run(ctx); err != nil {
+		t.Skipf("Run: %v (consul/nats 可能未启动)", err)
 	}
 	if err := c.Shutdown(ctx); err != nil {
 		t.Fatalf("Shutdown: %v", err)

@@ -24,7 +24,9 @@ var (
 
 type ICluster interface {
 	Run(ctx context.Context) error
-	Subscribe(nodeId uint64, subscriber messageQue.ISubscriber) (messageQue.ISubscription, error)
+	Subscribe(subject string, subscriber messageQue.ISubscriber) (messageQue.ISubscription, error)
+	// PublishSubject 向任意 MQ subject 发布字节流（如 gas.event.*），与按 nodeId 的 Send 通道隔离。
+	PublishSubject(subject string, data []byte) error
 
 	Send(nodeId uint64, message interface{}) (err error)
 	Call(nodeId uint64, message interface{}, timeout time.Duration) (data []byte, err error)
@@ -89,9 +91,15 @@ func (r *Cluster) Run(ctx context.Context) error {
 	return nil
 }
 
-func (r *Cluster) Subscribe(nodeId uint64, subscriber messageQue.ISubscriber) (messageQue.ISubscription, error) {
-	subject := convertor.ToString(nodeId)
+func (r *Cluster) Subscribe(subject string, subscriber messageQue.ISubscriber) (messageQue.ISubscription, error) {
 	return r.mq.Subscribe(subject, subscriber)
+}
+
+func (r *Cluster) PublishSubject(subject string, data []byte) error {
+	if r.mq == nil {
+		return errors.New("cluster: 消息队列未初始化")
+	}
+	return r.mq.Publish(subject, data)
 }
 
 // Send 发送消息到集群节点

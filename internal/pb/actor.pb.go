@@ -285,6 +285,66 @@ func (x *Session) GetValues() map[string]string {
 	return nil
 }
 
+type EventEnvelope struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Topic         string                 `protobuf:"bytes,1,opt,name=topic,proto3" json:"topic,omitempty"`
+	Payload       []byte                 `protobuf:"bytes,2,opt,name=payload,proto3" json:"payload,omitempty"`
+	SourceNode    uint64                 `protobuf:"varint,3,opt,name=source_node,json=sourceNode,proto3" json:"source_node,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EventEnvelope) Reset() {
+	*x = EventEnvelope{}
+	mi := &file_actor_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EventEnvelope) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EventEnvelope) ProtoMessage() {}
+
+func (x *EventEnvelope) ProtoReflect() protoreflect.Message {
+	mi := &file_actor_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EventEnvelope.ProtoReflect.Descriptor instead.
+func (*EventEnvelope) Descriptor() ([]byte, []int) {
+	return file_actor_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *EventEnvelope) GetTopic() string {
+	if x != nil {
+		return x.Topic
+	}
+	return ""
+}
+
+func (x *EventEnvelope) GetPayload() []byte {
+	if x != nil {
+		return x.Payload
+	}
+	return nil
+}
+
+func (x *EventEnvelope) GetSourceNode() uint64 {
+	if x != nil {
+		return x.SourceNode
+	}
+	return 0
+}
+
 var File_actor_proto protoreflect.FileDescriptor
 
 const file_actor_proto_rawDesc = "" +
@@ -314,7 +374,12 @@ const file_actor_proto_rawDesc = "" +
 	"\x06values\x18\x03 \x03(\v2\x1a.actor.Session.ValuesEntryR\x06values\x1a9\n" +
 	"\vValuesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\aZ\x05./;pbb\x06proto3"
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"`\n" +
+	"\rEventEnvelope\x12\x14\n" +
+	"\x05topic\x18\x01 \x01(\tR\x05topic\x12\x18\n" +
+	"\apayload\x18\x02 \x01(\fR\apayload\x12\x1f\n" +
+	"\vsource_node\x18\x03 \x01(\x04R\n" +
+	"sourceNodeB\aZ\x05./;pbb\x06proto3"
 
 var (
 	file_actor_proto_rawDescOnce sync.Once
@@ -328,20 +393,21 @@ func file_actor_proto_rawDescGZIP() []byte {
 	return file_actor_proto_rawDescData
 }
 
-var file_actor_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_actor_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_actor_proto_goTypes = []any{
-	(*Pid)(nil),      // 0: actor.Pid
-	(*Message)(nil),  // 1: actor.Message
-	(*Response)(nil), // 2: actor.Response
-	(*Session)(nil),  // 3: actor.Session
-	nil,              // 4: actor.Session.ValuesEntry
+	(*Pid)(nil),           // 0: actor.Pid
+	(*Message)(nil),       // 1: actor.Message
+	(*Response)(nil),      // 2: actor.Response
+	(*Session)(nil),       // 3: actor.Session
+	(*EventEnvelope)(nil), // 4: actor.EventEnvelope
+	nil,                   // 5: actor.Session.ValuesEntry
 }
 var file_actor_proto_depIdxs = []int32{
 	0, // 0: actor.Message.to:type_name -> actor.Pid
 	0, // 1: actor.Message.from:type_name -> actor.Pid
 	3, // 2: actor.Message.session:type_name -> actor.Session
 	0, // 3: actor.Session.agent:type_name -> actor.Pid
-	4, // 4: actor.Session.values:type_name -> actor.Session.ValuesEntry
+	5, // 4: actor.Session.values:type_name -> actor.Session.ValuesEntry
 	5, // [5:5] is the sub-list for method output_type
 	5, // [5:5] is the sub-list for method input_type
 	5, // [5:5] is the sub-list for extension type_name
@@ -360,7 +426,7 @@ func file_actor_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_actor_proto_rawDesc), len(file_actor_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   5,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
