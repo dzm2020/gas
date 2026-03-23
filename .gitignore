@@ -10,5 +10,7 @@
 # 日志与测试产物（勿提交）
 *.log
 pkg/network/logs/
-tools/
 *dump
+
+# 一些第三方执行文件
+tools/
