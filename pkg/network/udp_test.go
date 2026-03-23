@@ -85,15 +85,11 @@ func (m *mockUDPHandler) OnConnect(conn IConnection) error {
 	return nil
 }
 
-func (m *mockUDPHandler) OnMessage(conn IConnection, msg interface{}) error {
+func (m *mockUDPHandler) OnMessage(conn IConnection, data []byte) (int, error) {
 	m.onMessageCalled = true
-	glog.Debug("UDP OnMessage", zap.Int64("connectionId", conn.ID()), zap.Any("msg", msg))
-
-	// 发送响应消息
-	conn.Send("udp response message")
-
-	// conn.Close(nil)
-	return nil
+	glog.Debug("UDP OnMessage", zap.Int64("connectionId", conn.ID()), zap.Int("len", len(data)))
+	_ = conn.Send([]byte("udp response message"))
+	return len(data), nil
 }
 
 func (m *mockUDPHandler) OnClose(conn IConnection, err error) {
@@ -101,12 +97,14 @@ func (m *mockUDPHandler) OnClose(conn IConnection, err error) {
 	glog.Debug("UDP OnClose", zap.Int64("connectionId", conn.ID()), zap.Error(err))
 }
 
-// TestUDPServer_Listen 测试 UDP 服务器监听
+// TestUDPServer_Listen 测试 UDP 服务器监听（默认跳过长时间 sleep）
 func TestUDPServer_Listen(t *testing.T) {
+	if testing.Short() {
+		t.Skip("跳过长时间 Listen 测试")
+	}
 	glog.SetLogLevel(zap.DebugLevel)
 
 	server, err := NewServer(udpHandler, "udp://127.0.0.1:9989",
-		WithCodec(udpCodec),
 		WithUdpRcvChanSize(1024))
 	if err != nil {
 		t.Fatalf("创建UDP服务器失败: %v", err)
@@ -126,7 +124,6 @@ func TestUDPServer_Close(t *testing.T) {
 	glog.SetLogLevel(zap.DebugLevel)
 
 	server, err := NewServer(udpHandler, "udp://127.0.0.1:9990",
-		WithCodec(udpCodec),
 		WithUdpRcvChanSize(1024))
 	if err != nil {
 		t.Fatalf("创建UDP服务器失败: %v", err)
@@ -169,7 +166,6 @@ func TestUDPServer_MultipleClients(t *testing.T) {
 	glog.SetLogLevel(zap.DebugLevel)
 
 	server, err := NewServer(udpHandler, "udp://127.0.0.1:9991",
-		WithCodec(udpCodec),
 		WithUdpRcvChanSize(1024))
 	if err != nil {
 		t.Fatalf("创建UDP服务器失败: %v", err)

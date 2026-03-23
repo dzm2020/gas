@@ -108,35 +108,32 @@ func (m *mockHandler) OnConnect(conn IConnection) error {
 	return nil
 }
 
-func (m *mockHandler) OnMessage(conn IConnection, msg interface{}) error {
+func (m *mockHandler) OnMessage(conn IConnection, data []byte) (int, error) {
 	m.onMessageCalled = true
-	glog.Debug("OnMessage", zap.Int64("connectionId", conn.ID()), zap.Any("msg", msg))
-
-	conn.Send("response message")
-
-	//conn.Close(nil)
-	return nil
+	glog.Debug("OnMessage", zap.Int64("connectionId", conn.ID()), zap.Int("len", len(data)))
+	_ = conn.Send([]byte("response message"))
+	return len(data), nil
 }
 
 func (m *mockHandler) OnClose(conn IConnection, err error) {
 	m.onCloseCalled = true
 }
 
-// TestTCPServer_Listen 测试 TCP 服务器监听
+// TestTCPServer_Listen 测试 TCP 服务器监听（默认跳过长时间 sleep，加 -short=false 可跑满）
 func TestTCPServer_Listen(t *testing.T) {
+	if testing.Short() {
+		t.Skip("跳过长时间 Listen 测试")
+	}
 	glog.SetLogLevel(zap.DebugLevel)
 
-	server, err := NewServer(handler, "tcp://127.0.0.1:9988", WithCodec(codec))
+	server, err := NewServer(handler, "tcp://127.0.0.1:9988")
 	if err != nil {
 		t.Fatalf("创建服务器失败: %v", err)
 	}
-
-	// 启动服务器
 	if err := server.Start(); err != nil {
 		t.Fatalf("启动服务器失败: %v", err)
 	}
 	defer server.Shutdown(context.Background())
-
 	time.Sleep(10 * time.Second)
 }
 
@@ -145,12 +142,19 @@ func (c *tcpClient) Close() {
 }
 
 func TestTCPServer_Close(t *testing.T) {
-	client := tcpClient{}
-	client.Dial("127.0.0.1:9988")
-	client.Send("hello")
-	client.Send("hello")
+	server, err := NewServer(handler, "tcp://127.0.0.1:9996")
+	if err != nil {
+		t.Fatalf("创建服务器失败: %v", err)
+	}
+	if err := server.Start(); err != nil {
+		t.Fatalf("启动服务器失败: %v", err)
+	}
+	defer server.Shutdown(context.Background())
+	time.Sleep(50 * time.Millisecond)
+
+	client := tcpClient{t: t}
+	client.Dial("127.0.0.1:9996")
+	defer client.Close()
 	client.Send("hello")
 	client.Recv()
-	client.Close()
-	time.Sleep(time.Second * 60)
 }

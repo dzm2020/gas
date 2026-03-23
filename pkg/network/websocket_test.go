@@ -85,15 +85,11 @@ func (m *mockWSHandler) OnConnect(conn IConnection) error {
 	return nil
 }
 
-func (m *mockWSHandler) OnMessage(conn IConnection, msg interface{}) error {
+func (m *mockWSHandler) OnMessage(conn IConnection, data []byte) (int, error) {
 	m.onMessageCalled = true
-	glog.Debug("WebSocket OnMessage", zap.Int64("connectionId", conn.ID()), zap.Any("msg", msg))
-
-	// 发送响应消息
-	conn.Send("ws response message")
-
-	// conn.Close(nil)
-	return nil
+	glog.Debug("WebSocket OnMessage", zap.Int64("connectionId", conn.ID()), zap.Int("len", len(data)))
+	_ = conn.Send([]byte("ws response message"))
+	return len(data), nil
 }
 
 func (m *mockWSHandler) OnClose(conn IConnection, err error) {
@@ -101,12 +97,14 @@ func (m *mockWSHandler) OnClose(conn IConnection, err error) {
 	glog.Debug("WebSocket OnClose", zap.Int64("connectionId", conn.ID()), zap.Error(err))
 }
 
-// TestWebSocketServer_Listen 测试 WebSocket 服务器监听
+// TestWebSocketServer_Listen 测试 WebSocket 服务器监听（默认跳过长时间 sleep）
 func TestWebSocketServer_Listen(t *testing.T) {
+	if testing.Short() {
+		t.Skip("跳过长时间 Listen 测试")
+	}
 	glog.SetLogLevel(zap.DebugLevel)
 
-	server, err := NewServer(wsHandler, "ws://127.0.0.1:9992/ws",
-		WithCodec(wsCodec))
+	server, err := NewServer(wsHandler, "ws://127.0.0.1:9992/ws")
 	if err != nil {
 		t.Fatalf("创建WebSocket服务器失败: %v", err)
 	}
@@ -124,8 +122,7 @@ func TestWebSocketServer_Listen(t *testing.T) {
 func TestWebSocketServer_Close(t *testing.T) {
 	glog.SetLogLevel(zap.DebugLevel)
 
-	server, err := NewServer(wsHandler, "ws://127.0.0.1:9993/ws",
-		WithCodec(wsCodec))
+	server, err := NewServer(wsHandler, "ws://127.0.0.1:9993/ws")
 	if err != nil {
 		t.Fatalf("创建WebSocket服务器失败: %v", err)
 	}
@@ -166,8 +163,7 @@ func TestWebSocketServer_Close(t *testing.T) {
 func TestWebSocketServer_MultipleClients(t *testing.T) {
 	glog.SetLogLevel(zap.DebugLevel)
 
-	server, err := NewServer(wsHandler, "ws://127.0.0.1:9994/ws",
-		WithCodec(wsCodec))
+	server, err := NewServer(wsHandler, "ws://127.0.0.1:9994/ws")
 	if err != nil {
 		t.Fatalf("创建WebSocket服务器失败: %v", err)
 	}
@@ -209,7 +205,7 @@ func TestWebSocketServer_MultipleClients(t *testing.T) {
 func TestWebSocketServer_CustomPath(t *testing.T) {
 	glog.SetLogLevel(zap.DebugLevel)
 
-	server, err := NewServer(wsHandler, "ws://127.0.0.1:9995/chat", WithCodec(wsCodec))
+	server, err := NewServer(wsHandler, "ws://127.0.0.1:9995/chat")
 	if err != nil {
 		t.Fatalf("创建WebSocket服务器失败: %v", err)
 	}
