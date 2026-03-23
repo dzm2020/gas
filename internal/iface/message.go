@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/dzm2020/gas/internal/pb"
+	"github.com/dzm2020/gas/api/pb"
 )
 
 var (

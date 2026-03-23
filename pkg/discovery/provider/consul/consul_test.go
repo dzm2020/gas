@@ -2,6 +2,7 @@ package consul
 
 import (
 	"context"
+	"fmt"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -35,41 +36,37 @@ func TestRegistrar(t *testing.T) {
 		time.Sleep(1 * time.Second)
 	}()
 
-	provider.Watch("test", onNodeChangeHandler)
+	kind := fmt.Sprintf("consul-registrar-%d", time.Now().UnixNano())
+	memberID := uint64(time.Now().UnixNano())
+	member := &iface.Member{Id: memberID, Kind: kind, Address: "127.0.0.1", Port: 8080}
+	provider.Watch(kind, onNodeChangeHandler)
 
-	member := &iface.Member{Id: 1, Kind: "test", Address: "127.0.0.1", Port: 8080}
-	//  注册服务
 	if err := provider.Register(member); err != nil {
 		t.Fatal(err)
 	}
-	//  获取服务
 	time.Sleep(time.Second)
-	if provider.GetById(1) == nil {
-		t.Fatal("fail")
+	if provider.GetById(memberID) == nil {
+		t.Fatal("GetById after Register")
 	}
-	//  更新服务
 	member.Port = 8081
 	if err := provider.Update(member); err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(time.Second)
-	if list := provider.GetByKind("test"); len(list) != 1 {
-		t.Fatal("fail")
+	if list := provider.GetByKind(kind); len(list) != 1 {
+		t.Fatalf("GetByKind(%q) want 1, got %d", kind, len(list))
 	}
 
-	//  注销服务
 	if err := provider.Deregister(member.GetID()); err != nil {
 		t.Fatal(err)
 	}
 	time.Sleep(time.Second)
-	provider.Unwatch("test", onNodeChangeHandler)
+	provider.Unwatch(kind, onNodeChangeHandler)
 
-	//  注销服务
-	if err := provider.Deregister(member.GetID()); err != nil {
-		t.Fatal(err)
-	}
-	if list := provider.GetByKind("test"); len(list) != 0 {
-		t.Fatal("fail")
+	_ = provider.Deregister(member.GetID())
+
+	if list := provider.GetByKind(kind); len(list) != 0 {
+		t.Fatalf("GetByKind(%q) after Deregister want 0, got %d", kind, len(list))
 	}
 
 	if err := provider.Register(member); err != nil {

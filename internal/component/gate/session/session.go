@@ -9,10 +9,10 @@ import (
 	"errors"
 	"strconv"
 
+	"github.com/dzm2020/gas/api/pb"
 	"github.com/dzm2020/gas/internal/component/gate/codec"
 	"github.com/dzm2020/gas/internal/component/gate/protocol"
 	"github.com/dzm2020/gas/internal/iface"
-	"github.com/dzm2020/gas/internal/pb"
 	"github.com/dzm2020/gas/pkg/glog"
 	"github.com/dzm2020/gas/pkg/lib/xerror"
 

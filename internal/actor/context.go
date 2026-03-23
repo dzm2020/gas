@@ -5,8 +5,8 @@ import (
 	"errors"
 	"time"
 
+	"github.com/dzm2020/gas/api/pb"
 	"github.com/dzm2020/gas/internal/iface"
-	"github.com/dzm2020/gas/internal/pb"
 	"github.com/dzm2020/gas/pkg/glog"
 	"github.com/dzm2020/gas/pkg/lib/serializer"
 	"github.com/dzm2020/gas/pkg/lib/timer"

@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/duke-git/lancet/v2/convertor"
+	"github.com/dzm2020/gas/api/pb"
 	"github.com/dzm2020/gas/internal/iface"
-	"github.com/dzm2020/gas/internal/pb"
 	"github.com/dzm2020/gas/pkg/cluster"
 	"github.com/dzm2020/gas/pkg/glog"
 	"github.com/dzm2020/gas/pkg/lib/serializer"
@@ -104,7 +104,7 @@ func NewClusterSystem(selfNodeID uint64, ser serializer.ISerializer, transport c
 // ClusterSystem 在 System 之上增加集群能力：本地消息走嵌入的 System，跨节点走 transport。
 // 事件订阅与 PublishLocal 使用嵌入 *System 的 IEventBus；PublishCluster 由本类型实现。
 type ClusterSystem struct {
-	*System // 本地 Actor 系统，负责本节点进程与消息
+	*System                     // 本地 Actor 系统，负责本节点进程与消息
 	selfNodeID uint64           // 本节点ID
 	transport  cluster.ICluster // 集群传输，用于跨节点 Send/Call 与事件 MQ
 	eventSub   messageQue.ISubscription

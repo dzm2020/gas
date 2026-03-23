@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package actor;
+
+option go_package = "github.com/dzm2020/gas/api/pb;pb";
+
+message Pid {
+    uint64 node_id    = 1;
+    string actor_name = 2;
+    uint64 actor_id   = 3;
+}
+
+message Message {
+    Pid to          = 1;
+    Pid from        = 2;
+    string method   = 3;
+    bytes data      = 4;
+    bool async      = 5;
+    int64 deadline  = 6;
+    Session session = 7;
+}
+
+message Response {
+    bytes data     = 1;
+    string err_msg = 2;
+}
+
+message Session {
+    int64 id                   = 1;
+    Pid agent                  = 2;
+    map<string, string> values = 3;
+}
+
+// EventEnvelope 集群事件在 MQ 上传输的载荷（subject 仍为 gas.event.{topic}）。
+message EventEnvelope {
+    string topic       = 1;
+    bytes payload      = 2;
+    uint64 source_node = 3;
+}

@@ -2,6 +2,8 @@ package cluster
 
 import (
 	"context"
+	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -17,9 +19,35 @@ import (
 	_ "github.com/dzm2020/gas/pkg/messageQue/provider/nats"
 )
 
+const clusterTestIDBase = uint64(8_000_000)
+
+var clusterTestSeq atomic.Uint64
+
+// allocClusterMemberID 生成与其它集成测试不易冲突的节点 ID（多包并行 go test 时减轻 Consul 串扰）。
+func allocClusterMemberID() uint64 {
+	return clusterTestSeq.Add(1) + clusterTestIDBase
+}
+
+func waitUntilMemberGone(t *testing.T, c ICluster, id uint64, d time.Duration) {
+	t.Helper()
+	deadline := time.Now().Add(d)
+	for time.Now().Before(deadline) {
+		if c.GetById(id) == nil {
+			return
+		}
+		time.Sleep(300 * time.Millisecond)
+	}
+	if c.GetById(id) != nil {
+		t.Fatalf("GetById(%d) 在 Deregister 后仍非 nil", id)
+	}
+}
+
+var clusterMQNameSeq atomic.Uint64
+
 func testConfig() *Config {
+	mqName := fmt.Sprintf("cluster-test-mq-%d", clusterMQNameSeq.Add(1))
 	return &Config{
-		Name: "cluster-test",
+		Name: mqName,
 		Discovery: &dis.Config{
 			Type: "consul",
 			Config: map[string]interface{}{
@@ -33,7 +61,7 @@ func testConfig() *Config {
 			Type: "nats",
 			Config: map[string]interface{}{
 				"servers": []string{"nats://127.0.0.1:4222"},
-				"name":    "cluster-test-mq",
+				"name":    mqName,
 			},
 		},
 	}
@@ -89,15 +117,16 @@ func TestCluster_Send(t *testing.T) {
 	if err := c.Send(999999, "msg"); err == nil {
 		t.Fatal("Send 不存在的节点应返回错误")
 	}
-	mem := &discovery.Member{Id: 1, Kind: "cluster-test-svc", Address: "127.0.0.1", Port: 8080, Status: "passing"}
+	mid := allocClusterMemberID()
+	mem := &discovery.Member{Id: mid, Kind: fmt.Sprintf("cluster-test-svc-%d", mid), Address: "127.0.0.1", Port: 8080, Status: "passing"}
 	if err := c.Register(mem); err != nil {
 		t.Fatalf("Register: %v", err)
 	}
 	waitSync(t)
-	if err := c.Send(1, "hello"); err != nil {
+	if err := c.Send(mid, "hello"); err != nil {
 		t.Fatalf("Send: %v", err)
 	}
-	_ = c.Deregister(1)
+	_ = c.Deregister(mid)
 }
 
 func TestCluster_Call(t *testing.T) {
@@ -109,23 +138,25 @@ func TestCluster_Call(t *testing.T) {
 		ch <- req
 		_ = resp([]byte("pong"))
 	}}
-	_, err := c.Subscribe(1, sub)
+	mid := allocClusterMemberID()
+	subject := fmt.Sprint(mid)
+	_, err := c.Subscribe(subject, sub)
 	if err != nil {
 		t.Fatalf("Subscribe: %v", err)
 	}
-	mem := &discovery.Member{Id: 1, Kind: "cluster-test-call", Address: "127.0.0.1", Port: 8081, Status: "passing"}
+	mem := &discovery.Member{Id: mid, Kind: fmt.Sprintf("cluster-test-call-%d", mid), Address: "127.0.0.1", Port: 8081, Status: "passing"}
 	if err := c.Register(mem); err != nil {
 		t.Fatalf("Register: %v", err)
 	}
 	waitSync(t)
-	data, err := c.Call(1, []byte("ping"), 2*time.Second)
+	data, err := c.Call(mid, []byte("ping"), 2*time.Second)
 	if err != nil {
 		t.Fatalf("Call: %v", err)
 	}
 	if string(data) != "pong" {
 		t.Errorf("Call 期望响应 pong, 得到 %q", data)
 	}
-	_ = c.Deregister(1)
+	_ = c.Deregister(mid)
 }
 
 type testSubscriber struct {
@@ -142,7 +173,8 @@ func TestCluster_Subscribe(t *testing.T) {
 	c, cleanup := createCluster(t)
 	defer cleanup()
 	sub := &testSubscriber{}
-	got, err := c.Subscribe(2, sub)
+	subID := allocClusterMemberID()
+	got, err := c.Subscribe(fmt.Sprint(subID), sub)
 	if err != nil {
 		t.Fatalf("Subscribe: %v", err)
 	}
@@ -160,75 +192,82 @@ func TestCluster_Select(t *testing.T) {
 	if err != ErrNotFoundMember {
 		t.Errorf("Select 无成员时应返回 ErrNotFoundMember, 得到 %v", err)
 	}
-	m1 := &discovery.Member{Id: 10, Kind: "cluster-test-select", Address: "127.0.0.1", Port: 9010, Tags: []string{"tag1"}, Status: "passing"}
-	m2 := &discovery.Member{Id: 20, Kind: "cluster-test-select", Address: "127.0.0.1", Port: 9020, Tags: []string{"tag1"}, Status: "passing"}
+	id1, id2 := allocClusterMemberID(), allocClusterMemberID()
+	tag := fmt.Sprintf("tag1-%d-%d", id1, id2)
+	m1 := &discovery.Member{Id: id1, Kind: fmt.Sprintf("cluster-test-select-%d", id1), Address: "127.0.0.1", Port: 9010, Tags: []string{tag}, Status: "passing"}
+	m2 := &discovery.Member{Id: id2, Kind: fmt.Sprintf("cluster-test-select-%d", id2), Address: "127.0.0.1", Port: 9020, Tags: []string{tag}, Status: "passing"}
 	_ = c.Register(m1)
 	_ = c.Register(m2)
 	waitSync(t)
-	id, err := c.Select("tag1", nil)
+	id, err := c.Select(tag, nil)
 	if err != nil {
 		t.Fatalf("Select: %v", err)
 	}
-	if id != 10 && id != 20 {
-		t.Errorf("Select 期望 10 或 20, 得到 %d", id)
+	if id != id1 && id != id2 {
+		t.Errorf("Select 期望 %d 或 %d, 得到 %d", id1, id2, id)
 	}
-	id, err = c.Select("tag1", RouteFirst)
-	if err != nil || (id != 10 && id != 20) {
+	id, err = c.Select(tag, RouteFirst)
+	if err != nil || (id != id1 && id != id2) {
 		t.Errorf("Select RouteFirst: id=%d err=%v", id, err)
 	}
-	_ = c.Deregister(10)
-	_ = c.Deregister(20)
+	_ = c.Deregister(id1)
+	_ = c.Deregister(id2)
 }
 
 func TestCluster_Register_Update_Deregister(t *testing.T) {
 	c, cleanup := createCluster(t)
 	defer cleanup()
-	mem := &discovery.Member{Id: 100, Kind: "cluster-test-reg", Address: "127.0.0.1", Port: 9100, Tags: []string{"t1"}, Status: "passing"}
+	mid := allocClusterMemberID()
+	kind := fmt.Sprintf("cluster-test-reg-%d", mid)
+	mem := &discovery.Member{Id: mid, Kind: kind, Address: "127.0.0.1", Port: 9100, Tags: []string{"t1"}, Status: "passing"}
 	if err := c.Register(mem); err != nil {
 		t.Fatalf("Register: %v", err)
 	}
 	waitSync(t)
-	if c.GetById(100) == nil {
-		t.Error("GetById(100) 应有已注册的 member")
+	if c.GetById(mid) == nil {
+		t.Errorf("GetById(%d) 应有已注册的 member", mid)
 	}
-	mem2 := &discovery.Member{Id: 100, Kind: "cluster-test-reg", Address: "127.0.0.1", Port: 9101, Tags: []string{"t1"}, Status: "warning"}
+	mem2 := &discovery.Member{Id: mid, Kind: kind, Address: "127.0.0.1", Port: 9101, Tags: []string{"t1"}, Status: "warning"}
 	if err := c.Update(mem2); err != nil {
 		t.Fatalf("Update: %v", err)
 	}
-	if err := c.Deregister(100); err != nil {
+	if err := c.Deregister(mid); err != nil {
 		t.Fatalf("Deregister: %v", err)
 	}
-	waitSync(t)
-	if c.GetById(100) != nil {
-		t.Error("Deregister 后 GetById(100) 应为 nil")
-	}
+	waitUntilMemberGone(t, c, mid, 15*time.Second)
 }
 
 func TestCluster_GetByKind_GetByTag_GetAll(t *testing.T) {
 	c, cleanup := createCluster(t)
 	defer cleanup()
-	m1 := &discovery.Member{Id: 201, Kind: "cluster-test-get", Address: "127.0.0.1", Port: 9201, Tags: []string{"tagA"}, Status: "passing"}
-	m2 := &discovery.Member{Id: 202, Kind: "cluster-test-get", Address: "127.0.0.1", Port: 9202, Tags: []string{"tagA"}, Status: "passing"}
-	m3 := &discovery.Member{Id: 203, Kind: "cluster-test-get2", Address: "127.0.0.1", Port: 9203, Tags: []string{"tagB"}, Status: "passing"}
+	id1, id2, id3 := allocClusterMemberID(), allocClusterMemberID(), allocClusterMemberID()
+	kindGet := fmt.Sprintf("cluster-test-get-%d", id1)
+	tagA := fmt.Sprintf("tagA-%d", id1)
+	tagB := fmt.Sprintf("tagB-%d", id1)
+	m1 := &discovery.Member{Id: id1, Kind: kindGet, Address: "127.0.0.1", Port: 9201, Tags: []string{tagA}, Status: "passing"}
+	m2 := &discovery.Member{Id: id2, Kind: kindGet, Address: "127.0.0.1", Port: 9202, Tags: []string{tagA}, Status: "passing"}
+	m3 := &discovery.Member{Id: id3, Kind: kindGet + "-x", Address: "127.0.0.1", Port: 9203, Tags: []string{tagB}, Status: "passing"}
 	_ = c.Register(m1)
 	_ = c.Register(m2)
 	_ = c.Register(m3)
 	waitSync(t)
-	byKind := c.GetByKind("cluster-test-get")
+	byKind := c.GetByKind(kindGet)
 	if len(byKind) != 2 {
-		t.Errorf("GetByKind(cluster-test-get) 期望 2, 得到 %d", len(byKind))
+		t.Errorf("GetByKind(%q) 期望 2, 得到 %d", kindGet, len(byKind))
 	}
-	byTag := c.GetByTag("tagA")
+	byTag := c.GetByTag(tagA)
 	if len(byTag) != 2 {
-		t.Errorf("GetByTag(tagA) 期望 2, 得到 %d", len(byTag))
+		t.Errorf("GetByTag(%q) 期望 2, 得到 %d", tagA, len(byTag))
 	}
 	all := c.GetAll()
-	if len(all) < 3 {
-		t.Errorf("GetAll 期望至少 3, 得到 %d", len(all))
+	for _, id := range []uint64{id1, id2, id3} {
+		if all[id] == nil {
+			t.Errorf("GetAll 应包含本用例注册的 id %d", id)
+		}
 	}
-	_ = c.Deregister(201)
-	_ = c.Deregister(202)
-	_ = c.Deregister(203)
+	_ = c.Deregister(id1)
+	_ = c.Deregister(id2)
+	_ = c.Deregister(id3)
 }
 
 func TestCluster_Watch_Unwatch(t *testing.T) {
@@ -238,11 +277,13 @@ func TestCluster_Watch_Unwatch(t *testing.T) {
 	handler := func(_ *discovery.Topology) { called = true }
 	c.Watch("cluster-test-watch", handler)
 	// 注册一个成员触发 topology 变更
-	mem := &discovery.Member{Id: 301, Kind: "cluster-test-watch", Address: "127.0.0.1", Port: 9301, Status: "passing"}
+	mid := allocClusterMemberID()
+	kind := fmt.Sprintf("cluster-test-watch-%d", mid)
+	mem := &discovery.Member{Id: mid, Kind: kind, Address: "127.0.0.1", Port: 9301, Status: "passing"}
 	_ = c.Register(mem)
 	waitSync(t)
-	c.Unwatch("cluster-test-watch", handler)
-	_ = c.Deregister(301)
+	c.Unwatch(kind, handler)
+	_ = c.Deregister(mid)
 	_ = called
 }
 

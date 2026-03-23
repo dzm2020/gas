@@ -1,4 +1,14 @@
-*idea
-*examples
-*bin
-*tools
+# IDE
+.idea/
+*.iml
+
+# 构建产物
+/bin/
+/bin.exe
+/dist/
+
+# 日志与测试产物（勿提交）
+*.log
+pkg/network/logs/
+tools/
+*dump
