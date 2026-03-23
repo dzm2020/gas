@@ -29,6 +29,10 @@ type IdWorker struct {
 
 var iw *IdWorker
 
+func init() {
+	Init(0)
+}
+
 func Init(workerId int64) {
 	iw = new(IdWorker)
 	iw.maxWorkerId = getMaxWorkerId()

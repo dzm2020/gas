@@ -115,6 +115,8 @@ func (n *Node) Startup(comps ...component.IComponent[iface.INode]) (err error) {
 		compsystem.New(),
 	}
 
+	uid.Init(int64(n.GetID()))
+
 	components = append(components, comps...)
 	for _, comp := range components {
 		if err = n.IManager.Register(comp); err != nil {
@@ -127,8 +129,6 @@ func (n *Node) Startup(comps ...component.IComponent[iface.INode]) (err error) {
 		glog.Error("组件启动失败", zap.Error(err))
 		return
 	}
-
-	uid.Init(int64(n.GetID()))
 
 	glog.Info("节点启动完成", zap.String("path", n.path), zap.Strings("component", n.IManager.GetComponentNames()))
 
