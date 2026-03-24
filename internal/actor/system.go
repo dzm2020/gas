@@ -47,8 +47,6 @@ func spawn(s iface.ISystem, actor iface.IActor, args ...interface{}) *iface.Pid 
 		serializer: s.Serializer(),
 	}
 
-	ctx.sessionFactory = s.SessionFactory()
-
 	mailBox := newMailbox()
 	process := newProcess(mailBox)
 	ctx.process = process
@@ -92,11 +90,10 @@ func newSystem(selfNodeID uint64, ser serializer.ISerializer) *System {
 type System struct {
 	stopper.Stopper
 	iface.IEventBus
-	selfNodeID     uint64
-	serializer     serializer.ISerializer
-	IdDict         *maputil.ConcurrentMap[uint64, iface.IContext] // ActorId -> IContext
-	nameDict       *maputil.ConcurrentMap[string, iface.IContext] // 名字 -> IContext
-	sessionFactory iface.ISessionFactory                          // 可选，用于从 *Session 构造 ISession，由 gate 等上层注入
+	selfNodeID uint64
+	serializer serializer.ISerializer
+	IdDict     *maputil.ConcurrentMap[uint64, iface.IContext] // ActorId -> IContext
+	nameDict   *maputil.ConcurrentMap[string, iface.IContext] // 名字 -> IContext
 }
 
 func (s *System) NextID() uint64 {
@@ -113,16 +110,6 @@ func (s *System) NodeId() uint64 {
 
 func (s *System) Serializer() serializer.ISerializer {
 	return s.serializer
-}
-
-// SetSessionFactory 设置 Session 工厂；传入 nil 表示不使用。由需要 session 能力的上层（如 gate）调用。
-func (s *System) SetSessionFactory(f iface.ISessionFactory) {
-	s.sessionFactory = f
-}
-
-// SessionFactory 实现 systemWithSessionFactory，供 spawn 注入到 actorContext。
-func (s *System) SessionFactory() iface.ISessionFactory {
-	return s.sessionFactory
 }
 
 // Spawn 创建并注册新 Actor 进程，投递 OnInit 任务后返回 Pid。

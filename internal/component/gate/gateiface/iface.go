@@ -4,8 +4,8 @@ package gateiface
 import (
 	"context"
 
+	"github.com/dzm2020/gas/api/pb"
 	"github.com/dzm2020/gas/internal/component/gate/protocol"
-	"github.com/dzm2020/gas/internal/component/gate/session"
 	"github.com/dzm2020/gas/internal/iface"
 	"github.com/dzm2020/gas/pkg/network"
 )
@@ -25,7 +25,7 @@ type IGate interface {
 type IAgent interface {
 	Context() iface.IContext
 	GetEntity() network.IConnection
-	GetSession() *session.Session
+	GetSession() *pb.Session
 	SetMiddleware(chain []IMiddleware)
 	AppendMiddleware(middlewares ...IMiddleware)
 	GetMiddleware() []IMiddleware

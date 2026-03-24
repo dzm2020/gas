@@ -11,7 +11,6 @@ import (
 	"github.com/dzm2020/gas/pkg/lib/serializer"
 	"github.com/dzm2020/gas/pkg/lib/timer"
 
-	"github.com/duke-git/lancet/v2/convertor"
 	"go.uber.org/zap"
 )
 
@@ -21,15 +20,14 @@ const DefaultCallTimeout = 3 * time.Second
 var _ iface.IContext = (*actorContext)(nil)
 
 type actorContext struct {
-	process        iface.IProcess // 保存自己的 process 引用
-	pid            *iface.Pid
-	actor          iface.IActor
-	router         iface.IRouter
-	msg            *iface.ActorMessage
-	system         iface.ISystem
-	timeout        time.Duration
-	serializer     serializer.ISerializer
-	sessionFactory iface.ISessionFactory // 可选，由 System 注入，用于解耦 session 实现
+	process    iface.IProcess // 保存自己的 process 引用
+	pid        *iface.Pid
+	actor      iface.IActor
+	router     iface.IRouter
+	msg        *iface.ActorMessage
+	system     iface.ISystem
+	timeout    time.Duration
+	serializer serializer.ISerializer
 }
 
 func (a *actorContext) ID() *iface.Pid {
@@ -136,12 +134,7 @@ func (a *actorContext) handleMessage(m *iface.ActorMessage) error {
 
 // execHandler 基于方法名执行处理器
 func (a *actorContext) execHandler(msg *pb.Message) ([]byte, error) {
-	var s iface.ISession
-	if msg.GetSession() != nil && a.sessionFactory != nil {
-		raw := convertor.DeepClone(msg.GetSession())
-		s = a.sessionFactory.FromRaw(a, raw)
-	}
-	return a.router.Handle(a, msg.GetMethod(), s, msg.GetData())
+	return a.router.Handle(a, msg.GetMethod(), msg.GetSession(), msg.GetData())
 }
 
 func (a *actorContext) Send(pid *iface.Pid, methodName string, request interface{}) (err error) {

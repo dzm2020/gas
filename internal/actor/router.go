@@ -8,6 +8,7 @@ import (
 	"sync"
 	"unicode"
 
+	"github.com/dzm2020/gas/api/pb"
 	"github.com/dzm2020/gas/internal/iface"
 	"github.com/dzm2020/gas/pkg/glog"
 	"github.com/dzm2020/gas/pkg/lib/xerror"
@@ -63,7 +64,7 @@ var (
 	typeOfActorContext = reflect.TypeOf((*iface.IContext)(nil)).Elem()
 	typeOfError        = reflect.TypeOf((*error)(nil)).Elem()
 	typeOfByteArray    = reflect.TypeOf(([]byte)(nil))
-	typeOfISession     = reflect.TypeOf((*iface.ISession)(nil)).Elem() // 用于判断会话参数，不依赖具体实现
+	typeOfISession     = reflect.TypeOf((*pb.Session)(nil)).Elem() // 用于判断会话参数，不依赖具体实现
 )
 
 // AutoRegister 自动扫描并注册 actor 的所有导出方法
@@ -223,7 +224,7 @@ func (r *Router) parseThreeParamEntry(entry *routerEntry, methodType reflect.Typ
 }
 
 // Handle 基于方法名处理消息，从 message.Data 反序列化参数
-func (r *Router) Handle(ctx iface.IContext, methodName string, session iface.ISession, data []byte) ([]byte, error) {
+func (r *Router) Handle(ctx iface.IContext, methodName string, session *pb.Session, data []byte) ([]byte, error) {
 	r.mu.RLock()
 	entry, ok := r.methodRoutes[methodName]
 	r.mu.RUnlock()
@@ -266,7 +267,7 @@ func (r *Router) HasRoute(methodName string) bool {
 }
 
 // buildCallArgs 构建调用参数
-func (r *Router) buildCallArgs(ctx iface.IContext, entry routerEntry, session iface.ISession, data []byte) ([]reflect.Value, error) {
+func (r *Router) buildCallArgs(ctx iface.IContext, entry routerEntry, session *pb.Session, data []byte) ([]reflect.Value, error) {
 	actor := ctx.Actor()
 
 	callArgs := []reflect.Value{reflect.ValueOf(actor), reflect.ValueOf(ctx)}
@@ -329,7 +330,7 @@ func (r *Router) handleAsyncMessage(ctx iface.IContext, methodName string, data 
 }
 
 // handleSessionMessage 处理会话消息
-func (r *Router) handleSessionMessage(ctx iface.IContext, methodName string, session iface.ISession, data []byte, entry routerEntry) ([]byte, error) {
+func (r *Router) handleSessionMessage(ctx iface.IContext, methodName string, session *pb.Session, data []byte, entry routerEntry) ([]byte, error) {
 	callArgs, err := r.buildCallArgs(ctx, entry, session, data)
 	if err != nil {
 		return nil, err
@@ -338,7 +339,7 @@ func (r *Router) handleSessionMessage(ctx iface.IContext, methodName string, ses
 }
 
 // handleSessionOnlyMessage 处理仅会话消息（无request参数）
-func (r *Router) handleSessionOnlyMessage(ctx iface.IContext, methodName string, session iface.ISession, entry routerEntry) ([]byte, error) {
+func (r *Router) handleSessionOnlyMessage(ctx iface.IContext, methodName string, session *pb.Session, entry routerEntry) ([]byte, error) {
 	callArgs, err := r.buildCallArgs(ctx, entry, session, nil)
 	if err != nil {
 		return nil, err

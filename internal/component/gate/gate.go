@@ -10,7 +10,6 @@ import (
 	"github.com/dzm2020/gas/internal/component/gate/codec"
 	"github.com/dzm2020/gas/internal/component/gate/gateiface"
 	"github.com/dzm2020/gas/internal/component/gate/protocol"
-	"github.com/dzm2020/gas/internal/component/gate/session"
 	"github.com/dzm2020/gas/internal/iface"
 	"github.com/dzm2020/gas/pkg/glog"
 	"github.com/dzm2020/gas/pkg/lib/reflectutil"
@@ -114,7 +113,6 @@ func (g *Gate) Start(ctx context.Context) (err error) {
 	if err != nil {
 		return
 	}
-	g.system.SetSessionFactory(&session.Factory{})
 	return g.server.Start()
 }
 

@@ -28,9 +28,6 @@ type (
 		NodeId() uint64
 		NextID() uint64
 
-		SessionFactory() ISessionFactory
-		SetSessionFactory(f ISessionFactory)
-
 		Serializer() serializer.ISerializer
 		Spawn(actor IActor, args ...interface{}) *Pid
 
@@ -86,26 +83,9 @@ type (
 	}
 
 	IRouter interface {
-		Handle(ctx IContext, methodName string, session ISession, data []byte) ([]byte, error)
+		Handle(ctx IContext, methodName string, session *pb.Session, data []byte) ([]byte, error)
 		HasRoute(methodName string) bool
 		AutoRegister(actor IActor)
-	}
-
-	ISession interface {
-		GetId() int64
-		Raw() *pb.Session
-		SetString(key, value string)
-		GetString(key string) string
-		SetUint64(key string, value uint64)
-		GetUint64(key string) uint64
-		SetInt64(key string, value int64)
-		GetInt64(key string) int64
-	}
-
-	// ISessionFactory 由上层（如 gate）实现，用于在 actor 处理消息时把 *Session 包装成可写的 ISession。
-	// actor 包仅依赖此接口，不依赖具体 session 实现。
-	ISessionFactory interface {
-		FromRaw(ctx IContext, raw *pb.Session) ISession
 	}
 )
 

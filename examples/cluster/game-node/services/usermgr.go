@@ -2,7 +2,6 @@ package services
 
 import (
 	"github.com/dzm2020/gas/examples/cluster/common"
-	"github.com/dzm2020/gas/internal/component/gate/session"
 	"github.com/dzm2020/gas/internal/iface"
 	"github.com/dzm2020/gas/pkg/glog"
 	"go.uber.org/zap"
@@ -40,19 +39,13 @@ func (a *GameActor) OnMessage(ctx iface.IContext, msg interface{}) error {
 	return nil
 }
 
-func (a *GameActor) OnHandlerLogin(ctx iface.IContext, s iface.ISession, request *common.LoginRequest) error {
-	ses := s.(*session.Session)
+func (a *GameActor) OnHandlerLogin(ctx iface.IContext, request *common.LoginRequest) error {
 
 	glog.Infof("user mgr OnHandlerLogin received")
 
 	request.Uid = 123456
-
-	err := ses.Response([]byte("service response 1"))
-
-	err = ses.ResponseErr(123)
-
-	_ = err
-	return ses.Response([]byte("service response 2"))
+	// 带网关 Session 的路由里可通过 ctx.Message().Session 与 session 包函数向客户端回复，此处为集群内示例节点，无 *session.Session。
+	return nil
 }
 
 func (a *GameActor) OnHandlerSyncMessage(ctx iface.IContext, request *common.ChatMessageRequest, response *common.ChatMessageResponse) error {

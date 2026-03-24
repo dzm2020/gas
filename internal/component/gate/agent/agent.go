@@ -52,7 +52,7 @@ type Agent struct {
 	iface.Actor
 	gateiface.IBusinessHandler
 	ctx         iface.IContext
-	session     *session.Session
+	session     *pb.Session
 	entity      network.IConnection
 	middlewares []gateiface.IMiddleware
 }
@@ -72,11 +72,11 @@ func (agent *Agent) OnInit(ctx iface.IContext, params []interface{}) error {
 	if err != nil {
 		return xerror.Wrapf(err, "uid.NextId for session")
 	}
-	agent.session = session.New(&pb.Session{
+	agent.session = &pb.Session{
 		Id:     sessionID,
 		Agent:  ctx.ID(),
 		Values: make(map[string]string),
-	}, ctx)
+	}
 
 	agent.entity = entity
 	return agent.IBusinessHandler.OnInit(agent)
@@ -101,12 +101,12 @@ func (agent *Agent) OnData(msg *protocol.Message) (err error) {
 }
 
 func (agent *Agent) prepareRequest(msg *protocol.Message) {
-	agent.session.SetMessage(msg)
+	session.SetMessage(agent.session, msg)
 
 	actorMessage := agent.ctx.Message()
 	actorMessage.To = agent.ctx.ID()
 	actorMessage.Data = msg.Data
-	actorMessage.Session = agent.session.Raw()
+	actorMessage.Session = agent.GetSession()
 }
 
 // OnStop
@@ -142,7 +142,7 @@ func (agent *Agent) Context() iface.IContext {
 //	@Description:获取session
 //	@receiver agent
 //	@return *session.Session
-func (agent *Agent) GetSession() *session.Session {
+func (agent *Agent) GetSession() *pb.Session {
 	return agent.session
 }
 
