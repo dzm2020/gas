@@ -8,6 +8,7 @@
 - **节点与组件**：`Node` 管理配置加载（Profile）、日志（Logger）、集群（Cluster）、Actor 系统（System）及可选 Gate、Redis 等组件的启停与依赖顺序。
 - **Gate 网关**：监听 TCP / UDP / WebSocket，为每条连接绑定一个 Agent（Actor），协议解包后消息投递到对应 Agent，通过 Session 做响应与推送；支持中间件（日志、压缩、加密、限流等）。
 - **集群**：基于服务发现（如 Consul）与消息队列（如 NATS）实现节点注册、按节点 Send/Call、按 Tag 选节点、拓扑变更监听。
+- **事件总线**：基于 **topic** 字符串与 **`[]byte` 载荷**的发布订阅；支持本节点 **`PublishLocal`** 与集群 **`PublishCluster`**（经 MQ 广播后各节点再本地分发）；订阅回调通过 **`SubmitTask`** 在**订阅者 Actor 的邮箱协程**中与 `OnMessage` 同模型串行执行。
 - **可扩展**：核心能力通过接口抽象（`internal/iface`），序列化支持 JSON / MsgPack / Protobuf，组件可按需挂载。
 
 ## 安装
@@ -76,6 +77,21 @@ _ = sys.SendMessage(msg)
 - **Gate**：可选组件，从 Profile 的 `gate` 段读监听地址、最大连接数等并启动网络服务。
 
 集群配置示例（`cluster` 段）：需配置 `discovery`（如 type: consul）和 `messageQueue`（如 type: nats），并设 `single-node: false`。同一程序多进程、不同配置文件（不同 node.id/端口）即可组成集群。
+
+## 事件说明
+
+框架内「事件」指 **Actor 事件总线**（`IContext` / `ISystem` 上的 `Subscribe`、`PublishLocal`、`PublishCluster`），与 **`Send`/`Call` 的 Actor 消息**是两套机制：事件按 **topic** 多播给所有订阅者，载荷为 **`[]byte`**，由业务自行约定编码（如 JSON、Protobuf）。
+
+| 能力 | 说明 |
+|------|------|
+| **`Subscribe`** | 以**当前 Actor**为订阅者注册 `EventHandler`；仅允许订阅**本节点** Actor（`Pid` 与当前节点一致）。 |
+| **`PublishLocal`** | 仅在本节点总线查找订阅表并投递，**不经消息队列**。 |
+| **`PublishCluster`** | 将事件发到 MQ（subject 前缀 `gas.event.`，与节点收件箱用的数字 subject 隔离）；各节点收到后在本地再执行 **`PublishLocal`**。 |
+| **纯本地 `NewSystem`** | 未挂载集群传输时，`PublishCluster` 会返回 **`ErrEventNoCluster`**；`PublishLocal` 始终可用。 |
+
+**注意**：`PublishLocal` 会对**每个订阅者**复制一份 `payload` 再入队，高 QPS 或大 body 时注意开销；宜传小消息或传引用类标识由订阅方再拉数据。
+
+**易混淆**：`pkg/lib/event` 的 **`Listener[V]`** 是进程内同步回调列表，**不是** Actor 事件总线；二者对比见 **[`docs/event.md`](docs/event.md)**（含流程说明与示例测试路径）。
 
 ## 项目结构概要
 
