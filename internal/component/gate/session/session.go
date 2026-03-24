@@ -65,14 +65,13 @@ func SetMessage(s *pb.Session, msg *protocol.Message) {
 	SetString(s, ClientMessage, base64.StdEncoding.EncodeToString(value))
 }
 
-// SyncValues 将 Values 同步到对端 Agent（经 HandlerSetValue）。
-func SyncValues(ctx iface.IContext, s *pb.Session) error {
+func SetValue(ctx iface.IContext, s *pb.Session, values map[string]string) error {
 	if s == nil {
 		return ErrSessionIsNil
 	}
 	ensureSessionPB(s)
 	trans := newTransport(ctx, s.GetAgent())
-	return trans.setValue(s.Values)
+	return trans.setValue(values)
 }
 
 // Response 向对端推送业务响应（与 type Response 区分）。

@@ -48,6 +48,7 @@ func (a *GameActor) OnHandlerLogin(ctx iface.IContext, s *pb.Session, request *c
 	request.Uid = 123456
 
 	session.Response(ctx, s, []byte("response message"))
+
 	return nil
 }
 
