@@ -17,9 +17,6 @@ import (
 	"go.uber.org/zap"
 )
 
-// MaxSessionMessageBytes 为会话内编码后的单帧客户端消息上限，避免过大负载随 ActorMessage 在集群中传递。
-const MaxSessionMessageBytes = 512 * 1024
-
 // 与对端 Agent 路由方法名一致，用于 Actor 消息的 method 字段。
 const (
 	sessionMethodPush     = "HandlerPush"
@@ -30,8 +27,6 @@ const (
 var (
 	// ErrSessionIsNil 表示 ctx.Message() 为空或未携带 Session。
 	ErrSessionIsNil = errors.New("session is nil")
-	// ErrSessionMessageTooLarge 表示编码后的客户端消息超过 MaxSessionMessageBytes。
-	ErrSessionMessageTooLarge = errors.New("session: encoded message exceeds MaxSessionMessageBytes")
 )
 
 // protocolMessageFromSession 从会话 Msg 解码当前请求协议消息（与 SetMessage 写入格式一致）。
@@ -62,9 +57,6 @@ func SetMessage(s iface.ISession, msg *protocol.Message) error {
 	if err != nil {
 		glog.Warn("session.SetMessage encode failed", zap.Error(err))
 		return err
-	}
-	if len(bin) > MaxSessionMessageBytes {
-		return ErrSessionMessageTooLarge
 	}
 	s.SetMessage(bin)
 	return nil

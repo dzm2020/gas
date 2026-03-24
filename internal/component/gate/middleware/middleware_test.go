@@ -9,7 +9,6 @@ import (
 	"github.com/dzm2020/gas/internal/component/gate/codec"
 	"github.com/dzm2020/gas/internal/component/gate/gateiface"
 	"github.com/dzm2020/gas/internal/component/gate/protocol"
-	"github.com/dzm2020/gas/internal/component/gate/session"
 	"github.com/dzm2020/gas/internal/iface"
 	"github.com/dzm2020/gas/pkg/network"
 	"golang.org/x/time/rate"
@@ -145,7 +144,7 @@ type mockAgentForEncrypt struct {
 
 func (m *mockAgentForEncrypt) Context() iface.IContext                   { return nil }
 func (m *mockAgentForEncrypt) GetEntity() network.IConnection            { return nil }
-func (m *mockAgentForEncrypt) GetSession() *session.Session              { return nil }
+func (m *mockAgentForEncrypt) GetSession() iface.ISession               { return nil }
 func (m *mockAgentForEncrypt) SetMiddleware([]gateiface.IMiddleware)     {}
 func (m *mockAgentForEncrypt) AppendMiddleware(...gateiface.IMiddleware) {}
 func (m *mockAgentForEncrypt) GetMiddleware() []gateiface.IMiddleware    { return nil }
