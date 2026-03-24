@@ -106,11 +106,10 @@ func (b *localEventBus) dispatch(topic string, payload []byte) {
 	}
 	for _, rec := range jobs {
 		topicCopy := topic
-		payloadCopy := append([]byte(nil), payload...)
 		pid := rec.subscriber
 		fn := rec.fn
 		if err := sub.SubmitTask(pid, func(_ iface.IContext) error {
-			fn(topicCopy, payloadCopy)
+			fn(topicCopy, payload)
 			return nil
 		}); err != nil {
 			glog.Error("event: 投递到订阅 Actor 失败", zap.Error(err), zap.String("topic", topicCopy), zap.Any("subscriber", pid))

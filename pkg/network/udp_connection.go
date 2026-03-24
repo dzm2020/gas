@@ -11,26 +11,26 @@ import (
 // ------------------------------ UDP虚拟连接 ------------------------------
 
 type UDPConnection struct {
-	*baseConn     // 嵌入基类
-	remoteAddr    *net.UDPAddr
-	conn          *net.UDPConn // 底层UDP连接（由 UDPServer 共享）
-	connKey       string       // 连接键值（用于从管理器中移除）
-	rcvChan       chan []byte
-	sendChan      chan<- *udpPacket
-	udpConnMgr    *ConnManager // 与 baseConn.connMgr 同一实例，用于 RemoveUDP
+	*baseConn  // 嵌入基类
+	remoteAddr *net.UDPAddr
+	conn       *net.UDPConn // 底层UDP连接（由 UDPServer 共享）
+	connKey    string       // 连接键值（用于从管理器中移除）
+	rcvChan    chan []byte
+	sendChan   chan<- *udpPacket
+	udpConnMgr *ConnManager // 与 baseConn.connMgr 同一实例，用于 RemoveUDP
 }
 
 func newUDPConnection(ctx context.Context, conn *net.UDPConn, typ ConnType, remoteAddr *net.UDPAddr, server *UDPServer) *UDPConnection {
 	base := newBaseConn(ctx, "udp", typ, conn, remoteAddr, server.options, server.connMgr)
 	connKey := remoteAddr.String()
 	udpConn := &UDPConnection{
-		baseConn:    base,
-		remoteAddr:  remoteAddr,
-		conn:        conn,
-		connKey:     connKey,
-		rcvChan:     make(chan []byte, server.options.UdpRcvChanSize),
-		sendChan:    server.sendChan,
-		udpConnMgr:  server.connMgr,
+		baseConn:   base,
+		remoteAddr: remoteAddr,
+		conn:       conn,
+		connKey:    connKey,
+		rcvChan:    make(chan []byte, server.options.UdpRcvChanSize),
+		sendChan:   server.sendChan,
+		udpConnMgr: server.connMgr,
 	}
 	return udpConn
 }
@@ -39,9 +39,10 @@ func (c *UDPConnection) Send(data []byte) error {
 	if c.IsStop() {
 		return ErrConnectionClosed
 	}
-
+	// 异步发送。若调用方在返回后修改同一块缓冲区，可能与发送并发冲突
+	copyData := append([]byte(nil), data...)
 	select {
-	case c.sendChan <- &udpPacket{data: data, remoteAddr: c.remoteAddr}:
+	case c.sendChan <- &udpPacket{data: copyData, remoteAddr: c.remoteAddr}:
 	default:
 		return ErrChannelFull
 	}

@@ -302,17 +302,11 @@ func (s *System) Shutdown() error {
 	if !s.Stop() {
 		return ErrSystemShuttingDown
 	}
-
 	processes := s.GetAllProcesses()
-	var lastErr error
 	for _, process := range processes {
 		if err := process.Shutdown(); err != nil {
 			glog.Error("关闭进程失败", zap.Error(err))
-			lastErr = err
 		}
-	}
-	if lastErr != nil {
-		return xerror.Wrap(lastErr, "关闭进程时发生错误")
 	}
 	return nil
 }

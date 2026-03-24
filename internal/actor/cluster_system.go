@@ -17,6 +17,8 @@ import (
 	"go.uber.org/zap"
 )
 
+// eventSubscriber
+// @Description: 集群事件回调
 type eventSubscriber struct {
 	system *System
 }
@@ -25,6 +27,7 @@ type eventSubscriber struct {
 func (c *eventSubscriber) OnMessage(data []byte, _ func([]byte) error) {
 	env := &pb.EventEnvelope{}
 	if err := c.system.Serializer().Unmarshal(data, env); err != nil {
+		glog.Error("集群：处理事件订阅消息失败", zap.Error(err))
 		return
 	}
 	if env.Topic == "" {
@@ -33,42 +36,43 @@ func (c *eventSubscriber) OnMessage(data []byte, _ func([]byte) error) {
 	c.system.PublishLocal(env.Topic, env.Payload)
 }
 
+// messageSubscriber
+// @Description: 集群actor消息回调
 type messageSubscriber struct {
 	system *System
 }
 
 func (r *messageSubscriber) OnMessage(data []byte, response func(data []byte) error) {
-	message := &pb.Message{}
-	var err error
-	defer func() {
-		if err != nil {
-			glog.Error("集群：处理消息失败", zap.Error(err), zap.Any("message", message))
-		}
-	}()
+	msg := &iface.ActorMessage{Message: &pb.Message{}}
 
 	ser := r.system.Serializer()
-	if err = ser.Unmarshal(data, message); err != nil {
+	if err := ser.Unmarshal(data, msg.Message); err != nil {
+		glog.Error("集群：处理消息失败", zap.Error(err))
 		return
 	}
-	msg := &iface.ActorMessage{Message: message}
-
-	glog.Debug("集群：处理消息", zap.Any("message", message))
-
 	system := r.system
 	if msg.GetAsync() {
-		err = system.SendMessage(msg)
-	} else {
-		//  调用本地 actor（传输层已有完整 Message，使用 CallMessage）
-		responseData, responseErr := system.CallMessage(msg)
-		//  打包结果
-		responseMessage := iface.NewResponse(responseData, responseErr)
-		responseData, err = ser.Marshal(responseMessage)
-		if err != nil {
+		if err := system.SendMessage(msg); err != nil {
+			glog.Error("集群：处理消息失败", zap.Error(err))
 			return
 		}
-		//  写入到消息队列
-		err = response(responseData)
+		return
 	}
+	//  调用本地 actor（传输层已有完整 Message，使用 CallMessage）
+	responseData, responseErr := system.CallMessage(msg)
+	//  打包结果
+	responseMessage := iface.NewResponse(responseData, responseErr)
+	responseData, err := ser.Marshal(responseMessage)
+	if err != nil {
+		glog.Error("集群：处理消息失败", zap.Error(err))
+		return
+	}
+	//  写入到消息队列
+	if err := response(responseData); err != nil {
+		glog.Error("集群：处理消息失败", zap.Error(err))
+		return
+	}
+	glog.Debug("集群：处理消息", zap.Any("message", msg))
 }
 
 var (
@@ -90,6 +94,7 @@ func NewClusterSystem(selfNodeID uint64, ser serializer.ISerializer, transport c
 
 	//  消息订阅
 	if _, err = transport.Subscribe(convertor.ToString(selfNodeID), &messageSubscriber{system: sys}); err != nil {
+		_ = sub.Unsubscribe()
 		return nil, err
 	}
 
