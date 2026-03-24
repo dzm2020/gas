@@ -87,11 +87,34 @@ go test ./examples/event/... -count=1 -v
 
 ---
 
-## 7. 实现索引
+## 7. 与 `pkg/lib/event` 的区别
+
+本仓库存在两套名称相近、用途不同的「事件」能力，请勿混淆：
+
+| | **Actor 事件总线**（本文档） | **`pkg/lib/event.Listener`** |
+|---|------------------------------|-----------------------------|
+| **定位** | 框架内 topic + `[]byte`，与 Actor 邮箱、`IContext.Subscribe` 集成 | 泛型 `Listener[V]`，进程内同步回调列表 |
+| **执行模型** | 经 `SubmitTask` 在**订阅者 Actor 邮箱协程**中串行执行 | `Notify` 在**调用方 goroutine** 内同步遍历 handler |
+| **跨节点** | 支持 `PublishCluster`（经 MQ + 各节点 `PublishLocal`） | 无，仅本进程 |
+| **典型用途** | 业务领域事件、节点间广播 | 组件内部钩子、UI/配置变更通知等轻量监听 |
+
+详见 `docs/lib.md` 中 **2.12 event** 小节。
+
+---
+
+## 8. `PublishLocal` 与负载大小
+
+`PublishLocal` 会对**每个订阅者**复制一份 `payload` 再投递到对应 Actor 邮箱，以保证隔离与线程安全。在高 QPS、大 body 或单 topic 订阅者很多时，内存与调度开销会放大。
+
+**建议**：优先传递**小消息**（如 ID、版本号、短通知）；若必须传较大数据，考虑只传引用（键名、路径）由订阅方自行加载，或评估专用数据通道。
+
+---
+
+## 9. 实现索引
 
 | 内容 | 位置 |
 |------|------|
 | 本地总线与常量前缀 | `internal/actor/event_bus.go` |
 | 集群发布/订阅与 `EventEnvelope` 投递 | `internal/actor/cluster_system.go` |
 | `IContext` 上的 Subscribe/Publish* | `internal/actor/context.go` |
-| MQ 载荷定义 | `internal/pb/actor.proto`（`EventEnvelope`） |
+| MQ 载荷定义 | `api/pb/actor.proto`（`EventEnvelope`） |

@@ -5,16 +5,17 @@ go 1.25.3
 require (
 	github.com/RussellLuo/timingwheel v0.0.0-20220218152713-54845bda3108
 	github.com/duke-git/lancet/v2 v2.3.8
-	github.com/go-redis/redis/v8 v8.11.5
 	github.com/gorilla/websocket v1.5.3
 	github.com/hashicorp/consul/api v1.33.0
 	github.com/nats-io/nats.go v1.47.0
 	github.com/panjf2000/ants/v2 v2.11.3
+	github.com/redis/go-redis/v9 v9.18.0
 	github.com/spf13/viper v1.21.0
 	github.com/vmihailenco/msgpack/v5 v5.4.1
-	go.uber.org/atomic v1.9.0
+	go.uber.org/atomic v1.11.0
 	go.uber.org/zap v1.27.0
 	golang.org/x/exp v0.0.0-20250808145144-a408d31f581a
+	golang.org/x/time v0.15.0
 	google.golang.org/protobuf v1.34.2
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 	gopkg.in/yaml.v3 v3.0.1
@@ -22,7 +23,7 @@ require (
 
 require (
 	github.com/armon/go-metrics v0.4.1 // indirect
-	github.com/cespare/xxhash/v2 v2.1.2 // indirect
+	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/fatih/color v1.16.0 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
@@ -55,5 +56,4 @@ require (
 	golang.org/x/sync v0.16.0 // indirect
 	golang.org/x/sys v0.35.0 // indirect
 	golang.org/x/text v0.28.0 // indirect
-	golang.org/x/time v0.15.0 // indirect
 )

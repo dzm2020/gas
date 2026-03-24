@@ -58,19 +58,13 @@ func (m *ConnManager) ConnectionCount() int64 {
 	return m.count.Load()
 }
 
-// GetAll 返回当前所有连接的副本；先复制 keys 再按 key 取连接，缩短单次持锁时间。
+// GetAll 返回当前所有连接在单次读锁内的快照副本；持锁时间短，连接规模通常有限，语义为「某一时刻的一致性视图」。
 func (m *ConnManager) GetAll() []IConnection {
 	m.mu.RLock()
-	keys := make([]int64, 0, len(m.connections))
-	for id := range m.connections {
-		keys = append(keys, id)
-	}
-	m.mu.RUnlock()
-	m.mu.RLock()
 	defer m.mu.RUnlock()
-	conns := make([]IConnection, 0, len(keys))
-	for _, id := range keys {
-		if conn := m.connections[id]; conn != nil {
+	conns := make([]IConnection, 0, len(m.connections))
+	for _, conn := range m.connections {
+		if conn != nil {
 			conns = append(conns, conn)
 		}
 	}

@@ -9,8 +9,8 @@
 
 # 日志与测试产物（勿提交）
 *.log
-pkg/network/logs/
+**/logs/
 *dump
 
-# 一些第三方执行文件
-tools/
+# 勿使用 *examples / *tools 等宽泛通配，以免误忽略路径名含该子串的源码。
+tools

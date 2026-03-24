@@ -2,6 +2,17 @@
 
 ---
 
+## 0. 本仓库模块边界与 `go get`
+
+本仓库 **根模块**（`github.com/dzm2020/gas`）按 Go 惯例将大量实现放在 **`internal/`** 下：根据 Go 规则，**其他模块无法 `import` 本仓库的 `internal/...`**。
+
+因此：
+
+- README 与 **`examples/`** 中的 `import "github.com/dzm2020/gas/internal/..."` **仅在本仓库根目录作为 `main` 或测试构建时有效**；若你在**另一个** Go 模块里执行 `go get github.com/dzm2020/gas`，不能直接复制这些 import 路径编译通过。
+- 当前定位可理解为：**单模块应用 / 以本仓库为根的框架**，对外可复用部分主要在 **`pkg/`**（如 `pkg/cluster`、`pkg/network`、`pkg/discovery` 等）；若需第三方与示例一致的 Node/Gate/Actor 组装方式，需将相应 API **逐步下沉到 `pkg/`**（中长期演进），或采用 **fork / 模块 replace** 等同源复用方式。
+
+---
+
 ## 1. 包的概述
 
 `pkg/lib` 由多个**子包**组成，无根包；各子包独立导入使用。
@@ -173,13 +184,17 @@ Register/Start/Stop 在非法调用时返回包内错误变量（如 ErrCannotRe
 
 ### 2.12 event
 
+与 **Actor 事件总线**（`internal/actor`、`IContext.Subscribe`、`PublishLocal` / `PublishCluster`）不是同一套机制；对比说明见 **`docs/event.md` 第 7 节**。
+
 | 类型/函数/方法 | 说明 |
 |----------------|------|
 | `Listener[V any]` | 结构体，泛型事件监听器。 |
 | `NewListener[V any]() *Listener[V]` | 创建监听器。 |
-| `(m *Listener[V]) Register(handler func(V))` | 注册处理函数，重复不追加。 |
+| `(m *Listener[V]) Register(handler func(V))` | 注册处理函数；已存在同一函数指针则不再追加。 |
 | `(m *Listener[V]) UnRegister(handler func(V))` | 注销处理函数。 |
 | `(m *Listener[V]) Notify(param V)` | 同步调用所有已注册 handler(param)。 |
+
+**实现说明**：`Register` / `UnRegister` 通过 **函数指针（reflect 比较）** 判断是否「同一 handler」。每次传入的**闭包**即使逻辑相同，也会被视为不同 handler，可能导致重复注册；热路径若需稳定注销，请使用**具名函数**或包级变量函数，而非内联 `func(...) { ... }` 闭包。
 
 ---
 

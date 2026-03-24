@@ -1,3 +1,7 @@
+// Package event 提供泛型 Listener[V]：在调用方 goroutine 内同步通知多个 handler。
+// 与 Actor 的 topic 事件总线（internal/actor、IContext.Subscribe、PublishLocal/PublishCluster）语义不同，见 docs/event.md。
+//
+// Register/UnRegister 使用函数指针比较；闭包每次为不同指针，重复注册时不会与已有项合并。
 package event
 
 import (

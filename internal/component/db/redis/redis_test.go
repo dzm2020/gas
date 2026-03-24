@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/duke-git/lancet/v2/retry"
-	"github.com/go-redis/redis/v8"
+	"github.com/redis/go-redis/v9"
 )
 
 func Init(t *testing.T) {

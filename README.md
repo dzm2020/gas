@@ -16,8 +16,12 @@
 go get github.com/dzm2020/gas
 ```
 
-- **Go**：1.25.3+（见 `go.mod`）
-- **主要依赖**：zap、viper、redis、nats、consul、protobuf、gorilla/websocket 等。
+- **Go**：1.25.3+（见 `go.mod`）；CI 与本地请对齐同一工具链版本，避免行为差异。
+- **主要依赖**：zap、viper、[go-redis v9](https://github.com/redis/go-redis)、nats、consul、protobuf、gorilla/websocket 等。
+
+### 模块边界说明
+
+示例与文档中的 `import "github.com/dzm2020/gas/internal/..."` **仅在本仓库根模块内有效**。其他项目执行 `go get` 后**不能直接** import 本仓库的 `internal` 路径；可复用能力主要在 `pkg/`。详见 [`docs/lib.md`](docs/lib.md) 开头「模块边界」一节。
 
 ## 快速开始
 
@@ -86,3 +90,13 @@ _ = sys.SendMessage(msg)
 - `pkg/glog`、`pkg/lib/serializer`、`pkg/lib/component` 等：日志、序列化、组件管理。
 
 更多细节可参考仓库内 `docs/` 文档。
+
+## 文档索引
+
+| 文档 | 说明 |
+|------|------|
+| [`docs/lib.md`](docs/lib.md) | `pkg/lib` 子包说明与模块边界 |
+| [`docs/event.md`](docs/event.md) | Actor 事件总线；与 `pkg/lib/event` 的区别 |
+| [`docs/config.md`](docs/config.md) | 配置文件结构与安全注意事项 |
+| [`docs/message_flow.md`](docs/message_flow.md) | 消息流转 |
+| [`docs/api.md`](docs/api.md) | API 相关说明 |

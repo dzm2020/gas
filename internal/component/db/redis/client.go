@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/go-redis/redis/v8"
+	"github.com/redis/go-redis/v9"
 )
 
 // IsNil 判断错误是否为 Redis 的 Nil 错误（键不存在）

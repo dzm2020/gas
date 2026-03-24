@@ -1,10 +1,11 @@
 package redis
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
-	"github.com/go-redis/redis/v8"
+	"github.com/redis/go-redis/v9"
 )
 
 var (
@@ -40,7 +41,7 @@ func RunScript(rid int, name string, keys []string, args ...interface{}) (interf
 	}
 
 	// 调用原生 Run 方法（自动处理 EvalSha 回退）
-	return script.Run(client.Context(), client, keys, args...).Result()
+	return script.Run(context.Background(), client, keys, args...).Result()
 }
 
 // loadAllScripts 预加载所有脚本到 Redis（可选，提升首次执行性能）
@@ -49,7 +50,7 @@ func loadAllScripts(client *Client) error {
 	defer scriptsMu.RUnlock()
 
 	for name, script := range scripts {
-		_, err := script.Load(client.Context(), client).Result()
+		_, err := script.Load(context.Background(), client).Result()
 		if err != nil {
 			return fmt.Errorf("加载脚本[%s]失败: %w", name, err)
 		}

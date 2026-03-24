@@ -291,11 +291,20 @@ redis:
 
 ---
 
-## 9. 使用方式说明
+## 9. 安全与敏感配置
+
+- **勿将密钥、证书私钥、Redis/NATS 密码、加密中间件密钥等写入仓库**。生产环境应使用环境变量、密钥管理服务或部署时注入的配置，示例 YAML 中的占位符仅作格式说明。
+- **Gate TLS**：`tlsCertFile` / `tlsKeyFile` 指向的文件权限应受限；私钥不可提交到版本库。
+- **Gate 中间件**（加密、限流等）：加密插件涉及密钥交换与 XOR，限流涉及配额；参数多在代码中构造（见 `internal/component/gate/middleware`），勿在公开仓库中硬编码生产密钥或过高配额导致被滥用。
+- **集群**：Consul / NATS 的 `token`、`password` 等字段与 `redis.password` 同属敏感信息，按组织安全策略管理。
+
+---
+
+## 10. 使用方式说明
 
 - 配置文件路径在创建 Profile 时传入：`profile.New("config.yaml")`，由节点在启动时加载。
 - 未配置的顶层键会使用各模块的默认值（如 `logger`、`gate`、`cluster` 的默认实现）。
 - 各组件通过 `node.Profile().Get("键名", &结构体)` 读取对应片段，键名与上表中的顶层键一致（如 `cluster`、`logger`、`gate`、`redis`）。
 - duration 在 YAML 中可使用如 `1s`、`2m` 等 Go duration 格式；在 JSON 中为数字时一般按纳秒解析，具体以 Viper 行为为准。
 
-以上字段与代码中 `pkg/glog`、`pkg/cluster`、`pkg/discovery`、`internal/component/gate`、`internal/component/db/redis` 等处的 Config 结构一致，若有增减以代码为准。
+以上字段与代码中 `pkg/glog`、`pkg/cluster`、`pkg/discovery`、`internal/component/gate`、`internal/component/db/redis` 等处的 Config 结构一致，若有增减以代码为准。Redis 客户端依赖为 **`github.com/redis/go-redis/v9`**。
