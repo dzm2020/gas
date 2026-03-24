@@ -62,8 +62,9 @@ var (
 	typeOfActor        = reflect.TypeOf((*iface.IActor)(nil)).Elem()
 	typeOfActorContext = reflect.TypeOf((*iface.IContext)(nil)).Elem()
 	typeOfError        = reflect.TypeOf((*error)(nil)).Elem()
-	typeOfByteArray    = reflect.TypeOf(([]byte)(nil))
-	typeOfSessionPtr   = reflect.TypeOf((*iface.ISession)(nil))
+	typeOfByteArray  = reflect.TypeOf(([]byte)(nil))
+	// Implements 要求参数为接口类型，不能传 *iface.ISession 指针类型
+	typeOfISession = reflect.TypeOf((*iface.ISession)(nil)).Elem()
 )
 
 // AutoRegister 自动扫描并注册 actor 的所有导出方法
@@ -171,7 +172,7 @@ func (r *Router) createMethodEntry(method reflect.Method, methodType reflect.Typ
 func (r *Router) parseTwoParamEntry(entry *routerEntry, methodType reflect.Type) error {
 	param1Type := methodType.In(2)
 
-	if methodType.In(2).Implements(typeOfSessionPtr) {
+	if methodType.In(2).Implements(typeOfISession) {
 		// (actor, ctx, session iface.ISession) error - 仅会话消息
 		entry.handlerType = handlerTypeSessionOnly
 	} else {
@@ -195,7 +196,7 @@ func (r *Router) parseThreeParamEntry(entry *routerEntry, methodType reflect.Typ
 	param1Type := methodType.In(2)
 	param2Type := methodType.In(3)
 
-	if methodType.In(2).Implements(typeOfSessionPtr) {
+	if methodType.In(2).Implements(typeOfISession) {
 		// (actor, ctx, session *pb.Session, request) error - 会话消息
 		entry.handlerType = handlerTypeSession
 		requestType, isByte, err := parseRequestType(param2Type)
