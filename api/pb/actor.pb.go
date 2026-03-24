@@ -7,12 +7,11 @@
 package pb
 
 import (
+	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
+	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
-
-	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
-	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 )
 
 const (
@@ -228,9 +227,10 @@ func (x *Response) GetErrMsg() string {
 
 type Session struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            int64             `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
-	Agent         *Pid              `protobuf:"bytes,2,opt,name=agent,proto3" json:"agent,omitempty"`
-	Values        map[string]string `protobuf:"bytes,3,rep,name=values,proto3" json:"values,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Id            int64                  `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`      // 分布式唯一ID
+	Agent         *Pid                   `protobuf:"bytes,2,opt,name=agent,proto3" json:"agent,omitempty"` // agent actor pid
+	Msg           []byte                 `protobuf:"bytes,3,opt,name=msg,proto3" json:"msg,omitempty"`     // 客户端消息
+	Values        map[string]string      `protobuf:"bytes,4,rep,name=values,proto3" json:"values,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -275,6 +275,13 @@ func (x *Session) GetId() int64 {
 func (x *Session) GetAgent() *Pid {
 	if x != nil {
 		return x.Agent
+	}
+	return nil
+}
+
+func (x *Session) GetMsg() []byte {
+	if x != nil {
+		return x.Msg
 	}
 	return nil
 }
@@ -367,12 +374,13 @@ const file_actor_proto_rawDesc = "" +
 	"\asession\x18\a \x01(\v2\x0e.actor.SessionR\asession\"6\n" +
 	"\bResponse\x12\x12\n" +
 	"\x04data\x18\x01 \x01(\fR\x04data\x12\x16\n" +
-	"\x06errMsg\x18\x02 \x01(\tR\x06errMsg\"\xaa\x01\n" +
+	"\x06errMsg\x18\x02 \x01(\tR\x06errMsg\"\xbc\x01\n" +
 	"\aSession\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\x12 \n" +
 	"\x05agent\x18\x02 \x01(\v2\n" +
-	".actor.PidR\x05agent\x122\n" +
-	"\x06values\x18\x03 \x03(\v2\x1a.actor.Session.ValuesEntryR\x06values\x1a9\n" +
+	".actor.PidR\x05agent\x12\x10\n" +
+	"\x03msg\x18\x03 \x01(\fR\x03msg\x122\n" +
+	"\x06values\x18\x04 \x03(\v2\x1a.actor.Session.ValuesEntryR\x06values\x1a9\n" +
 	"\vValuesEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"`\n" +

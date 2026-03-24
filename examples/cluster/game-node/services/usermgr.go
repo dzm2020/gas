@@ -40,13 +40,16 @@ func (a *GameActor) OnMessage(ctx iface.IContext, msg interface{}) error {
 	return nil
 }
 
+// OnHandlerLogin 集群侧会话型 handler：s 非 nil，回写客户端请用 gate/session.Response（或 ResponseErr/Push），勿手写 Send。
 func (a *GameActor) OnHandlerLogin(ctx iface.IContext, s iface.ISession, request *common.LoginRequest) error {
 
 	glog.Infof("user mgr OnHandlerLogin received")
 
 	request.Uid = 123456
 
-	_ = session.Response(s, []byte("response message"))
+	if err := session.Response(s, []byte("response message")); err != nil {
+		return err
+	}
 
 	return nil
 }

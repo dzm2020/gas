@@ -21,12 +21,12 @@ type Session struct {
 	ctx iface.IContext
 }
 
-func (m *Session) GetId() int64 {
-	return m.Session.GetId()
-}
-
 func (m *Session) PB() *pb.Session {
 	return m.Session
+}
+
+func (m *Session) GetId() int64 {
+	return m.Session.GetId()
 }
 
 // Send
@@ -64,8 +64,11 @@ func (m *Session) SetUint64(key string, value uint64) {
 	m.Values[key] = strconv.FormatUint(value, 10)
 }
 
-// GetUint64 从 Values 取并解析为 uint64，
+// GetUint64 从 Values 取并解析为 uint64；未设置或解析失败时返回 0。需区分语义时请用 GetUint64OK。
 func (m *Session) GetUint64(key string) uint64 {
+	if m == nil || m.Values == nil {
+		return 0
+	}
 	valStr, ok := m.Values[key]
 	if !ok {
 		return 0
@@ -77,24 +80,6 @@ func (m *Session) GetUint64(key string) uint64 {
 	return val
 }
 
-// SetInt64 在 Values 中存 int64（不同步，需同步请调 SyncValues）。
-func (m *Session) SetInt64(key string, value int64) {
-	m.ensure()
-	m.Values[key] = strconv.FormatInt(value, 10)
-}
-
-// GetInt64 从 Values 取并解析为 int64，
-func (m *Session) GetInt64(key string) int64 {
-	valStr, ok := m.Values[key]
-	if !ok {
-		return 0
-	}
-	val, err := strconv.ParseInt(valStr, 10, 64)
-	if err != nil {
-		return 0
-	}
-	return val
-}
 func (m *Session) ensure() {
 	if m == nil {
 		return
@@ -102,4 +87,18 @@ func (m *Session) ensure() {
 	if m.Values == nil {
 		m.Values = make(map[string]string)
 	}
+}
+
+func (m *Session) SetMessage(msg []byte) {
+	if m == nil || m.Session == nil {
+		return
+	}
+	m.Msg = msg
+}
+
+func (m *Session) GetMessage() []byte {
+	if m == nil || m.Session == nil {
+		return nil
+	}
+	return m.Session.GetMsg()
 }

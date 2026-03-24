@@ -122,13 +122,13 @@ func EqualPid(o *Pid, other *Pid) bool {
 }
 
 type ISession interface {
-	GetId() int64
 	PB() *pb.Session
+	GetId() int64
 	Send(method string, bin []byte) error
 	SetString(key, value string)
 	GetString(key string) string
 	SetUint64(key string, value uint64)
 	GetUint64(key string) uint64
-	SetInt64(key string, value int64)
-	GetInt64(key string) int64
+	SetMessage(msg []byte)
+	GetMessage() []byte
 }

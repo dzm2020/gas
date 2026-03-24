@@ -96,18 +96,23 @@ func (agent *Agent) OnData(msg *protocol.Message) (err error) {
 		return err
 	}
 
-	agent.prepareRequest(msg)
+	if err = agent.prepareRequest(msg); err != nil {
+		return err
+	}
 
 	return agent.IBusinessHandler.OnRoute(agent, agent.session, msg.Data)
 }
 
-func (agent *Agent) prepareRequest(msg *protocol.Message) {
-	_ = session.SetMessage(agent.session, msg)
+func (agent *Agent) prepareRequest(msg *protocol.Message) error {
+	if err := session.SetMessage(agent.session, msg); err != nil {
+		return err
+	}
 
 	actorMessage := agent.ctx.Message()
 	actorMessage.To = agent.ctx.ID()
 	actorMessage.Data = msg.Data
 	actorMessage.Session = agent.session.PB()
+	return nil
 }
 
 // OnStop

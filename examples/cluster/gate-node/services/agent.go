@@ -26,6 +26,7 @@ func (a *BusinessHandler) OnStop(agent gateiface.IAgent) error {
 	return nil
 }
 
+// OnRoute 网关业务入口：s 由框架注入且非 nil；下行客户端用 session.Response/ResponseErr/Push；转发游戏节点用 ctx.ForwardMessage，会话快照在消息体 Session 字段中。
 func (a *BusinessHandler) OnRoute(agent gateiface.IAgent, s iface.ISession, data []byte) error {
 	glog.Info("OnData", zap.Int64("sessionId", s.GetId()))
 
@@ -49,10 +50,16 @@ func (a *BusinessHandler) OnRoute(agent gateiface.IAgent, s iface.ISession, data
 	//}
 	//glog.Info("OnHandlerSyncMessage", zap.Any("response", response))
 
-	// test gate send message  to client
-	_ = session.ResponseErr(s, 111)
-	_ = session.Response(s, []byte("test response"))
-	_ = session.Push(s, 1, 1, []byte("test push"))
+	// 下行示例：优先 session 包封装，并检查 error
+	if err := session.ResponseErr(s, 111); err != nil {
+		return err
+	}
+	if err := session.Response(s, []byte("test response")); err != nil {
+		return err
+	}
+	if err := session.Push(s, 1, 1, []byte("test push")); err != nil {
+		return err
+	}
 
 	// test cluster actor session
 	//  负载均衡
@@ -64,5 +71,4 @@ func (a *BusinessHandler) OnRoute(agent gateiface.IAgent, s iface.ISession, data
 	pid := iface.NewPidWithName("UserMgr", nodeId)
 	//  转发
 	return ctx.ForwardMessage(pid, "OnHandlerLogin")
-	return nil
 }
