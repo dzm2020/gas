@@ -134,7 +134,8 @@ func (a *actorContext) handleMessage(m *iface.ActorMessage) error {
 
 // execHandler 基于方法名执行处理器
 func (a *actorContext) execHandler(msg *pb.Message) ([]byte, error) {
-	return a.router.Handle(a, msg.GetMethod(), msg.GetSession(), msg.GetData())
+	s := NewSession(a, msg.GetSession())
+	return a.router.Handle(a, msg.GetMethod(), s, msg.GetData())
 }
 
 func (a *actorContext) Send(pid *iface.Pid, methodName string, request interface{}) (err error) {

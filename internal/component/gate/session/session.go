@@ -2,10 +2,9 @@ package session
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"errors"
-	"strconv"
 
-	"github.com/dzm2020/gas/api/pb"
 	"github.com/dzm2020/gas/internal/component/gate/codec"
 	"github.com/dzm2020/gas/internal/component/gate/protocol"
 	"github.com/dzm2020/gas/internal/iface"
@@ -16,24 +15,19 @@ import (
 // ClientMessage 为会话 Values 中存放当前请求协议消息（base64）的键，与 gate/session KeyMessage 一致。
 const ClientMessage = "clientMessage"
 
+// 与对端 Agent 路由方法名一致，用于 Actor 消息的 method 字段。
+const (
+	sessionMethodPush     = "HandlerPush"
+	sessionMethodSetValue = "HandlerSetValue"
+	sessionMethodShutDown = "HandlerShutdown"
+)
+
 // ErrSessionIsNil 表示 ctx.Message() 为空或未携带 Session。
 var ErrSessionIsNil = errors.New("session is nil")
 
-func ensureSessionPB(s *pb.Session) {
-	if s == nil {
-		return
-	}
-	if s.Values == nil {
-		s.Values = make(map[string]string)
-	}
-}
-
-// protocolMessageFromSessionPB 从 pb.Session.Values 解码当前请求协议消息（与网关 session 编码格式一致）。
-func protocolMessageFromSessionPB(s *pb.Session) *protocol.Message {
-	if s == nil || s.Values == nil {
-		return nil
-	}
-	value := s.Values[ClientMessage]
+// protocolMessageFromSession 从 pb.Session.Values 解码当前请求协议消息（与网关 session 编码格式一致）。
+func protocolMessageFromSession(s iface.ISession) *protocol.Message {
+	value := s.GetString(ClientMessage)
 	if value == "" {
 		return nil
 	}
@@ -50,139 +44,81 @@ func protocolMessageFromSessionPB(s *pb.Session) *protocol.Message {
 //	@Description: 设置当前请求消息并写入 Values（base64），供集群序列化后 GetMessage 使用。
 //	@receiver a
 //	@param msg
-func SetMessage(s *pb.Session, msg *protocol.Message) error {
+func SetMessage(s iface.ISession, msg *protocol.Message) error {
 	if s == nil {
 		return ErrSessionIsNil
 	}
 	if msg == nil {
-		delete(s.Values, ClientMessage)
+		s.SetString(ClientMessage, "")
 		return nil
 	}
 	value, err := codec.Encode(msg)
 	if err != nil {
 		glog.Warn("session.setMessageEncoded encode failed", zap.Error(err))
-		delete(s.Values, ClientMessage)
+		s.SetString(ClientMessage, "")
 		return nil
 	}
-	ensureSessionPB(s)
-	SetString(s, ClientMessage, base64.StdEncoding.EncodeToString(value))
+	s.SetString(ClientMessage, base64.StdEncoding.EncodeToString(value))
 	return nil
 }
 
-func SetValue(ctx iface.IContext, s *pb.Session, values map[string]string) error {
+func SetValue(s iface.ISession, values map[string]string) error {
 	if s == nil {
 		return ErrSessionIsNil
 	}
-	ensureSessionPB(s)
-	trans := newTransport(ctx, s.GetAgent())
-	return trans.setValue(values)
+	bin, err := json.Marshal(values)
+	if err != nil {
+		return err
+	}
+	return s.Send(sessionMethodSetValue, bin)
 }
 
 // Response 向对端推送业务响应（与 type Response 区分）。
-func Response(ctx iface.IContext, s *pb.Session, data []byte) error {
+func Response(s iface.ISession, data []byte) error {
 	if s == nil {
 		return ErrSessionIsNil
 	}
 	clientMsg := protocol.NewData(data)
-	clientMsg.Copy(protocolMessageFromSessionPB(s))
-	trans := newTransport(ctx, s.GetAgent())
+	clientMsg.Copy(protocolMessageFromSession(s))
 	bin, err := codec.Encode(clientMsg)
 	if err != nil {
 		return err
 	}
-	return trans.push(bin)
+	return s.Send(sessionMethodPush, bin)
 }
 
 // ResponseErr 设置错误码并推送无 body 消息。
-func ResponseErr(ctx iface.IContext, s *pb.Session, errCode uint16) error {
+func ResponseErr(s iface.ISession, errCode uint16) error {
 	if s == nil {
 		return ErrSessionIsNil
 	}
 	clientMsg := protocol.NewErr(errCode)
-	clientMsg.Copy(protocolMessageFromSessionPB(s))
-	trans := newTransport(ctx, s.GetAgent())
+	clientMsg.Copy(protocolMessageFromSession(s))
 	bin, err := codec.Encode(clientMsg)
 	if err != nil {
 		return err
 	}
-	return trans.push(bin)
+	return s.Send(sessionMethodPush, bin)
 }
 
 // Push 按 cmd/act 向对端推送带 body 消息。
-func Push(ctx iface.IContext, s *pb.Session, cmd, act uint8, data []byte) error {
+func Push(s iface.ISession, cmd, act uint8, data []byte) error {
 	if s == nil {
 		return ErrSessionIsNil
 	}
 	clientMsg := protocol.New(cmd, act, data)
-	trans := newTransport(ctx, s.GetAgent())
+
 	bin, err := codec.Encode(clientMsg)
 	if err != nil {
 		return err
 	}
-	return trans.push(bin)
+	return s.Send(sessionMethodPush, bin)
 }
 
 // Shutdown 通知对端关闭连接（经 HandlerShutdown）。
-func Shutdown(ctx iface.IContext, s *pb.Session) error {
+func Shutdown(s iface.ISession) error {
 	if s == nil {
 		return ErrSessionIsNil
 	}
-	trans := newTransport(ctx, s.GetAgent())
-	return trans.closeRemote()
-}
-
-// SetString 设置 Values 中的字符串（不同步到对端）。
-func SetString(s *pb.Session, key, value string) {
-	ensureSessionPB(s)
-	s.Values[key] = value
-}
-
-// GetString 从 Values 取字符串，不存在返回空串。
-func GetString(s *pb.Session, key string) string {
-	if s == nil || s.Values == nil {
-		return ""
-	}
-	return s.Values[key]
-}
-
-// SetUint64 在 Values 中存 uint64
-func SetUint64(s *pb.Session, key string, value uint64) {
-	s.Values[key] = strconv.FormatUint(value, 10)
-}
-
-// GetUint64 从 Values 取并解析为 uint64，
-func GetUint64(s *pb.Session, key string) uint64 {
-	valStr, ok := s.Values[key]
-	if !ok {
-		return 0
-	}
-	val, err := strconv.ParseUint(valStr, 10, 64)
-	if err != nil {
-		return 0
-	}
-	return val
-}
-
-// SetInt64 在 Values 中存 int64（不同步，需同步请调 SyncValues）。
-func SetInt64(s *pb.Session, key string, value int64) {
-	ensureSessionPB(s)
-	s.Values[key] = strconv.FormatInt(value, 10)
-}
-
-// GetInt64 从 Values 取并解析为 int64，
-func GetInt64(s *pb.Session, key string) int64 {
-	valStr, ok := s.Values[key]
-	if !ok {
-		return 0
-	}
-	val, err := strconv.ParseInt(valStr, 10, 64)
-	if err != nil {
-		return 0
-	}
-	return val
-}
-
-// GetID 返回当前消息中的会话 Id
-func GetID(s *pb.Session) int64 {
-	return s.Id
+	return s.Send(sessionMethodShutDown, nil)
 }

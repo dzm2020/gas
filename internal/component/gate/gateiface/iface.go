@@ -4,7 +4,6 @@ package gateiface
 import (
 	"context"
 
-	"github.com/dzm2020/gas/api/pb"
 	"github.com/dzm2020/gas/internal/component/gate/protocol"
 	"github.com/dzm2020/gas/internal/iface"
 	"github.com/dzm2020/gas/pkg/network"
@@ -25,7 +24,7 @@ type IGate interface {
 type IAgent interface {
 	Context() iface.IContext
 	GetEntity() network.IConnection
-	GetSession() *pb.Session
+	GetSession() iface.ISession
 	SetMiddleware(chain []IMiddleware)
 	AppendMiddleware(middlewares ...IMiddleware)
 	GetMiddleware() []IMiddleware
@@ -46,7 +45,7 @@ type IMiddleware interface {
 // IBusinessHandler 业务侧实现的接口：初始化、按消息路由、停止时清理。
 type IBusinessHandler interface {
 	OnInit(agent IAgent) error
-	OnRoute(agent IAgent, data []byte) error
+	OnRoute(agent IAgent, session iface.ISession, data []byte) error
 	OnStop(agent IAgent) error
 }
 
@@ -56,7 +55,7 @@ type AgentHandler struct{}
 func (a *AgentHandler) OnInit(agent IAgent) error {
 	return nil
 }
-func (a *AgentHandler) OnRoute(agent IAgent, data []byte) error {
+func (a *AgentHandler) OnRoute(agent IAgent, session iface.ISession, data []byte) error {
 	return nil
 }
 func (a *AgentHandler) OnStop(agent IAgent) error {

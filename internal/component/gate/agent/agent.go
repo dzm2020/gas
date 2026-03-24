@@ -6,8 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/duke-git/lancet/v2/maputil"
 	"github.com/dzm2020/gas/api/pb"
+	"github.com/dzm2020/gas/internal/actor"
 	"github.com/dzm2020/gas/internal/component/gate/codec"
 	"github.com/dzm2020/gas/internal/component/gate/gateiface"
 	"github.com/dzm2020/gas/internal/component/gate/middleware"
@@ -52,7 +52,7 @@ type Agent struct {
 	iface.Actor
 	gateiface.IBusinessHandler
 	ctx         iface.IContext
-	session     *pb.Session
+	session     iface.ISession
 	entity      network.IConnection
 	middlewares []gateiface.IMiddleware
 }
@@ -72,11 +72,12 @@ func (agent *Agent) OnInit(ctx iface.IContext, params []interface{}) error {
 	if err != nil {
 		return xerror.Wrapf(err, "uid.NextId for session")
 	}
-	agent.session = &pb.Session{
+
+	agent.session = actor.NewSession(ctx, &pb.Session{
 		Id:     sessionID,
 		Agent:  ctx.ID(),
 		Values: make(map[string]string),
-	}
+	})
 
 	agent.entity = entity
 	return agent.IBusinessHandler.OnInit(agent)
@@ -97,16 +98,16 @@ func (agent *Agent) OnData(msg *protocol.Message) (err error) {
 
 	agent.prepareRequest(msg)
 
-	return agent.IBusinessHandler.OnRoute(agent, msg.Data)
+	return agent.IBusinessHandler.OnRoute(agent, agent.session, msg.Data)
 }
 
 func (agent *Agent) prepareRequest(msg *protocol.Message) {
-	session.SetMessage(agent.session, msg)
+	_ = session.SetMessage(agent.session, msg)
 
 	actorMessage := agent.ctx.Message()
 	actorMessage.To = agent.ctx.ID()
 	actorMessage.Data = msg.Data
-	actorMessage.Session = agent.GetSession()
+	actorMessage.Session = agent.session.PB()
 }
 
 // OnStop
@@ -142,7 +143,7 @@ func (agent *Agent) Context() iface.IContext {
 //	@Description:获取session
 //	@receiver agent
 //	@return *session.Session
-func (agent *Agent) GetSession() *pb.Session {
+func (agent *Agent) GetSession() iface.ISession {
 	return agent.session
 }
 
@@ -204,7 +205,9 @@ func (agent *Agent) Push(msg *protocol.Message) (err error) {
 //	@param values
 //	@return error
 func (agent *Agent) SetValues(values map[string]string) error {
-	agent.session.Values = maputil.Merge(agent.session.Values, values)
+	for k, v := range values {
+		agent.session.SetString(k, v)
+	}
 	return nil
 }
 

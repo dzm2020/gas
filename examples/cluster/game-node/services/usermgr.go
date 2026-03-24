@@ -1,7 +1,6 @@
 package services
 
 import (
-	"github.com/dzm2020/gas/api/pb"
 	"github.com/dzm2020/gas/examples/cluster/common"
 	"github.com/dzm2020/gas/internal/component/gate/session"
 	"github.com/dzm2020/gas/internal/iface"
@@ -41,13 +40,13 @@ func (a *GameActor) OnMessage(ctx iface.IContext, msg interface{}) error {
 	return nil
 }
 
-func (a *GameActor) OnHandlerLogin(ctx iface.IContext, s *pb.Session, request *common.LoginRequest) error {
+func (a *GameActor) OnHandlerLogin(ctx iface.IContext, s iface.ISession, request *common.LoginRequest) error {
 
 	glog.Infof("user mgr OnHandlerLogin received")
 
 	request.Uid = 123456
 
-	session.Response(ctx, s, []byte("response message"))
+	_ = session.Response(s, []byte("response message"))
 
 	return nil
 }

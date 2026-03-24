@@ -84,7 +84,7 @@ type (
 	}
 
 	IRouter interface {
-		Handle(ctx IContext, methodName string, session *pb.Session, data []byte) ([]byte, error)
+		Handle(ctx IContext, methodName string, session ISession, data []byte) ([]byte, error)
 		HasRoute(methodName string) bool
 		AutoRegister(actor IActor)
 	}
@@ -121,4 +121,12 @@ func EqualPid(o *Pid, other *Pid) bool {
 		return true
 	}
 	return o.GetActorName() == other.GetActorName()
+}
+
+type ISession interface {
+	GetId() int64
+	PB() *pb.Session
+	Send(method string, bin []byte) error
+	SetString(key, value string)
+	GetString(key string) string
 }
