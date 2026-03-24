@@ -165,13 +165,6 @@ func (a *actorContext) ForwardMessage(pid *iface.Pid, methodName string) error {
 	return a.system.SendMessage(msg)
 }
 
-func (a *actorContext) GetSession() *pb.Session {
-	if a.msg == nil {
-		return nil
-	}
-	return a.msg.GetSession()
-}
-
 func (a *actorContext) Shutdown() error {
 	return a.process.Shutdown()
 }

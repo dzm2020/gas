@@ -14,9 +14,9 @@ import (
 	"github.com/dzm2020/gas/internal/node"
 )
 
-// TestSingleGate 为集成测试：会加载 ../conf/gate-node-config.yaml，需 consul、nats 等依赖。
+// TestGate 为集成测试：会加载 ../conf/gate-node-config.yaml，需 consul、nats 等依赖。
 // 若本地未启动发现与消息队列，测试会 Skip。
-func TestSingleGate(t *testing.T) {
+func TestGate(t *testing.T) {
 	Node = node.New()
 	Node.SetConfigPath("../conf/gate-node-config.yaml")
 	Node.SetConfigType("yaml")

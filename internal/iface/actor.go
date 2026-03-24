@@ -61,7 +61,6 @@ type (
 		GetName() string
 		Actor() IActor
 		Message() *ActorMessage
-		GetSession() *pb.Session
 		Process() IProcess
 		System() ISystem
 		SetCallTimeout(timeout time.Duration)
@@ -69,7 +68,6 @@ type (
 		Call(to *Pid, methodName string, request interface{}, reply interface{}) error
 		SendMessage(message *ActorMessage) (err error)
 		CallMessage(message *ActorMessage) (data []byte, err error)
-		// Subscribe 在本 Actor（ctx.ID()）上订阅事件；PublishLocal / PublishCluster 委托本节点 ISystem。
 		Subscribe(topic string, handler EventHandler) (IEventSubscription, error)
 		PublishLocal(topic string, payload []byte)
 		PublishCluster(topic string, payload []byte) error
@@ -129,4 +127,8 @@ type ISession interface {
 	Send(method string, bin []byte) error
 	SetString(key, value string)
 	GetString(key string) string
+	SetUint64(key string, value uint64)
+	GetUint64(key string) uint64
+	SetInt64(key string, value int64)
+	GetInt64(key string) int64
 }
