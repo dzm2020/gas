@@ -10,7 +10,6 @@ import (
 	"github.com/dzm2020/gas/internal/component/gate/protocol"
 	"github.com/dzm2020/gas/internal/iface"
 	"github.com/dzm2020/gas/pkg/glog"
-	"github.com/dzm2020/gas/pkg/lib/xerror"
 	"go.uber.org/zap"
 )
 
@@ -51,18 +50,23 @@ func protocolMessageFromSessionPB(s *pb.Session) *protocol.Message {
 //	@Description: 设置当前请求消息并写入 Values（base64），供集群序列化后 GetMessage 使用。
 //	@receiver a
 //	@param msg
-func SetMessage(s *pb.Session, msg *protocol.Message) {
+func SetMessage(s *pb.Session, msg *protocol.Message) error {
+	if s == nil {
+		return ErrSessionIsNil
+	}
 	if msg == nil {
 		delete(s.Values, ClientMessage)
-		return
+		return nil
 	}
 	value, err := codec.Encode(msg)
 	if err != nil {
 		glog.Warn("session.setMessageEncoded encode failed", zap.Error(err))
 		delete(s.Values, ClientMessage)
-		return
+		return nil
 	}
+	ensureSessionPB(s)
 	SetString(s, ClientMessage, base64.StdEncoding.EncodeToString(value))
+	return nil
 }
 
 func SetValue(ctx iface.IContext, s *pb.Session, values map[string]string) error {
@@ -84,7 +88,7 @@ func Response(ctx iface.IContext, s *pb.Session, data []byte) error {
 	trans := newTransport(ctx, s.GetAgent())
 	bin, err := codec.Encode(clientMsg)
 	if err != nil {
-		return xerror.Wrapf(err, "session response encode failed")
+		return err
 	}
 	return trans.push(bin)
 }
@@ -99,7 +103,7 @@ func ResponseErr(ctx iface.IContext, s *pb.Session, errCode uint16) error {
 	trans := newTransport(ctx, s.GetAgent())
 	bin, err := codec.Encode(clientMsg)
 	if err != nil {
-		return xerror.Wrapf(err, "session.ResponseErr encode failed")
+		return err
 	}
 	return trans.push(bin)
 }

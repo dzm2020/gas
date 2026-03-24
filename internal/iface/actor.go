@@ -61,6 +61,7 @@ type (
 		GetName() string
 		Actor() IActor
 		Message() *ActorMessage
+		GetSession() *pb.Session
 		Process() IProcess
 		System() ISystem
 		SetCallTimeout(timeout time.Duration)
