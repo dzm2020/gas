@@ -1,0 +1,27 @@
+include:
+  - "cluster.yaml"
+  - "logger.yaml"
+
+node:
+  id: 1
+  kind: gate-node-test
+  address: 127.0.0.1
+  port: 9002
+
+
+gate:
+  address: tcp://127.0.0.1:9002
+  keepAlive: 60
+  sendChanSize: 1024
+  readBufSize: 4096
+  maxConn: 10000
+
+
+
+
+
+
+
+
+
+

@@ -2,7 +2,6 @@ package node
 
 import (
 	"context"
-	"errors"
 	"os"
 	"os/signal"
 	"runtime/debug"
@@ -26,15 +25,15 @@ import (
 )
 
 // New 创建节点实例
-func New() *Node {
+func New(path string) *Node {
 	node := &Node{
 		Member:     new(iface.Member),
 		serializer: serializer.Json,
 		IManager:   component.NewComponentsMgr[iface.INode](),
-		path:       "config.yml",
-		configType: "yaml",
+		path:       path,
 	}
 	node.ctx, node.cancel = context.WithCancel(context.Background())
+	node.init()
 	return node
 }
 
@@ -44,23 +43,63 @@ type Node struct {
 	*iface.Member
 	component.IManager[iface.INode]
 	path       string
-	configType string
 	serializer serializer.ISerializer
 	panicHook  func(entry zapcore.Entry)
 	ctx        context.Context
 	cancel     context.CancelFunc
+	components []component.IComponent[iface.INode]
+}
+
+func (n *Node) init() {
+	//  初始配置文件
+	profile := compprofile.New(n.path)
+	//  初始节点信息
+	if err := profile.Get("node", n.Member); err != nil {
+		panic(err)
+	}
+
+	//  初始化日志
+	logger := complogger.New(func(entry zapcore.Entry) {
+		if n.panicHook != nil {
+			n.panicHook(entry)
+		}
+	})
+
+	// 注册组件（Profile 需为首个，负责加载配置并填充 node.Member）
+	n.components = []component.IComponent[iface.INode]{
+		profile,
+		logger,
+	}
+	//  初始化集群
+	if !profile.Standalone() {
+		n.components = append(n.components, compcluster.New())
+	}
+	//  初始化actor system
+	n.components = append(n.components, compsystem.New())
+
+	uid.Init(int64(n.GetID()))
+	grs.SetPanicHandler(func(err interface{}) {
+		glog.Panic("panic", zap.Any("err", err), zap.String("stack", string(debug.Stack())))
+	})
+
+	glog.Info("节点初始化完成", zap.String("path", n.path))
 }
 
 func (n *Node) Info() *iface.Member {
 	return n.Member
 }
 
-func (n *Node) SetConfigPath(path string) {
-	n.path = path
+// SetSerializer 设置序列化器
+func (n *Node) SetSerializer(ser serializer.ISerializer) {
+	n.serializer = ser
 }
 
-func (n *Node) SetConfigType(typ string) {
-	n.configType = typ
+func (n *Node) SetPanicHook(hook func(entry zapcore.Entry)) {
+	n.panicHook = hook
+}
+
+func (n *Node) Serializer() serializer.ISerializer {
+	return n.serializer
 }
 
 func (n *Node) System() iface.ISystem {
@@ -87,36 +126,10 @@ func (n *Node) Profile() iface.IProfile {
 	return c.(iface.IProfile)
 }
 
-// SetSerializer 设置序列化器
-func (n *Node) SetSerializer(ser serializer.ISerializer) {
-	n.serializer = ser
-}
-
-func (n *Node) SetPanicHook(hook func(entry zapcore.Entry)) {
-	n.panicHook = hook
-}
-
-func (n *Node) Serializer() serializer.ISerializer {
-	return n.serializer
-}
-
 func (n *Node) Startup(comps ...component.IComponent[iface.INode]) (err error) {
 	defer xerror.PrintCoreDump()
 
-	grs.SetPanicHandler(func(err interface{}) {
-		glog.Panic("panic", zap.Any("err", err), zap.String("stack", string(debug.Stack())))
-	})
-
-	// 注册组件（Profile 需为首个，负责加载配置并填充 node.Member）
-	components := []component.IComponent[iface.INode]{
-		compprofile.New(n.path, n.configType),
-		complogger.New(n.panicHook),
-		compcluster.New(),
-		compsystem.New(),
-	}
-
-	uid.Init(int64(n.GetID()))
-
+	components := n.components
 	components = append(components, comps...)
 	for _, comp := range components {
 		if err = n.IManager.Register(comp); err != nil {
@@ -130,14 +143,12 @@ func (n *Node) Startup(comps ...component.IComponent[iface.INode]) (err error) {
 		return
 	}
 
-	glog.Info("节点启动完成", zap.String("path", n.path), zap.Strings("component", n.IManager.GetComponentNames()))
+	glog.Info("节点启动完成", zap.Strings("component", n.IManager.GetComponentNames()))
 
-	//  所有组件注册完成后,在集群中注册节点（非单节点模式下需已注册 cluster 组件）
-	if n.Cluster() == nil {
-		return errors.New("cluster 组件未注册，无法注册节点；非单节点模式请在 Startup 前注册 cluster 组件")
-	}
-	if err = n.Cluster().Register(n.Info()); err != nil {
-		return err
+	if !n.Profile().Standalone() {
+		if err = n.Cluster().Register(n.Info()); err != nil {
+			return err
+		}
 	}
 
 	// 阻塞等待进程终止信号

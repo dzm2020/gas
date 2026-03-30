@@ -8,18 +8,16 @@ package gate_node
 import (
 	"testing"
 
+	"github.com/dzm2020/gas"
 	. "github.com/dzm2020/gas/examples/cluster/common"
 	"github.com/dzm2020/gas/examples/cluster/gate-node/services"
 	"github.com/dzm2020/gas/internal/component/gate"
-	"github.com/dzm2020/gas/internal/node"
 )
 
 // TestGate 为集成测试：会加载 ../conf/gate-node-config.yaml，需 consul、nats 等依赖。
 // 若本地未启动发现与消息队列，测试会 Skip。
 func TestGate(t *testing.T) {
-	Node = node.New()
-	Node.SetConfigPath("../conf/gate-node-config.yaml")
-	Node.SetConfigType("yaml")
+	Node = gas.Configure("../conf/node_gate.yaml")
 
 	gateComponent := gate.NewComponent(&services.BusinessHandler{})
 

@@ -1,26 +1,3 @@
-node:
-  id: 1
-  kind: gate-node-test
-  address: 127.0.0.1
-  port: 9002
-
-logger:
-  path: ./logs/app.log
-  level: info
-  printConsole: true
-  file:
-    maxSize: 50
-    maxBackups: 100
-    maxAge: 30
-    compress: false
-    localTime: true
-gate:
-  address: tcp://127.0.0.1:9002
-  keepAlive: 60
-  sendChanSize: 1024
-  readBufSize: 4096
-  maxConn: 10000
-
 cluster:
   name: gas-node
   discovery:
@@ -47,11 +24,3 @@ cluster:
       retryOnFailedConnect: true
       servers:
         - nats://127.0.0.1:4222
-
-
-
-
-
-
-
-

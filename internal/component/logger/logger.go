@@ -6,8 +6,8 @@ import (
 	"github.com/dzm2020/gas/internal/iface"
 	"github.com/dzm2020/gas/pkg/glog"
 	"github.com/dzm2020/gas/pkg/lib/component"
-
 	"go.uber.org/zap"
+
 	"go.uber.org/zap/zapcore"
 )
 
@@ -49,8 +49,5 @@ func (c *Logger) Start(ctx context.Context, node iface.INode) error {
 }
 
 func (c *Logger) Stop(ctx context.Context) error {
-	if err := glog.Stop(); err != nil {
-		return err
-	}
-	return nil
+	return glog.Stop()
 }

@@ -7,6 +7,7 @@ import (
 	"github.com/dzm2020/gas/pkg/cluster"
 	"github.com/dzm2020/gas/pkg/glog"
 	"github.com/dzm2020/gas/pkg/lib/component"
+	"github.com/dzm2020/gas/pkg/lib/fileutil"
 	"github.com/spf13/viper"
 )
 
@@ -17,14 +18,16 @@ var _ iface.IProfile = (*Profile)(nil)
 // Profile 配置加载组件：持有一个 viper 实例
 type Profile struct {
 	component.BaseComponent[iface.INode]
-	path       string
-	configType string
-	vp         *viper.Viper
+	vp *viper.Viper
 }
 
 // New 创建配置组件，path 为配置文件路径。
-func New(path string, configType string) *Profile {
-	return &Profile{path: path, configType: configType}
+func New(path string) *Profile {
+	vp, err := fileutil.ViperLoadConfigWithInclude(path)
+	if err != nil {
+		panic(err)
+	}
+	return &Profile{vp: vp}
 }
 
 func (c *Profile) Name() string {
@@ -32,21 +35,15 @@ func (c *Profile) Name() string {
 }
 
 func (c *Profile) Start(ctx context.Context, node iface.INode) error {
-	c.vp = viper.New()
-	c.vp.SetConfigFile(c.path)
-	c.vp.SetConfigType(c.configType)
-	if err := c.vp.ReadInConfig(); err != nil {
-		return err
-	}
-	return c.vp.UnmarshalKey("node", node.Info())
+	return nil
 }
 
 func (c *Profile) Get(key string, cfg interface{}) error {
 	return c.vp.UnmarshalKey(key, cfg)
 }
 
-func (c *Profile) IsSingleNodeMode() bool {
-	return c.vp.GetBool("single-node")
+func (c *Profile) Standalone() bool {
+	return c.vp.GetBool("standalone")
 }
 
 func (c *Profile) GetCluster() *cluster.Config {

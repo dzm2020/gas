@@ -25,15 +25,13 @@ type (
 		Get(key string, cfg interface{}) error
 		GetCluster() *cluster.Config
 		GetLogger() *glog.Config
-		IsSingleNodeMode() bool
+		Standalone() bool
 	}
 
 	INode interface {
 		IMember
 		component.IManager[INode]
 		Info() *Member
-		SetConfigPath(path string)
-		SetConfigType(typ string)
 		Serializer() serializer.ISerializer
 		SetSerializer(ser serializer.ISerializer)
 		System() ISystem

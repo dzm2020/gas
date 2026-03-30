@@ -4,18 +4,15 @@ import (
 	"context"
 	"testing"
 
+	"github.com/dzm2020/gas"
 	. "github.com/dzm2020/gas/examples/cluster/common"
 	"github.com/dzm2020/gas/examples/cluster/game-node/services"
 	"github.com/dzm2020/gas/internal/iface"
-	"github.com/dzm2020/gas/internal/node"
 	"github.com/dzm2020/gas/pkg/lib/component"
 )
 
 func TestGameNode(t *testing.T) {
-	Node = node.New()
-
-	Node.SetConfigPath("../conf/game-node-config.yaml")
-	Node.SetConfigType("yaml")
+	Node = gas.Configure("../conf/node_game.yaml")
 
 	_ = Node.Startup(&GameNode{})
 }

@@ -25,7 +25,7 @@ func (c *System) Name() string {
 }
 
 func (c *System) Start(ctx context.Context, node iface.INode) error {
-	if node.Profile().IsSingleNodeMode() {
+	if node.Profile().Standalone() {
 		c.ISystem = actor.NewSystem(node.GetID(), node.Serializer())
 		return nil
 	}

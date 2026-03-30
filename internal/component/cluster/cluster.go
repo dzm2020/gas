@@ -31,9 +31,6 @@ func (r *Cluster) Name() string {
 }
 
 func (r *Cluster) Start(ctx context.Context, node iface.INode) (err error) {
-	if node.Profile().IsSingleNodeMode() {
-		return
-	}
 	r.node = node
 
 	conf := node.Profile().GetCluster()

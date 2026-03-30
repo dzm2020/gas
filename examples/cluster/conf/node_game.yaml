@@ -1,0 +1,8 @@
+node:
+  id: 1001
+  kind: gate-node-test
+  address: 127.0.0.2
+  port: 9003
+  tags: ["UserMgr"]
+
+

@@ -1,0 +1,10 @@
+logger:
+  path: ./logs/app.log
+  level: info
+  printConsole: true
+  file:
+    maxSize: 50
+    maxBackups: 100
+    maxAge: 30
+    compress: false
+    localTime: true

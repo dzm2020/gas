@@ -1,0 +1,7 @@
+include:
+  - "db.yaml"
+
+app:
+  name: "my-app"
+  port: 8080
+
